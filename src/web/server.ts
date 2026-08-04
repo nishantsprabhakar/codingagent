@@ -7,6 +7,8 @@ import { PermissionManager, type PermissionDecision } from "../permissions";
 import { resolveInRoot } from "../tools/paths";
 import { WebSocketReporter, createConfirmFn } from "./reporter";
 import { loadRecentFolders, addRecentFolder } from "../recentFolders";
+import { saveLastModel } from "../preferences";
+import { listOpenRouterModels, GROQ_MODELS } from "../providers/openrouterModels";
 import type { ClientMessage, ServerMessage } from "./protocol";
 import type { LlmConfig } from "../types";
 
@@ -26,11 +28,12 @@ const MIME: Record<string, string> = {
 
 export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: boolean, port: number): void {
   let currentRoot = initialRoot;
+  let currentModel = llmConfig.model;
   addRecentFolder(currentRoot);
 
   const httpServer = http.createServer((req, res) => {
     try {
-      handleHttp(req, res, currentRoot);
+      handleHttp(req, res, currentRoot, llmConfig.provider);
     } catch (err: any) {
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end(`Internal error: ${err.message ?? err}`);
@@ -48,10 +51,10 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
     const reporter = new WebSocketReporter(send);
     const confirmFn = createConfirmFn(send, pending);
     const permissions = new PermissionManager(yolo, confirmFn);
-    let agent = new Agent(currentRoot, llmConfig, permissions, reporter);
+    let agent = new Agent(currentRoot, { ...llmConfig, model: currentModel }, permissions, reporter);
     agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
 
-    send({ type: "init", root: currentRoot, provider: llmConfig.provider, model: llmConfig.model, yolo, recentFolders: loadRecentFolders() });
+    send({ type: "init", root: currentRoot, provider: llmConfig.provider, model: currentModel, yolo, recentFolders: loadRecentFolders() });
 
     ws.on("message", async (raw) => {
       let msg: ClientMessage;
@@ -81,9 +84,19 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
           await agent.dispose();
           currentRoot = target;
           addRecentFolder(currentRoot);
-          agent = new Agent(currentRoot, llmConfig, permissions, reporter);
+          agent = new Agent(currentRoot, { ...llmConfig, model: currentModel }, permissions, reporter);
           agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
-          send({ type: "init", root: currentRoot, provider: llmConfig.provider, model: llmConfig.model, yolo, recentFolders: loadRecentFolders() });
+          send({ type: "init", root: currentRoot, provider: llmConfig.provider, model: currentModel, yolo, recentFolders: loadRecentFolders() });
+        } else if (msg.type === "switch_model") {
+          const model = msg.model?.trim();
+          if (!model) {
+            reporter.error("No model specified.");
+            return;
+          }
+          currentModel = model;
+          agent.setModel(model);
+          saveLastModel(llmConfig.provider, model);
+          send({ type: "model_changed", model });
         }
       } catch (err: any) {
         // A single bad request/response should never take the whole server
@@ -105,19 +118,33 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
     console.log(`\ncoding-agent web UI running at http://localhost:${port}`);
     console.log(`root: ${currentRoot}`);
     console.log(
-      `model: ${llmConfig.provider} · ${llmConfig.model}${yolo ? "  (yolo mode: all actions auto-approved)" : ""}\n`
+      `model: ${llmConfig.provider} · ${currentModel}${yolo ? "  (yolo mode: all actions auto-approved)" : ""}\n`
     );
   });
 }
 
-function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: string): void {
+function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: string, provider: string): void {
   const url = new URL(req.url ?? "/", "http://localhost");
 
   if (url.pathname === "/api/tree") return handleTree(url, res, root);
   if (url.pathname === "/api/file") return handleFile(url, res, root);
   if (url.pathname === "/api/upload" && req.method === "POST") return handleUpload(req, url, res, root);
+  if (url.pathname === "/api/models") return void handleModels(res, provider);
 
   serveStatic(url.pathname, res);
+}
+
+async function handleModels(res: http.ServerResponse, provider: string): Promise<void> {
+  try {
+    if (provider === "groq") return sendJson(res, 200, { models: GROQ_MODELS });
+    if (provider === "openrouter") return sendJson(res, 200, { models: await listOpenRouterModels() });
+    return sendJson(res, 200, {
+      models: [],
+      note: "Pollinations doesn't support model selection for tool-calling.",
+    });
+  } catch (err: any) {
+    sendJson(res, 502, { error: `Failed to fetch model list: ${err.message ?? err}` });
+  }
 }
 
 function handleTree(url: URL, res: http.ServerResponse, root: string): void {

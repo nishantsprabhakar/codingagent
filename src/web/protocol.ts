@@ -10,10 +10,12 @@ export type ServerMessage =
   | { type: "error"; text: string }
   | { type: "thinking"; value: boolean }
   | { type: "tasks"; tasks: TaskItem[] }
-  | { type: "history"; items: HistoryItem[] };
+  | { type: "history"; items: HistoryItem[] }
+  | { type: "model_changed"; model: string };
 
 export type ClientMessage =
   | { type: "user_message"; text: string }
   | { type: "permission_response"; id: string; decision: PermissionDecision }
   | { type: "reset" }
-  | { type: "switch_folder"; path: string };
+  | { type: "switch_folder"; path: string }
+  | { type: "switch_model"; model: string };

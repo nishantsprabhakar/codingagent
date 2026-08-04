@@ -34,6 +34,11 @@
     folderCancel: document.getElementById("folder-cancel"),
     folderSwitch: document.getElementById("folder-switch"),
     uploadInput: document.getElementById("upload-input"),
+    modelOverlay: document.getElementById("model-overlay"),
+    modelSearch: document.getElementById("model-search"),
+    modelList: document.getElementById("model-list"),
+    modelCancel: document.getElementById("model-cancel"),
+    modelProviderNote: document.getElementById("model-provider-note"),
   };
 
   const TOOL_ICONS = {
@@ -58,6 +63,9 @@
     pendingPermissionId: null,
     currentRoot: "",
     recentFolders: [],
+    currentProvider: "",
+    currentModel: "",
+    modelCache: null,
   };
 
   function escapeHtml(s) {
@@ -139,10 +147,11 @@
         const switched = state.currentRoot && state.currentRoot !== msg.root;
         state.currentRoot = msg.root;
         state.recentFolders = msg.recentFolders || [];
+        state.currentProvider = msg.provider;
+        state.currentModel = msg.model;
         el.cwdLabel.textContent = msg.root;
         el.cwdLabel.title = msg.root;
-        el.modelBadge.textContent = msg.provider ? `${msg.provider} · ${msg.model}` : msg.model;
-        el.modelBadge.title = msg.provider ? `${msg.provider} · ${msg.model}` : msg.model;
+        updateModelBadge();
         el.yoloBadge.hidden = !msg.yolo;
         if (switched) {
           state.toolCards.clear();
@@ -181,7 +190,17 @@
       case "history":
         replayHistory(msg.items);
         break;
+      case "model_changed":
+        state.currentModel = msg.model;
+        updateModelBadge();
+        break;
     }
+  }
+
+  function updateModelBadge() {
+    const text = state.currentProvider ? `${state.currentProvider} · ${state.currentModel}` : state.currentModel;
+    el.modelBadge.textContent = text;
+    el.modelBadge.title = `${text} — click to change`;
   }
 
   // ---------- Tasks ----------
@@ -497,6 +516,73 @@
     }
   });
 
+  // ---------- Model picker ----------
+
+  async function openModelModal() {
+    el.modelOverlay.hidden = false;
+    el.modelSearch.value = "";
+    el.modelSearch.focus();
+    el.modelProviderNote.textContent = `Provider: ${state.currentProvider}`;
+
+    if (state.modelCache && state.modelCache.provider === state.currentProvider) {
+      renderModelList(state.modelCache.models);
+      return;
+    }
+
+    el.modelList.innerHTML = `<div class="model-list-loading">Loading models…</div>`;
+    try {
+      const res = await fetch("/api/models");
+      const data = await res.json();
+      const models = data.models || [];
+      state.modelCache = { provider: state.currentProvider, models };
+      if (!models.length) {
+        el.modelList.innerHTML = `<div class="model-list-empty">${escapeHtml(data.note || "No selectable models for this provider.")}</div>`;
+        return;
+      }
+      renderModelList(models);
+    } catch (err) {
+      el.modelList.innerHTML = `<div class="model-list-empty">Failed to load models: ${escapeHtml(String(err.message || err))}</div>`;
+    }
+  }
+
+  function renderModelList(models) {
+    const query = el.modelSearch.value.trim().toLowerCase();
+    const filtered = query
+      ? models.filter((m) => m.name.toLowerCase().includes(query) || m.id.toLowerCase().includes(query))
+      : models;
+
+    el.modelList.innerHTML = "";
+    if (!filtered.length) {
+      el.modelList.innerHTML = `<div class="model-list-empty">No models match "${escapeHtml(query)}"</div>`;
+      return;
+    }
+
+    for (const model of filtered) {
+      const row = document.createElement("div");
+      row.className = `model-item${model.id === state.currentModel ? " active" : ""}`;
+      row.innerHTML = `
+        <div>
+          <div class="model-item-name">${escapeHtml(model.name)}</div>
+          <div class="model-item-id">${escapeHtml(model.id)}</div>
+        </div>
+        ${model.free ? '<span class="model-item-free">FREE</span>' : ""}
+      `;
+      row.addEventListener("click", () => {
+        send({ type: "switch_model", model: model.id });
+        el.modelOverlay.hidden = true;
+      });
+      el.modelList.appendChild(row);
+    }
+  }
+
+  el.modelBadge.addEventListener("click", openModelModal);
+  el.modelCancel.addEventListener("click", () => {
+    el.modelOverlay.hidden = true;
+  });
+  el.modelSearch.addEventListener("input", () => {
+    if (state.modelCache) renderModelList(state.modelCache.models);
+  });
+
   // ---------- File upload ----------
 
   async function uploadFile(file) {
@@ -644,6 +730,7 @@
     if (e.key !== "Escape") return;
     if (!el.codePanel.hidden) el.codePanel.hidden = true;
     if (!el.folderOverlay.hidden) el.folderOverlay.hidden = true;
+    if (!el.modelOverlay.hidden) el.modelOverlay.hidden = true;
   });
 
   // ---------- Init ----------

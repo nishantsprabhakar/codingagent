@@ -5,6 +5,7 @@ import * as readline from "readline";
 import { Agent } from "./agent";
 import { PermissionManager, type ConfirmFn } from "./permissions";
 import { printBanner, printError, ConsoleReporter, color } from "./ui";
+import { loadLastModel } from "./preferences";
 import type { LlmConfig, LlmProvider } from "./types";
 
 // Last-resort safety net: modern Node terminates the whole process on an
@@ -76,7 +77,11 @@ function parseArgs(argv: string[]): CliOptions {
   const envVar = API_KEY_ENV[provider];
   if (!apiKey && envVar) apiKey = process.env[envVar];
 
-  options.llmConfig = { provider, model: model || DEFAULT_MODEL[provider], apiKey };
+  // Explicit --model/env wins; otherwise fall back to whatever was last
+  // chosen for this provider via the web UI's model picker, then the
+  // hardcoded default.
+  const resolvedModel = model || loadLastModel(provider) || DEFAULT_MODEL[provider];
+  options.llmConfig = { provider, model: resolvedModel, apiKey };
   return options;
 }
 

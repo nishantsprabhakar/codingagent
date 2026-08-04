@@ -34,7 +34,7 @@
         <span id="cwd-label" class="cwd-label"></span>
       </div>
       <div class="topbar-right">
-        <span id="model-badge" class="badge"></span>
+        <button id="model-badge" class="badge badge-clickable" title="Click to choose a different model"></button>
         <span id="yolo-badge" class="badge badge-yolo" hidden>YOLO</span>
         <button id="folder-btn" class="icon-btn" title="Switch project folder">&#128193;</button>
         <button id="reset-btn" class="icon-btn" title="Reset conversation">&#x27F2;</button>
@@ -109,6 +109,28 @@
     <div class="permission-actions">
       <button id="folder-cancel" class="btn btn-secondary">Cancel</button>
       <button id="folder-switch" class="btn btn-primary">Switch</button>
+    </div>
+  </div>
+</div>
+
+<div id="model-overlay" class="overlay" hidden>
+  <div class="permission-modal">
+    <div class="permission-header">
+      <span class="permission-icon">&#129504;</span>
+      <div>
+        <div class="permission-title">Choose a model</div>
+        <div id="model-provider-note" class="permission-tool"></div>
+      </div>
+    </div>
+    <input
+      id="model-search"
+      class="folder-input"
+      type="text"
+      placeholder="Search models…"
+    />
+    <div id="model-list" class="recent-folders model-list"></div>
+    <div class="permission-actions">
+      <button id="model-cancel" class="btn btn-secondary">Cancel</button>
     </div>
   </div>
 </div>

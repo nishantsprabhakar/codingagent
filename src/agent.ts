@@ -81,6 +81,15 @@ export class Agent {
     if (this.tasks.length) this.reporter.tasks(this.tasks);
   }
 
+  /** Switches the model for subsequent turns without losing conversation history. */
+  setModel(model: string): void {
+    this.llmConfig = { ...this.llmConfig, model };
+  }
+
+  getModel(): string {
+    return this.llmConfig.model;
+  }
+
   /** Connects any MCP servers configured in <root>/mcp.json. Safe to not await — runs in the background. */
   async connectMcp(): Promise<void> {
     await this.mcpManager.connectAll(this.ctx.root, (message) => console.error(`[coding-agent] ${message}`));

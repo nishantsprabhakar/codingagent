@@ -190,6 +190,13 @@ REPL commands:
 - **File upload**: the paperclip icon next to the composer (or dragging a file
   onto the chat) uploads it straight into the project root, so you can hand
   the agent a reference file without it already being in the folder.
+- **Model picker**: click the model badge in the header to search and switch
+  models without losing your conversation. For OpenRouter this fetches the
+  live list of 300+ models and filters it down to ones that actually support
+  tool-calling (most don't) — free ones are tagged and sorted first. Groq's
+  small, stable lineup is listed directly. Your choice is remembered per
+  provider (`~/.coding-agent/preferences.json`) and reused on the next
+  launch.
 
 ## Known limitations
 
