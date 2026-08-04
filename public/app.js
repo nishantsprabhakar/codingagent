@@ -27,6 +27,13 @@
     permDeny: document.getElementById("perm-deny"),
     tasksSection: document.getElementById("tasks-section"),
     taskList: document.getElementById("task-list"),
+    folderBtn: document.getElementById("folder-btn"),
+    folderOverlay: document.getElementById("folder-overlay"),
+    folderInput: document.getElementById("folder-input"),
+    recentFolders: document.getElementById("recent-folders"),
+    folderCancel: document.getElementById("folder-cancel"),
+    folderSwitch: document.getElementById("folder-switch"),
+    uploadInput: document.getElementById("upload-input"),
   };
 
   const TOOL_ICONS = {
@@ -49,6 +56,8 @@
     toolCards: new Map(),
     thinkingRow: null,
     pendingPermissionId: null,
+    currentRoot: "",
+    recentFolders: [],
   };
 
   function escapeHtml(s) {
@@ -61,6 +70,15 @@
   function clearEmptyState() {
     const empty = el.chatLog.querySelector(".empty-state");
     if (empty) empty.remove();
+  }
+
+  function showEmptyState(title) {
+    el.chatLog.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-glyph">&gt;_</div>
+        <div class="empty-state-title">${escapeHtml(title)}</div>
+        <div class="empty-state-sub">Describe what you want built, fixed, or explained.</div>
+      </div>`;
   }
 
   function scrollToBottom() {
@@ -117,14 +135,24 @@
 
   function handleServerMessage(msg) {
     switch (msg.type) {
-      case "init":
+      case "init": {
+        const switched = state.currentRoot && state.currentRoot !== msg.root;
+        state.currentRoot = msg.root;
+        state.recentFolders = msg.recentFolders || [];
         el.cwdLabel.textContent = msg.root;
         el.cwdLabel.title = msg.root;
         el.modelBadge.textContent = msg.provider ? `${msg.provider} · ${msg.model}` : msg.model;
         el.modelBadge.title = msg.provider ? `${msg.provider} · ${msg.model}` : msg.model;
         el.yoloBadge.hidden = !msg.yolo;
+        if (switched) {
+          state.toolCards.clear();
+          renderTasks([]);
+          el.codePanel.hidden = true;
+          showEmptyState("Switched project folder.");
+        }
         loadTree(el.fileTree, ".");
         break;
+      }
       case "thinking":
         showThinking(msg.value);
         break;
@@ -428,12 +456,111 @@
     send({ type: "reset" });
     state.toolCards.clear();
     renderTasks([]);
-    el.chatLog.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-glyph">&gt;_</div>
-        <div class="empty-state-title">Conversation reset.</div>
-        <div class="empty-state-sub">Describe what you want built, fixed, or explained.</div>
-      </div>`;
+    showEmptyState("Conversation reset.");
+  });
+
+  // ---------- Switch project folder ----------
+
+  function openFolderModal() {
+    el.folderInput.value = state.currentRoot;
+    el.recentFolders.innerHTML = "";
+    for (const folder of state.recentFolders) {
+      const row = document.createElement("div");
+      row.className = "recent-folder-item";
+      row.textContent = folder;
+      row.title = folder;
+      row.addEventListener("click", () => {
+        el.folderInput.value = folder;
+      });
+      el.recentFolders.appendChild(row);
+    }
+    el.folderOverlay.hidden = false;
+    el.folderInput.focus();
+  }
+
+  function switchFolder() {
+    const path = el.folderInput.value.trim();
+    if (!path) return;
+    send({ type: "switch_folder", path });
+    el.folderOverlay.hidden = true;
+  }
+
+  el.folderBtn.addEventListener("click", openFolderModal);
+  el.folderCancel.addEventListener("click", () => {
+    el.folderOverlay.hidden = true;
+  });
+  el.folderSwitch.addEventListener("click", switchFolder);
+  el.folderInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      switchFolder();
+    }
+  });
+
+  // ---------- File upload ----------
+
+  async function uploadFile(file) {
+    clearEmptyState();
+    const statusRow = document.createElement("div");
+    statusRow.className = "thinking-row";
+    statusRow.textContent = `Uploading ${file.name}…`;
+    el.chatLog.appendChild(statusRow);
+    scrollToBottom();
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const res = await fetch(`/api/upload?path=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        body: buffer,
+      });
+      const data = await res.json();
+      statusRow.remove();
+      if (!res.ok) {
+        appendErrorMessage(`Upload failed for ${file.name}: ${data.error || res.statusText}`);
+      } else {
+        const row = document.createElement("div");
+        row.className = "msg msg-assistant";
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.textContent = `📎 Uploaded ${data.path} (${formatBytes(data.bytes)})`;
+        row.appendChild(bubble);
+        el.chatLog.appendChild(row);
+        scrollToBottom();
+        loadTree(el.fileTree, ".");
+      }
+    } catch (err) {
+      statusRow.remove();
+      appendErrorMessage(`Upload failed for ${file.name}: ${err.message || err}`);
+    }
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  el.uploadInput.addEventListener("change", () => {
+    for (const file of el.uploadInput.files) uploadFile(file);
+    el.uploadInput.value = "";
+  });
+
+  ["dragenter", "dragover"].forEach((evt) =>
+    el.chatLog.addEventListener(evt, (e) => {
+      e.preventDefault();
+      el.chatLog.classList.add("drag-over");
+    })
+  );
+  ["dragleave", "drop"].forEach((evt) =>
+    el.chatLog.addEventListener(evt, (e) => {
+      e.preventDefault();
+      el.chatLog.classList.remove("drag-over");
+    })
+  );
+  el.chatLog.addEventListener("drop", (e) => {
+    const files = e.dataTransfer?.files;
+    if (!files) return;
+    for (const file of files) uploadFile(file);
   });
 
   // ---------- File tree ----------
@@ -514,7 +641,9 @@
   });
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !el.codePanel.hidden) el.codePanel.hidden = true;
+    if (e.key !== "Escape") return;
+    if (!el.codePanel.hidden) el.codePanel.hidden = true;
+    if (!el.folderOverlay.hidden) el.folderOverlay.hidden = true;
   });
 
   // ---------- Init ----------

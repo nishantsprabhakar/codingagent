@@ -2,7 +2,7 @@ import type { PermissionDecision } from "../permissions";
 import type { TaskItem, HistoryItem } from "../types";
 
 export type ServerMessage =
-  | { type: "init"; root: string; provider: string; model: string; yolo: boolean }
+  | { type: "init"; root: string; provider: string; model: string; yolo: boolean; recentFolders: string[] }
   | { type: "assistant"; text: string }
   | { type: "tool_call"; id: string; name: string; label: string; args: unknown }
   | { type: "tool_result"; id: string; output: string; ok: boolean }
@@ -15,4 +15,5 @@ export type ServerMessage =
 export type ClientMessage =
   | { type: "user_message"; text: string }
   | { type: "permission_response"; id: string; decision: PermissionDecision }
-  | { type: "reset" };
+  | { type: "reset" }
+  | { type: "switch_folder"; path: string };

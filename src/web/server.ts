@@ -6,6 +6,7 @@ import { Agent } from "../agent";
 import { PermissionManager, type PermissionDecision } from "../permissions";
 import { resolveInRoot } from "../tools/paths";
 import { WebSocketReporter, createConfirmFn } from "./reporter";
+import { loadRecentFolders, addRecentFolder } from "../recentFolders";
 import type { ClientMessage, ServerMessage } from "./protocol";
 import type { LlmConfig } from "../types";
 
@@ -13,6 +14,7 @@ const PUBLIC_DIR = path.join(__dirname, "..", "..", "public");
 const IGNORED_ENTRIES = new Set(["node_modules", ".git", "dist", "build"]);
 const MAX_TREE_ENTRIES = 500;
 const MAX_FILE_BYTES = 300_000;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -22,10 +24,13 @@ const MIME: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-export function startWebServer(root: string, llmConfig: LlmConfig, yolo: boolean, port: number): void {
+export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: boolean, port: number): void {
+  let currentRoot = initialRoot;
+  addRecentFolder(currentRoot);
+
   const httpServer = http.createServer((req, res) => {
     try {
-      handleHttp(req, res, root);
+      handleHttp(req, res, currentRoot);
     } catch (err: any) {
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end(`Internal error: ${err.message ?? err}`);
@@ -43,10 +48,10 @@ export function startWebServer(root: string, llmConfig: LlmConfig, yolo: boolean
     const reporter = new WebSocketReporter(send);
     const confirmFn = createConfirmFn(send, pending);
     const permissions = new PermissionManager(yolo, confirmFn);
-    const agent = new Agent(root, llmConfig, permissions, reporter);
+    let agent = new Agent(currentRoot, llmConfig, permissions, reporter);
     agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
 
-    send({ type: "init", root, provider: llmConfig.provider, model: llmConfig.model, yolo });
+    send({ type: "init", root: currentRoot, provider: llmConfig.provider, model: llmConfig.model, yolo, recentFolders: loadRecentFolders() });
 
     ws.on("message", async (raw) => {
       let msg: ClientMessage;
@@ -67,6 +72,18 @@ export function startWebServer(root: string, llmConfig: LlmConfig, yolo: boolean
           }
         } else if (msg.type === "reset") {
           agent.reset();
+        } else if (msg.type === "switch_folder") {
+          const target = path.resolve(msg.path);
+          if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) {
+            reporter.error(`Folder not found: ${target}`);
+            return;
+          }
+          await agent.dispose();
+          currentRoot = target;
+          addRecentFolder(currentRoot);
+          agent = new Agent(currentRoot, llmConfig, permissions, reporter);
+          agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
+          send({ type: "init", root: currentRoot, provider: llmConfig.provider, model: llmConfig.model, yolo, recentFolders: loadRecentFolders() });
         }
       } catch (err: any) {
         // A single bad request/response should never take the whole server
@@ -86,7 +103,7 @@ export function startWebServer(root: string, llmConfig: LlmConfig, yolo: boolean
 
   httpServer.listen(port, () => {
     console.log(`\ncoding-agent web UI running at http://localhost:${port}`);
-    console.log(`root: ${root}`);
+    console.log(`root: ${currentRoot}`);
     console.log(
       `model: ${llmConfig.provider} · ${llmConfig.model}${yolo ? "  (yolo mode: all actions auto-approved)" : ""}\n`
     );
@@ -98,6 +115,7 @@ function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: s
 
   if (url.pathname === "/api/tree") return handleTree(url, res, root);
   if (url.pathname === "/api/file") return handleFile(url, res, root);
+  if (url.pathname === "/api/upload" && req.method === "POST") return handleUpload(req, url, res, root);
 
   serveStatic(url.pathname, res);
 }
@@ -158,6 +176,49 @@ function handleFile(url: URL, res: http.ServerResponse, root: string): void {
   } catch {
     sendJson(res, 200, { path: relPath, truncated: false, content: "(binary file, cannot preview)" });
   }
+}
+
+function handleUpload(req: http.IncomingMessage, url: URL, res: http.ServerResponse, root: string): void {
+  const relPath = url.searchParams.get("path");
+  if (!relPath) return sendJson(res, 400, { error: "missing path" });
+
+  let filePath: string;
+  try {
+    filePath = resolveInRoot(root, relPath);
+  } catch (err: any) {
+    return sendJson(res, 400, { error: err.message });
+  }
+
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  let aborted = false;
+
+  req.on("data", (chunk: Buffer) => {
+    if (aborted) return;
+    totalBytes += chunk.length;
+    if (totalBytes > MAX_UPLOAD_BYTES) {
+      aborted = true;
+      sendJson(res, 413, { error: `File exceeds the ${MAX_UPLOAD_BYTES / 1024 / 1024}MB upload limit` });
+      req.destroy();
+      return;
+    }
+    chunks.push(chunk);
+  });
+
+  req.on("end", () => {
+    if (aborted) return;
+    try {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, Buffer.concat(chunks));
+      sendJson(res, 200, { ok: true, path: relPath, bytes: totalBytes });
+    } catch (err: any) {
+      sendJson(res, 500, { error: err.message ?? String(err) });
+    }
+  });
+
+  req.on("error", (err) => {
+    if (!aborted) sendJson(res, 500, { error: err.message });
+  });
 }
 
 function serveStatic(pathname: string, res: http.ServerResponse): void {

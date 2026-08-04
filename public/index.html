@@ -36,6 +36,7 @@
       <div class="topbar-right">
         <span id="model-badge" class="badge"></span>
         <span id="yolo-badge" class="badge badge-yolo" hidden>YOLO</span>
+        <button id="folder-btn" class="icon-btn" title="Switch project folder">&#128193;</button>
         <button id="reset-btn" class="icon-btn" title="Reset conversation">&#x27F2;</button>
       </div>
     </header>
@@ -49,6 +50,8 @@
     </div>
 
     <div class="composer">
+      <label for="upload-input" class="upload-btn" title="Upload a file into this project">&#128206;</label>
+      <input id="upload-input" type="file" multiple hidden />
       <textarea
         id="composer-input"
         class="composer-input"
@@ -83,6 +86,29 @@
       <button id="perm-deny" class="btn btn-danger">Deny</button>
       <button id="perm-always" class="btn btn-secondary">Always allow</button>
       <button id="perm-allow" class="btn btn-primary">Allow once</button>
+    </div>
+  </div>
+</div>
+
+<div id="folder-overlay" class="overlay" hidden>
+  <div class="permission-modal">
+    <div class="permission-header">
+      <span class="permission-icon">&#128193;</span>
+      <div>
+        <div class="permission-title">Switch project folder</div>
+        <div class="permission-tool">The agent will restart with a new working directory.</div>
+      </div>
+    </div>
+    <input
+      id="folder-input"
+      class="folder-input"
+      type="text"
+      placeholder="Paste or type a full folder path…"
+    />
+    <div id="recent-folders" class="recent-folders"></div>
+    <div class="permission-actions">
+      <button id="folder-cancel" class="btn btn-secondary">Cancel</button>
+      <button id="folder-switch" class="btn btn-primary">Switch</button>
     </div>
   </div>
 </div>

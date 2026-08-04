@@ -482,6 +482,66 @@ body {
 .composer-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12); }
 .composer-input:disabled { opacity: 0.5; }
 
+.upload-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.upload-btn:hover { color: var(--text); border-color: var(--accent); }
+
+.folder-input {
+  width: 100%;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 9px 12px;
+  outline: none;
+  margin-bottom: 10px;
+}
+.folder-input:focus { border-color: var(--accent); }
+
+.recent-folders {
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.recent-folder-item {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid transparent;
+}
+.recent-folder-item:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border-soft); }
+
+.chat-log.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -8px;
+  background: rgba(34, 211, 238, 0.05);
+}
+
 .send-btn {
   width: 38px;
   height: 38px;

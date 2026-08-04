@@ -183,6 +183,13 @@ REPL commands:
   `mcp__<server>__<tool>`, gated behind the same permission prompts as
   everything else. A server that fails to start is skipped with a logged
   warning, not fatal.
+- **Switch project folder**: the folder icon in the web UI's header opens a
+  modal to type/paste a different project path and switch to it live — no
+  need to close the app and use the desktop launcher's folder picker. It
+  remembers your last 10 folders for one-click switching back.
+- **File upload**: the paperclip icon next to the composer (or dragging a file
+  onto the chat) uploads it straight into the project root, so you can hand
+  the agent a reference file without it already being in the folder.
 
 ## Known limitations
 
