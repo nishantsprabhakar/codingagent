@@ -1,0 +1,203 @@
+# coding-agent
+
+A minimal coding agent in the spirit of Claude Code / Codex — it takes a
+natural-language prompt, decides which tools to call, and edits files or runs
+commands in a working directory with your permission. It uses a pluggable
+model backend: [Pollinations AI](https://pollinations.ai) is free and keyless
+but, as of 2026-07-30, no longer supports the tool-calling this agent depends
+on — so in practice you need a free key from [Groq](https://console.groq.com/keys)
+or [OpenRouter](https://openrouter.ai/keys) instead (both still $0 for typical
+use). Comes with both a terminal REPL and a web UI.
+
+## Quick start (no terminal required)
+
+1. Install [Node.js](https://nodejs.org) if you don't already have it (just
+   click through the installer — no terminal needed for that either).
+2. Double-click **`Coding Agent`** on your Desktop (or **`Start Coding
+   Agent.bat`** inside this folder).
+3. The first time, a folder picker will pop up — choose the project you want
+   the agent to work on.
+4. Next, you'll be asked for a free API key from Groq or OpenRouter (paste
+   either — the launcher detects which one from its format). Get one in under
+   a minute: [console.groq.com/keys](https://console.groq.com/keys) or
+   [openrouter.ai/keys](https://openrouter.ai/keys), no credit card needed.
+   You can skip this, but the agent won't be able to take real actions until
+   you add one (see Known limitations below).
+5. A browser window opens automatically at `http://localhost:4390` with the
+   chat UI.
+6. To close it later, just close the console window that opened alongside the
+   browser tab.
+7. To point it at a different project later, double-click **`Change Project
+   Folder.bat`**. To add or change your key later, double-click **`Change
+   Model Key.bat`**.
+
+Everything else in this README (npm scripts, CLI flags, the terminal REPL) is
+for anyone who wants to run it manually or dig into how it works.
+
+## Requirements
+
+- Node.js 18+ (for global `fetch` and modern JS support). Install from
+  [nodejs.org](https://nodejs.org) if `node -v` doesn't work in your terminal.
+
+## Setup
+
+```bash
+cd coding-agent
+npm install
+npm run build
+npm start -- --cwd /path/to/your/project
+```
+
+Or run without building, for development:
+
+```bash
+npm install
+npm run dev -- --cwd /path/to/your/project
+```
+
+To install it as a global `agent` command:
+
+```bash
+npm install -g .
+agent --cwd /path/to/your/project
+```
+
+## Usage
+
+```
+agent [options]
+
+Options:
+  --cwd <path>      Working directory the agent may read/write (default: current directory)
+  --provider <name> "pollinations" (default, free, no key), "groq", or "openrouter" (both free tier, need a key)
+  --model <name>    Model to use (default: "openai" for pollinations, "llama-3.3-70b-versatile" for groq,
+                    "inclusionai/ling-3.0-flash:free" for openrouter)
+  --api-key <key>   API key for --provider groq/openrouter (or set GROQ_API_KEY / OPENROUTER_API_KEY)
+  --yolo            Auto-approve all file writes / edits / shell commands (dangerous)
+  --web             Serve the web UI instead of the terminal REPL
+  --port <n>        Port for the web UI (default: 4390)
+  --help            Show this help
+```
+
+### Using Groq or OpenRouter instead of Pollinations
+
+**As of 2026-07-30, Pollinations requires a paid account for tool-calling
+requests** — which is everything this agent does (reading files, writing
+code, running commands). Anonymous Pollinations access is effectively
+unusable for this agent now; you need a key from one of these instead:
+
+- [Groq](https://console.groq.com/keys) — free tier, no credit card,
+  `llama-3.3-70b-versatile` by default (or `openai/gpt-oss-120b` via `--model`).
+- [OpenRouter](https://openrouter.ai/keys) — free tier, `inclusionai/ling-3.0-flash:free`
+  by default. OpenRouter's free-model lineup rotates over time; browse current
+  ones at [openrouter.ai/models?max_price=0](https://openrouter.ai/models?max_price=0)
+  and pass a different one with `--model` if needed — verify it actually
+  supports tool calling before relying on it (not all free models do).
+
+```bash
+agent --web --provider groq --api-key gsk_your_key_here --cwd /path/to/your/project
+agent --web --provider openrouter --api-key sk-or-v1-your_key_here --cwd /path/to/your/project
+# or set one once for the session:
+export GROQ_API_KEY=gsk_your_key_here
+agent --web --provider groq --cwd /path/to/your/project
+```
+
+The double-click launcher asks for a key once (either provider — it's
+auto-detected from the key's format, `sk-or-v1-...` vs anything else) and
+remembers your choice; skip it and it'll ask again next launch. Update it
+anytime via `Change Model Key.bat`.
+
+### Web UI
+
+```bash
+npm run web -- --cwd /path/to/your/project
+# or, after building:
+npm start -- --web --cwd /path/to/your/project
+```
+
+Then open `http://localhost:4390`. It gives you a chat panel, a file tree you
+can click through to preview files, tool-call cards you can expand to see
+output, and a permission modal (with a diff preview) for every mutating
+action — same permission model as the terminal, just with buttons instead of
+keystrokes.
+
+### Terminal REPL
+
+Once running, just type what you want:
+
+```
+you> add a .gitignore for a Node project and initialize git
+you> read package.json and add a "lint" script that runs eslint
+you> there's a bug in src/utils.ts where dates aren't parsed correctly, find and fix it
+```
+
+REPL commands:
+
+- `/reset` — clear conversation history (keeps the same working directory)
+- `/cwd <path>` — switch working directory (also resets history)
+- `/exit` — quit
+
+## How it works
+
+- **Model**: pluggable provider (`src/providers/`) — Pollinations (default,
+  keyless, but no longer usable for tool-calling — see Known limitations),
+  Groq, or OpenRouter, all OpenAI-compatible chat completions endpoints. Each
+  provider retries on 429/5xx and fails fast (no pointless retrying) on
+  permanent errors like 401/402/404.
+- **Tools**: `read_file`, `write_file`, `edit_file`, `list_dir`, `glob_search`,
+  `grep_search`, `run_shell_command`, `create_docx`, `create_pptx`,
+  `create_xlsx` — file paths are sandboxed to the `--cwd` root (a path that
+  resolves outside it is rejected).
+- **Permissions**: read-only tools run automatically. Mutating tools
+  (file writes, shell commands, MCP tool calls) print a preview (diff for
+  edits, full content for new files, the literal command for shell) and ask
+  `[y]es / [a]lways / [n]o` before running, unless `--yolo` is passed.
+- **Loop**: on each user message, the agent calls the model, executes any
+  requested tool calls, feeds the results back, and repeats until the model
+  responds with plain text instead of a tool call.
+
+## Features
+
+- **Project context**: on startup, the agent automatically reads your
+  project's top-level file listing, `package.json` (name/description/scripts/
+  dependencies), and README, and gives that to the model up front — it
+  doesn't need to `list_dir` just to find out what kind of project this is.
+- **Documents**: ask for a Word doc, PowerPoint deck, or Excel workbook and
+  the agent generates a genuine, well-formatted `.docx`/`.pptx`/`.xlsx` file
+  (headings, bullet lists, tables; bold header rows and auto-sized columns in
+  Excel) — not just a text file with the wrong extension.
+- **Task list**: for anything beyond a single trivial step, the agent lays out
+  a plan as a live checklist (pending → in progress → done), shown in the web
+  UI sidebar and the terminal. It updates this as it works, the same way it
+  would track its own todos.
+- **Persistent sessions**: conversation history and the task list are saved to
+  `.coding-agent/session.json` inside the project you're working on, and
+  restored automatically — close the browser tab or the console window,
+  reopen later, and you're back where you left off (a "Resumed previous
+  session" divider marks where it picks up). `/reset` (or the reset button)
+  clears it and starts fresh.
+- **MCP support**: drop an `mcp.json` in your project root (see
+  `mcp.json.example` — same format as Claude Desktop/VS Code:
+  `{"mcpServers": {"name": {"command", "args", "env"}}}`) and the agent
+  connects to those servers on startup, merging their tools in as
+  `mcp__<server>__<tool>`, gated behind the same permission prompts as
+  everything else. A server that fails to start is skipped with a logged
+  warning, not fatal.
+
+## Known limitations
+
+- **Pollinations (the default, keyless provider) can no longer run this agent
+  at all**, as of 2026-07-30 — it now requires a paid account for tool-calling
+  requests specifically, which is everything this agent does. You need a
+  `--provider groq` or `--provider openrouter` key (see above); plain chat
+  without tools is the only thing that still works anonymously on Pollinations.
+- Free-tier model lineups on Groq/OpenRouter shift over time — if a model
+  stops working, check current model lists (linked above) and update
+  `--model`.
+- `run_shell_command` is sandboxed to the working directory via `cwd`, but the
+  command itself is not restricted — it can still reference absolute paths.
+  The permission prompt is your safety net; review commands before approving.
+- No streaming output yet — responses appear once the model finishes.
+- MCP support only covers stdio-based servers (spawned as a subprocess) — no HTTP/SSE remote servers yet.
+- Session persistence is per-project (one `.coding-agent/session.json`), not per-browser-tab — opening the same
+  project from two tabs/terminals at once will race on the same history file.

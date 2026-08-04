@@ -1,0 +1,34 @@
+{
+  "name": "coding-agent",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A minimal, free, agentic coding CLI (Claude Code / Codex style) powered by Pollinations AI.",
+  "bin": {
+    "agent": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "web": "tsx src/index.ts --web"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "diff": "^5.2.0",
+    "docx": "^9.7.1",
+    "exceljs": "^4.4.0",
+    "glob": "^10.4.5",
+    "pptxgenjs": "^4.0.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/diff": "^5.2.3",
+    "@types/node": "^20.14.0",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.15.0",
+    "typescript": "^5.5.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "example-everything": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-everything"]
+    },
+    "example-filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/dir"]
+    },
+    "example-with-env": {
+      "command": "npx",
+      "args": ["-y", "@some/mcp-server"],
+      "env": { "SOME_API_KEY": "your-key-here" }
+    }
+  }
+}

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>coding-agent</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+  <button id="sidebar-toggle" class="mobile-toggle" title="Toggle files">☰</button>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo-mark">&gt;_</span>
+      <span class="logo-text">coding-agent</span>
+    </div>
+    <div id="tasks-section" hidden>
+      <div class="sidebar-section-title">Tasks</div>
+      <div id="task-list" class="task-list"></div>
+    </div>
+
+    <div class="sidebar-section-title">Files</div>
+    <div id="file-tree" class="file-tree"></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span id="status-dot" class="status-dot"></span>
+        <span id="status-text" class="status-text">connecting&hellip;</span>
+      </div>
+      <div class="topbar-center">
+        <span id="cwd-label" class="cwd-label"></span>
+      </div>
+      <div class="topbar-right">
+        <span id="model-badge" class="badge"></span>
+        <span id="yolo-badge" class="badge badge-yolo" hidden>YOLO</span>
+        <button id="reset-btn" class="icon-btn" title="Reset conversation">&#x27F2;</button>
+      </div>
+    </header>
+
+    <div id="chat-log" class="chat-log">
+      <div class="empty-state">
+        <div class="empty-state-glyph">&gt;_</div>
+        <div class="empty-state-title">Ready when you are.</div>
+        <div class="empty-state-sub">Describe what you want built, fixed, or explained.</div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <textarea
+        id="composer-input"
+        class="composer-input"
+        placeholder="Ask the agent to build, fix, or explain something…"
+        rows="1"
+      ></textarea>
+      <button id="send-btn" class="send-btn" title="Send">&#x2191;</button>
+    </div>
+  </main>
+
+  <aside id="code-panel" class="code-panel" hidden>
+    <div class="code-panel-header">
+      <span id="code-panel-title" class="code-panel-title"></span>
+      <button id="code-panel-close" class="icon-btn">&times;</button>
+    </div>
+    <pre id="code-panel-content" class="code-panel-content"></pre>
+  </aside>
+</div>
+
+<div id="permission-overlay" class="overlay" hidden>
+  <div class="permission-modal">
+    <div class="permission-header">
+      <span class="permission-icon">&#9888;</span>
+      <div>
+        <div class="permission-title">Permission requested</div>
+        <div id="permission-tool" class="permission-tool"></div>
+      </div>
+    </div>
+    <div id="permission-label" class="permission-label"></div>
+    <pre id="permission-preview" class="permission-preview" hidden></pre>
+    <div class="permission-actions">
+      <button id="perm-deny" class="btn btn-danger">Deny</button>
+      <button id="perm-always" class="btn btn-secondary">Always allow</button>
+      <button id="perm-allow" class="btn btn-primary">Allow once</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
