@@ -1,9 +1,12 @@
 {
-  "name": "coding-agent",
+  "name": "wrexlyn",
   "private": true,
   "version": "0.1.0",
-  "description": "A minimal, free, agentic coding CLI (Claude Code / Codex style) powered by Pollinations AI.",
+  "description": "Wrexlyn — a free, agentic coding assistant with a web UI, document generation, MCP support, and multi-chat sessions.",
+  "author": "Nishant Prabhakar",
+  "license": "UNLICENSED",
   "bin": {
+    "wrexlyn": "dist/index.js",
     "agent": "dist/index.js"
   },
   "scripts": {

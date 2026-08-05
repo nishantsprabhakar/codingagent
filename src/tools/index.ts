@@ -1,3 +1,8 @@
+/**
+ * Wrexlyn — Copyright (c) 2026 Nishant Prabhakar. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * See LICENSE for details.
+ */
 import type { ToolSpec } from "../types";
 import { readFileTool, writeFileTool, editFileTool, listDirTool } from "./fs";
 import { globSearchTool, grepSearchTool } from "./search";

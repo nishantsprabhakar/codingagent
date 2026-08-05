@@ -1,3 +1,8 @@
+/**
+ * Wrexlyn — Copyright (c) 2026 Nishant Prabhakar. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * See LICENSE for details.
+ */
 import type { ChatMessage, ToolDefinition, ChatCompletionResult, LlmConfig } from "./types";
 import * as pollinations from "./providers/pollinations";
 import * as groq from "./providers/groq";

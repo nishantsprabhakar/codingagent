@@ -1,3 +1,8 @@
+/**
+ * Wrexlyn — Copyright (c) 2026 Nishant Prabhakar. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * See LICENSE for details.
+ */
 import type { Reporter, TaskItem, HistoryItem } from "./types";
 
 const CODES = {
@@ -28,7 +33,7 @@ export const color = {
 };
 
 export function printBanner(root: string, model: string): void {
-  console.log(color.bold(color.cyan("\ncoding-agent")) + color.dim(" — free AI coding agent (Pollinations)"));
+  console.log(color.bold(color.cyan("\nWrexlyn")) + color.dim(" — free AI coding agent"));
   console.log(color.dim(`root: ${root}`));
   console.log(color.dim(`model: ${model}`));
   console.log(color.dim("commands: /new  /sessions  /switch <id>  /cwd <path>  /exit\n"));

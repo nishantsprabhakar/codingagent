@@ -1,3 +1,8 @@
+/*
+ * Wrexlyn — Copyright (c) 2026 Nishant Prabhakar. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * See LICENSE for details.
+ */
 :root {
   --bg: #0a0d12;
   --bg-elevated: #10141b;
@@ -183,6 +188,13 @@ body {
   padding: 0 8px 16px;
   font-family: var(--mono);
   font-size: 12.5px;
+}
+
+.sidebar-footer {
+  padding: 8px 16px 12px;
+  font-size: 9.5px;
+  color: var(--text-faint);
+  border-top: 1px solid var(--border-soft);
 }
 
 .progress-panel {

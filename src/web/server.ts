@@ -1,3 +1,8 @@
+/**
+ * Wrexlyn — Copyright (c) 2026 Nishant Prabhakar. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * See LICENSE for details.
+ */
 import * as http from "http";
 import * as fs from "fs";
 import * as path from "path";
@@ -156,7 +161,7 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
   });
 
   httpServer.listen(port, () => {
-    console.log(`\ncoding-agent web UI running at http://localhost:${port}`);
+    console.log(`\nWrexlyn web UI running at http://localhost:${port}`);
     console.log(`root: ${currentRoot}`);
     console.log(
       `model: ${llmConfig.provider} · ${currentModel}${yolo ? "  (yolo mode: all actions auto-approved)" : ""}\n`

@@ -1,3 +1,8 @@
+/**
+ * Wrexlyn — Copyright (c) 2026 Nishant Prabhakar. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * See LICENSE for details.
+ */
 import { chatCompletion } from "./llm";
 import { TOOLS, TOOL_DEFINITIONS } from "./tools";
 import { UPDATE_TASKS_DEFINITION } from "./tools/tasks";

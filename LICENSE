@@ -1,0 +1,30 @@
+Wrexlyn
+Copyright (c) 2026 Nishant Prabhakar
+All rights reserved.
+
+This software and associated documentation files (the "Software") are the
+proprietary property of Nishant Prabhakar. No license, right, or interest in
+the Software, express or implied, is granted to any person obtaining a copy
+of it, except with the prior written permission of Nishant Prabhakar.
+
+Without such permission, no part of the Software may be copied, modified,
+merged, published, distributed, sublicensed, sold, or otherwise used, in
+whole or in part, for any purpose.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL
+NISHANT PRABHAKAR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF,
+OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+Third-party notice: this project depends on open-source packages (including,
+among others, docx, pptxgenjs, exceljs, ws, glob, diff, and
+@modelcontextprotocol/sdk) that are used unmodified via npm and remain
+licensed under their own respective open-source licenses. The all-rights-
+reserved terms above apply only to the original source code, assets, and
+documentation authored for Wrexlyn, and do not alter, restrict, or supersede
+the license terms of any third-party dependency.

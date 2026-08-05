@@ -1,3 +1,8 @@
+/**
+ * Wrexlyn — Copyright (c) 2026 Nishant Prabhakar. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * See LICENSE for details.
+ */
 import type { Reporter, TaskItem, HistoryItem } from "../types";
 import type { ConfirmFn, PermissionDecision } from "../permissions";
 import type { ServerMessage } from "./protocol";

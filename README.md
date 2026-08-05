@@ -1,4 +1,6 @@
-# coding-agent
+# Wrexlyn
+
+&copy; 2026 Nishant Prabhakar. All rights reserved. See [LICENSE](LICENSE).
 
 A minimal coding agent in the spirit of Claude Code / Codex — it takes a
 natural-language prompt, decides which tools to call, and edits files or runs

@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+/**
+ * Wrexlyn — Copyright (c) 2026 Nishant Prabhakar. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * See LICENSE for details.
+ */
 import * as fs from "fs";
 import * as path from "path";
 import * as readline from "readline";
