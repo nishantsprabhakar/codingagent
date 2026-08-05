@@ -133,8 +133,10 @@ you> there's a bug in src/utils.ts where dates aren't parsed correctly, find and
 
 REPL commands:
 
-- `/reset` — clear conversation history (keeps the same working directory)
-- `/cwd <path>` — switch working directory (also resets history)
+- `/new` (or `/reset`) — start a new chat (keeps the same working directory)
+- `/sessions` — list this project's chats (`*` marks the active one)
+- `/switch <id>` — switch to a chat by id (from `/sessions`)
+- `/cwd <path>` — switch working directory
 - `/exit` — quit
 
 ## How it works
@@ -166,16 +168,20 @@ REPL commands:
   the agent generates a genuine, well-formatted `.docx`/`.pptx`/`.xlsx` file
   (headings, bullet lists, tables; bold header rows and auto-sized columns in
   Excel) — not just a text file with the wrong extension.
-- **Task list**: for anything beyond a single trivial step, the agent lays out
-  a plan as a live checklist (pending → in progress → done), shown in the web
-  UI sidebar and the terminal. It updates this as it works, the same way it
-  would track its own todos.
-- **Persistent sessions**: conversation history and the task list are saved to
-  `.coding-agent/session.json` inside the project you're working on, and
-  restored automatically — close the browser tab or the console window,
-  reopen later, and you're back where you left off (a "Resumed previous
-  session" divider marks where it picks up). `/reset` (or the reset button)
-  clears it and starts fresh.
+- **Progress visualization**: for anything beyond a single trivial step, the
+  agent lays out a plan as a task list, shown in the web UI as a percentage
+  ring plus a connected step-by-step timeline (pulsing while a step is in
+  progress, filling in as steps complete) — and as a plain checklist in the
+  terminal. It updates this as it works, the same way it'd track its own
+  todos.
+- **Multiple chats per project**: the sidebar's "Chats" section works like a
+  normal chat app — **+ New** starts a fresh conversation, past chats are
+  listed with an auto-generated title and last-updated time, click one to
+  switch back to it (full history and progress state included), hover for a
+  delete button. Each is stored separately under
+  `.coding-agent/sessions/<id>.json`; closing the tab and reopening resumes
+  whichever chat was active. Projects using the older single-session format
+  are migrated automatically the first time they're opened.
 - **MCP support**: drop an `mcp.json` in your project root (see
   `mcp.json.example` — same format as Claude Desktop/VS Code:
   `{"mcpServers": {"name": {"command", "args", "env"}}}`) and the agent

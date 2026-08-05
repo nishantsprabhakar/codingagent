@@ -3,7 +3,7 @@ import { TOOLS, TOOL_DEFINITIONS } from "./tools";
 import { UPDATE_TASKS_DEFINITION } from "./tools/tasks";
 import { PermissionManager } from "./permissions";
 import { gatherProjectContext } from "./projectContext";
-import { loadSession, saveSession, clearSession } from "./session";
+import { loadSession, saveSession, deleteSession, createSessionId, deriveTitle, pickMostRecentSessionId } from "./session";
 import { McpManager } from "./mcp";
 import type { ChatMessage, ToolContext, Reporter, LlmConfig, TaskItem, HistoryItem } from "./types";
 
@@ -56,29 +56,70 @@ export class Agent {
   private tasks: TaskItem[] = [];
   private ctx: ToolContext;
   private mcpManager = new McpManager();
+  private sysMessage: ChatMessage;
+  private sessionId: string;
+  private sessionTitle = "New chat";
 
   constructor(
     root: string,
     private llmConfig: LlmConfig,
     private permissions: PermissionManager,
-    private reporter: Reporter
+    private reporter: Reporter,
+    sessionId?: string
   ) {
     this.ctx = { root };
+    this.sysMessage = { role: "system", content: systemPrompt(root, gatherProjectContext(root)) };
+    this.sessionId = sessionId ?? pickMostRecentSessionId(root) ?? createSessionId();
+    this.loadSessionData();
+  }
 
-    const projectContext = gatherProjectContext(root);
-    const sys: ChatMessage = { role: "system", content: systemPrompt(root, projectContext) };
-
-    const restored = loadSession(root);
+  private loadSessionData(): void {
+    const restored = loadSession(this.ctx.root, this.sessionId);
     if (restored) {
-      this.messages = [sys, ...restored.messages];
+      this.messages = [this.sysMessage, ...restored.messages];
       this.historyLog = restored.historyLog;
       this.tasks = restored.tasks;
+      this.sessionTitle = restored.title;
     } else {
-      this.messages = [sys];
+      this.messages = [this.sysMessage];
+      this.historyLog = [];
+      this.tasks = [];
+      this.sessionTitle = "New chat";
     }
+  }
 
-    if (this.historyLog.length) this.reporter.history(this.historyLog);
-    if (this.tasks.length) this.reporter.tasks(this.tasks);
+  /** Pushes this session's history/tasks to the reporter — call after construction or a session switch. */
+  replayCurrentState(): void {
+    this.reporter.history(this.historyLog);
+    this.reporter.tasks(this.tasks);
+  }
+
+  getSessionId(): string {
+    return this.sessionId;
+  }
+
+  getSessionTitle(): string {
+    return this.sessionTitle;
+  }
+
+  /** Loads a different (existing) session's history into this Agent without recreating it (keeps MCP connections alive). */
+  switchSession(sessionId: string): void {
+    this.sessionId = sessionId;
+    this.loadSessionData();
+  }
+
+  /** Starts a brand-new, empty session and returns its id. */
+  startNewSession(): string {
+    this.sessionId = createSessionId();
+    this.messages = [this.sysMessage];
+    this.historyLog = [];
+    this.tasks = [];
+    this.sessionTitle = "New chat";
+    return this.sessionId;
+  }
+
+  deleteSession(sessionId: string): void {
+    deleteSession(this.ctx.root, sessionId);
   }
 
   /** Switches the model for subsequent turns without losing conversation history. */
@@ -100,15 +141,8 @@ export class Agent {
     await this.mcpManager.closeAll();
   }
 
-  reset(): void {
-    const sys = this.messages[0];
-    this.messages = [sys];
-    this.historyLog = [];
-    this.tasks = [];
-    clearSession(this.ctx.root);
-  }
-
   async handleUserMessage(userText: string): Promise<void> {
+    if (this.messages.length === 1) this.sessionTitle = deriveTitle(userText);
     this.messages.push({ role: "user", content: userText });
     this.historyLog.push({ type: "user", text: userText });
 
@@ -169,7 +203,8 @@ export class Agent {
   }
 
   private persist(): void {
-    saveSession(this.ctx.root, this.messages, this.historyLog, this.tasks);
+    // this.messages[0] is always the system prompt — persist everything after it.
+    saveSession(this.ctx.root, this.sessionId, this.sessionTitle, this.messages.slice(1), this.historyLog, this.tasks);
   }
 
   private recordTool(id: string, name: string, label: string, args: unknown, output: string, ok: boolean): string {

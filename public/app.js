@@ -10,7 +10,6 @@
     cwdLabel: document.getElementById("cwd-label"),
     modelBadge: document.getElementById("model-badge"),
     yoloBadge: document.getElementById("yolo-badge"),
-    resetBtn: document.getElementById("reset-btn"),
     chatLog: document.getElementById("chat-log"),
     composerInput: document.getElementById("composer-input"),
     sendBtn: document.getElementById("send-btn"),
@@ -25,8 +24,9 @@
     permAllow: document.getElementById("perm-allow"),
     permAlways: document.getElementById("perm-always"),
     permDeny: document.getElementById("perm-deny"),
-    tasksSection: document.getElementById("tasks-section"),
-    taskList: document.getElementById("task-list"),
+    progressSection: document.getElementById("progress-section"),
+    newChatBtn: document.getElementById("new-chat-btn"),
+    sessionList: document.getElementById("session-list"),
     folderBtn: document.getElementById("folder-btn"),
     folderOverlay: document.getElementById("folder-overlay"),
     folderInput: document.getElementById("folder-input"),
@@ -66,6 +66,8 @@
     currentProvider: "",
     currentModel: "",
     modelCache: null,
+    sessionId: "",
+    sessions: [],
   };
 
   function escapeHtml(s) {
@@ -144,24 +146,31 @@
   function handleServerMessage(msg) {
     switch (msg.type) {
       case "init": {
-        const switched = state.currentRoot && state.currentRoot !== msg.root;
+        const rootChanged = state.currentRoot && state.currentRoot !== msg.root;
         state.currentRoot = msg.root;
         state.recentFolders = msg.recentFolders || [];
         state.currentProvider = msg.provider;
         state.currentModel = msg.model;
+        state.sessionId = msg.sessionId;
         el.cwdLabel.textContent = msg.root;
         el.cwdLabel.title = msg.root;
         updateModelBadge();
         el.yoloBadge.hidden = !msg.yolo;
-        if (switched) {
-          state.toolCards.clear();
-          renderTasks([]);
-          el.codePanel.hidden = true;
-          showEmptyState("Switched project folder.");
-        }
+        // The server always follows "init" with fresh "history"/"tasks" for
+        // whatever session is now active — clear the view and let those
+        // messages repopulate it (an empty history just leaves it empty).
+        state.toolCards.clear();
+        renderProgress([]);
+        el.codePanel.hidden = true;
+        showEmptyState(rootChanged ? "Switched project folder." : "Ready when you are.");
         loadTree(el.fileTree, ".");
         break;
       }
+      case "sessions":
+        state.sessions = msg.sessions;
+        state.sessionId = msg.activeId;
+        renderSessionList();
+        break;
       case "thinking":
         showThinking(msg.value);
         break;
@@ -185,7 +194,7 @@
         showPermissionModal(msg.id, msg.toolName, msg.label, msg.preview);
         break;
       case "tasks":
-        renderTasks(msg.tasks);
+        renderProgress(msg.tasks);
         break;
       case "history":
         replayHistory(msg.items);
@@ -203,20 +212,57 @@
     el.modelBadge.title = `${text} — click to change`;
   }
 
-  // ---------- Tasks ----------
+  // ---------- Progress (high-tech task visualization) ----------
 
-  const TASK_GLYPH = { pending: "○", in_progress: "◐", completed: "✓" };
+  const RING_RADIUS = 26;
+  const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
-  function renderTasks(tasks) {
-    el.taskList.innerHTML = "";
-    el.tasksSection.hidden = !tasks || tasks.length === 0;
-    if (!tasks) return;
-    for (const t of tasks) {
-      const row = document.createElement("div");
-      row.className = `task-item ${t.status}`;
-      row.innerHTML = `<span class="task-glyph">${TASK_GLYPH[t.status] || "?"}</span><span class="task-subject">${escapeHtml(t.subject)}</span>`;
-      el.taskList.appendChild(row);
+  function renderProgress(tasks) {
+    const hasTasks = Array.isArray(tasks) && tasks.length > 0;
+    el.progressSection.hidden = !hasTasks;
+    if (!hasTasks) {
+      el.progressSection.innerHTML = "";
+      return;
     }
+
+    const total = tasks.length;
+    const completed = tasks.filter((t) => t.status === "completed").length;
+    const percent = Math.round((completed / total) * 100);
+    const offset = RING_CIRCUMFERENCE * (1 - percent / 100);
+    const anyActive = tasks.some((t) => t.status === "in_progress");
+
+    const steps = tasks
+      .map((t, i) => {
+        const isLast = i === tasks.length - 1;
+        const dotContent = t.status === "completed" ? "&#10003;" : "";
+        const line = isLast ? "" : `<span class="stepper-line ${t.status === "completed" ? "filled" : ""}"></span>`;
+        return `
+          <div class="stepper-step">
+            <div class="stepper-marker">
+              <span class="stepper-dot ${t.status}">${dotContent}</span>
+              ${line}
+            </div>
+            <div class="stepper-label ${t.status}">${escapeHtml(t.subject)}</div>
+          </div>
+        `;
+      })
+      .join("");
+
+    el.progressSection.innerHTML = `
+      <div class="sidebar-section-title">Progress</div>
+      <div class="progress-panel ${anyActive ? "active" : ""}">
+        <div class="progress-ring-wrap">
+          <svg class="progress-ring" viewBox="0 0 64 64">
+            <circle class="progress-ring-bg" cx="32" cy="32" r="${RING_RADIUS}"></circle>
+            <circle class="progress-ring-fill" cx="32" cy="32" r="${RING_RADIUS}"
+              stroke-dasharray="${RING_CIRCUMFERENCE}" stroke-dashoffset="${offset}"></circle>
+          </svg>
+          <div class="progress-percent">${percent}<span class="progress-percent-sign">%</span></div>
+        </div>
+        <div class="progress-summary">${completed} / ${total} steps complete</div>
+      </div>
+      <div class="progress-stepper">${steps}</div>
+    `;
   }
 
   // ---------- History replay ----------
@@ -471,11 +517,50 @@
     }
   });
 
-  el.resetBtn.addEventListener("click", () => {
-    send({ type: "reset" });
-    state.toolCards.clear();
-    renderTasks([]);
-    showEmptyState("Conversation reset.");
+  // ---------- Chats (sessions) ----------
+
+  function renderSessionList() {
+    el.sessionList.innerHTML = "";
+    if (!state.sessions.length) {
+      el.sessionList.innerHTML = `<div class="session-list-empty">No chats yet.</div>`;
+      return;
+    }
+    for (const s of state.sessions) {
+      const row = document.createElement("div");
+      row.className = `session-item${s.id === state.sessionId ? " active" : ""}`;
+      row.innerHTML = `
+        <div class="session-item-text">
+          <div class="session-item-title">${escapeHtml(s.title)}</div>
+          <div class="session-item-time">${formatRelativeTime(s.updatedAt)}</div>
+        </div>
+        <span class="session-item-delete" title="Delete chat">&times;</span>
+      `;
+      row.addEventListener("click", () => {
+        if (s.id !== state.sessionId) send({ type: "switch_session", id: s.id });
+      });
+      row.querySelector(".session-item-delete").addEventListener("click", (e) => {
+        e.stopPropagation();
+        send({ type: "delete_session", id: s.id });
+      });
+      el.sessionList.appendChild(row);
+    }
+  }
+
+  function formatRelativeTime(timestamp) {
+    if (!timestamp) return "";
+    const diffMs = Date.now() - timestamp;
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(timestamp).toLocaleDateString();
+  }
+
+  el.newChatBtn.addEventListener("click", () => {
+    send({ type: "new_session" });
   });
 
   // ---------- Switch project folder ----------

@@ -35,7 +35,8 @@ export const createDocxTool: ToolSpec = {
       name: "create_docx",
       description:
         "Create a well-formatted Word (.docx) document from structured content blocks. Use this instead of " +
-        "write_file for any Word document request.",
+        "write_file for any Word document request. `blocks` must contain the actual, complete content the user " +
+        "asked for — never call this with an empty or placeholder body.",
       parameters: {
         type: "object",
         properties: {
@@ -69,6 +70,9 @@ export const createDocxTool: ToolSpec = {
   describe: (args) => `create ${args.path}`,
   preview: async (args) => summarizeBlocks(args.path, args.title, args.blocks),
   run: async (args, ctx) => {
+    const emptyCheck = checkDocxHasContent(args.blocks);
+    if (emptyCheck) return { ok: false, output: emptyCheck };
+
     const filePath = resolveInRoot(ctx.root, args.path);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
 
@@ -114,6 +118,25 @@ export const createDocxTool: ToolSpec = {
   },
 };
 
+/** Returns an error message if `blocks` has no real content, or null if it's fine. */
+function checkDocxHasContent(blocks: any[] | undefined): string | null {
+  if (!Array.isArray(blocks) || blocks.length === 0) {
+    return "blocks is empty — this would create a near-blank document. Write out the actual content the user " +
+      "asked for as real blocks (headings, paragraphs, bullets, tables) before calling this tool.";
+  }
+  const hasContent = blocks.some((b) => {
+    if (b.type === "heading" || b.type === "paragraph") return typeof b.text === "string" && b.text.trim().length > 0;
+    if (b.type === "bullets") return Array.isArray(b.items) && b.items.some((i: any) => String(i).trim().length > 0);
+    if (b.type === "table") return (Array.isArray(b.headers) && b.headers.length > 0) || (Array.isArray(b.rows) && b.rows.length > 0);
+    return false;
+  });
+  if (!hasContent) {
+    return "Every block is empty (no text/items/rows) — this would create a near-blank document. Fill in the " +
+      "actual content the user asked for, then call this tool again.";
+  }
+  return null;
+}
+
 function summarizeBlocks(filePath: string, title: string | undefined, blocks: any[]): string {
   const counts: Record<string, number> = {};
   for (const b of blocks ?? []) counts[b.type] = (counts[b.type] ?? 0) + 1;
@@ -133,7 +156,8 @@ export const createPptxTool: ToolSpec = {
       name: "create_pptx",
       description:
         "Create a well-formatted PowerPoint (.pptx) presentation from a list of slides, each with a title and " +
-        "optional bullet points and speaker notes.",
+        "optional bullet points and speaker notes. `slides` must contain the actual content the user asked for " +
+        "— never call this with empty or placeholder slides.",
       parameters: {
         type: "object",
         properties: {
@@ -157,6 +181,9 @@ export const createPptxTool: ToolSpec = {
   describe: (args) => `create ${args.path}`,
   preview: async (args) => `New PowerPoint presentation: ${args.path}\n${(args.slides ?? []).length} slide(s)`,
   run: async (args, ctx) => {
+    const emptyCheck = checkPptxHasContent(args.slides);
+    if (emptyCheck) return { ok: false, output: emptyCheck };
+
     const filePath = resolveInRoot(ctx.root, args.path);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
 
@@ -182,6 +209,21 @@ export const createPptxTool: ToolSpec = {
   },
 };
 
+function checkPptxHasContent(slides: any[] | undefined): string | null {
+  if (!Array.isArray(slides) || slides.length === 0) {
+    return "slides is empty — this would create a blank presentation. Write out real slides (title + bullets) " +
+      "for the content the user asked for before calling this tool.";
+  }
+  const hasContent = slides.some(
+    (s) => (typeof s.title === "string" && s.title.trim().length > 0) || (Array.isArray(s.bullets) && s.bullets.some((b: any) => String(b).trim().length > 0))
+  );
+  if (!hasContent) {
+    return "Every slide is empty (no title or bullets) — this would create a blank presentation. Fill in the " +
+      "actual content, then call this tool again.";
+  }
+  return null;
+}
+
 // ---------- Excel (.xlsx) ----------
 
 export const createXlsxTool: ToolSpec = {
@@ -192,7 +234,8 @@ export const createXlsxTool: ToolSpec = {
       name: "create_xlsx",
       description:
         "Create a well-formatted Excel (.xlsx) workbook with one or more sheets, each with an optional bold " +
-        "header row and auto-sized columns.",
+        "header row and auto-sized columns. Sheets must contain the actual data the user asked for — never call " +
+        "this with empty or placeholder rows.",
       parameters: {
         type: "object",
         properties: {
@@ -220,6 +263,9 @@ export const createXlsxTool: ToolSpec = {
   describe: (args) => `create ${args.path}`,
   preview: async (args) => `New Excel workbook: ${args.path}\n${(args.sheets ?? []).length} sheet(s)`,
   run: async (args, ctx) => {
+    const emptyCheck = checkXlsxHasContent(args.sheets);
+    if (emptyCheck) return { ok: false, output: emptyCheck };
+
     const filePath = resolveInRoot(ctx.root, args.path);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
 
@@ -253,3 +299,18 @@ export const createXlsxTool: ToolSpec = {
     return { ok: true, output: `Created ${args.path} (${sheetSpecs.length} sheet(s), ${stat.size} bytes)` };
   },
 };
+
+function checkXlsxHasContent(sheets: any[] | undefined): string | null {
+  if (!Array.isArray(sheets) || sheets.length === 0) {
+    return "sheets is empty — this would create a blank workbook. Write out the actual headers/rows for the data " +
+      "the user asked for before calling this tool.";
+  }
+  const hasContent = sheets.some(
+    (s) => (Array.isArray(s.headers) && s.headers.length > 0) || (Array.isArray(s.rows) && s.rows.length > 0)
+  );
+  if (!hasContent) {
+    return "Every sheet is empty (no headers or rows) — this would create a blank workbook. Fill in the actual " +
+      "data, then call this tool again.";
+  }
+  return null;
+}

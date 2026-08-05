@@ -9,6 +9,7 @@ import { WebSocketReporter, createConfirmFn } from "./reporter";
 import { loadRecentFolders, addRecentFolder } from "../recentFolders";
 import { saveLastModel } from "../preferences";
 import { listOpenRouterModels, GROQ_MODELS } from "../providers/openrouterModels";
+import { listSessions } from "../session";
 import type { ClientMessage, ServerMessage } from "./protocol";
 import type { LlmConfig } from "../types";
 
@@ -47,6 +48,22 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
     };
 
+    const sendInit = () => {
+      send({
+        type: "init",
+        root: currentRoot,
+        provider: llmConfig.provider,
+        model: currentModel,
+        yolo,
+        recentFolders: loadRecentFolders(),
+        sessionId: agent.getSessionId(),
+        sessionTitle: agent.getSessionTitle(),
+      });
+    };
+    const sendSessions = () => {
+      send({ type: "sessions", sessions: listSessions(currentRoot), activeId: agent.getSessionId() });
+    };
+
     const pending = new Map<string, (decision: PermissionDecision) => void>();
     const reporter = new WebSocketReporter(send);
     const confirmFn = createConfirmFn(send, pending);
@@ -54,7 +71,9 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
     let agent = new Agent(currentRoot, { ...llmConfig, model: currentModel }, permissions, reporter);
     agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
 
-    send({ type: "init", root: currentRoot, provider: llmConfig.provider, model: currentModel, yolo, recentFolders: loadRecentFolders() });
+    sendInit();
+    sendSessions();
+    agent.replayCurrentState();
 
     ws.on("message", async (raw) => {
       let msg: ClientMessage;
@@ -67,14 +86,13 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
       try {
         if (msg.type === "user_message") {
           await agent.handleUserMessage(msg.text);
+          sendSessions();
         } else if (msg.type === "permission_response") {
           const resolve = pending.get(msg.id);
           if (resolve) {
             pending.delete(msg.id);
             resolve(msg.decision);
           }
-        } else if (msg.type === "reset") {
-          agent.reset();
         } else if (msg.type === "switch_folder") {
           const target = path.resolve(msg.path);
           if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) {
@@ -86,7 +104,9 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
           addRecentFolder(currentRoot);
           agent = new Agent(currentRoot, { ...llmConfig, model: currentModel }, permissions, reporter);
           agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
-          send({ type: "init", root: currentRoot, provider: llmConfig.provider, model: currentModel, yolo, recentFolders: loadRecentFolders() });
+          sendInit();
+          sendSessions();
+          agent.replayCurrentState();
         } else if (msg.type === "switch_model") {
           const model = msg.model?.trim();
           if (!model) {
@@ -97,6 +117,27 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
           agent.setModel(model);
           saveLastModel(llmConfig.provider, model);
           send({ type: "model_changed", model });
+        } else if (msg.type === "new_session") {
+          agent.startNewSession();
+          sendInit();
+          sendSessions();
+          agent.replayCurrentState();
+        } else if (msg.type === "switch_session") {
+          agent.switchSession(msg.id);
+          sendInit();
+          sendSessions();
+          agent.replayCurrentState();
+        } else if (msg.type === "delete_session") {
+          const wasActive = msg.id === agent.getSessionId();
+          agent.deleteSession(msg.id);
+          if (wasActive) {
+            agent.startNewSession();
+            sendInit();
+            agent.replayCurrentState();
+          }
+          sendSessions();
+        } else if (msg.type === "list_sessions") {
+          sendSessions();
         }
       } catch (err: any) {
         // A single bad request/response should never take the whole server

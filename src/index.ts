@@ -6,6 +6,7 @@ import { Agent } from "./agent";
 import { PermissionManager, type ConfirmFn } from "./permissions";
 import { printBanner, printError, ConsoleReporter, color } from "./ui";
 import { loadLastModel } from "./preferences";
+import { listSessions } from "./session";
 import type { LlmConfig, LlmProvider } from "./types";
 
 // Last-resort safety net: modern Node terminates the whole process on an
@@ -146,6 +147,7 @@ async function runRepl(options: CliOptions): Promise<void> {
   const reporter = new ConsoleReporter();
   let agent = new Agent(options.root, options.llmConfig, permissions, reporter);
   agent.connectMcp().catch((err) => printError(`MCP connect error: ${err.message ?? err}`));
+  agent.replayCurrentState();
 
   printBanner(options.root, `${options.llmConfig.provider} · ${options.llmConfig.model}`);
   if (options.yolo) {
@@ -161,9 +163,35 @@ async function runRepl(options: CliOptions): Promise<void> {
         rl.close();
         return;
       }
-      if (line === "/reset") {
-        agent.reset();
-        console.log("(conversation reset)\n");
+      if (line === "/reset" || line === "/new") {
+        agent.startNewSession();
+        console.log("(started a new chat)\n");
+        promptLoop();
+        return;
+      }
+      if (line === "/sessions") {
+        const sessions = listSessions(options.root);
+        if (!sessions.length) {
+          console.log("(no saved chats yet)\n");
+        } else {
+          for (const s of sessions) {
+            const marker = s.id === agent.getSessionId() ? color.cyan("* ") : "  ";
+            console.log(`${marker}${color.dim(s.id)}  ${s.title}`);
+          }
+          console.log("");
+        }
+        promptLoop();
+        return;
+      }
+      if (line.startsWith("/switch")) {
+        const id = line.slice(7).trim();
+        if (id) {
+          agent.switchSession(id);
+          agent.replayCurrentState();
+          console.log(`(switched to chat "${agent.getSessionTitle()}")\n`);
+        } else {
+          console.log("(usage: /switch <session-id> — see /sessions for ids)\n");
+        }
         promptLoop();
         return;
       }
@@ -176,7 +204,8 @@ async function runRepl(options: CliOptions): Promise<void> {
             options.root = resolved;
             agent = new Agent(options.root, options.llmConfig, permissions, reporter);
             agent.connectMcp().catch((err) => printError(`MCP connect error: ${err.message ?? err}`));
-            console.log(`(working directory set to ${resolved}, conversation reset)\n`);
+            agent.replayCurrentState();
+            console.log(`(working directory set to ${resolved})\n`);
           } else {
             console.log(`(no such directory: ${resolved})\n`);
           }

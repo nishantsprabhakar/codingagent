@@ -31,7 +31,7 @@ export function printBanner(root: string, model: string): void {
   console.log(color.bold(color.cyan("\ncoding-agent")) + color.dim(" — free AI coding agent (Pollinations)"));
   console.log(color.dim(`root: ${root}`));
   console.log(color.dim(`model: ${model}`));
-  console.log(color.dim("commands: /reset  /cwd <path>  /exit\n"));
+  console.log(color.dim("commands: /new  /sessions  /switch <id>  /cwd <path>  /exit\n"));
 }
 
 export function printToolCall(label: string): void {
