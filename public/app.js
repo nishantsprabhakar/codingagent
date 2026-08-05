@@ -119,6 +119,9 @@
       setBusy(false);
       if (wasBusy) {
         appendErrorMessage("Connection to the agent was lost. Reconnecting… you'll need to resend your last message.");
+        stopFakeProgress();
+        pushFeedItem("🔌", "Connection lost", "tool-fail");
+        setHudSummary("Disconnected");
       }
       setTimeout(connect, 2000);
     });
@@ -165,7 +168,7 @@
         // whatever session is now active — clear the view and let those
         // messages repopulate it (an empty history just leaves it empty).
         state.toolCards.clear();
-        renderProgress([]);
+        hudReset();
         el.codePanel.hidden = true;
         showEmptyState(rootChanged ? "Switched project folder." : "Ready when you are.");
         loadTree(el.fileTree, ".");
@@ -178,28 +181,33 @@
         break;
       case "thinking":
         showThinking(msg.value);
+        hudOnThinking(msg.value);
         break;
       case "tool_call":
         addToolCard(msg.id, msg.name, msg.label);
+        hudOnToolCall(msg.id, msg.name, msg.label);
         break;
       case "tool_result":
         updateToolCard(msg.id, msg.output, msg.ok);
+        hudOnToolResult(msg.id, msg.ok);
         break;
       case "assistant":
         showThinking(false);
         appendAssistantMessage(msg.text);
         setBusy(false);
+        hudOnTurnEnd(true);
         break;
       case "error":
         showThinking(false);
         appendErrorMessage(msg.text);
         setBusy(false);
+        hudOnTurnEnd(false);
         break;
       case "permission_request":
         showPermissionModal(msg.id, msg.toolName, msg.label, msg.preview);
         break;
       case "tasks":
-        renderProgress(msg.tasks);
+        applyTasks(msg.tasks);
         break;
       case "history":
         replayHistory(msg.items);
@@ -217,28 +225,167 @@
     el.modelBadge.title = `${text} — click to change`;
   }
 
-  // ---------- Progress (high-tech task visualization) ----------
+  // ---------- Live activity HUD (percentage ring + live feed) ----------
 
   const RING_RADIUS = 26;
   const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
-  function renderProgress(tasks) {
-    const hasTasks = Array.isArray(tasks) && tasks.length > 0;
-    el.progressSection.hidden = !hasTasks;
-    if (!hasTasks) {
-      el.progressSection.innerHTML = "";
+  const hud = {
+    built: false,
+    visible: false,
+    tasks: [],
+    feed: [],
+    feedSeq: 0,
+    feedCollapsed: false,
+    toolLabels: new Map(),
+    fakePercent: 0,
+    fakeTimer: null,
+  };
+
+  function ensureHudSkeleton() {
+    if (hud.built) return;
+    el.progressSection.innerHTML = `
+      <div class="sidebar-section-title">Live Activity</div>
+      <div class="progress-panel" id="hud-panel">
+        <div class="progress-ring-wrap">
+          <svg class="progress-ring" viewBox="0 0 64 64">
+            <circle class="progress-ring-bg" cx="32" cy="32" r="${RING_RADIUS}"></circle>
+            <circle class="progress-ring-fill" id="hud-ring-fill" cx="32" cy="32" r="${RING_RADIUS}"
+              stroke-dasharray="${RING_CIRCUMFERENCE}" stroke-dashoffset="${RING_CIRCUMFERENCE}"></circle>
+          </svg>
+          <div class="progress-percent" id="hud-percent">0<span class="progress-percent-sign">%</span></div>
+        </div>
+        <div class="progress-summary" id="hud-summary">Idle</div>
+      </div>
+      <div class="progress-stepper" id="hud-stepper" hidden></div>
+      <div class="feed-panel">
+        <div class="feed-header" id="feed-toggle" title="Click to expand/collapse">
+          <span class="feed-live-dot"></span>
+          <span class="feed-title">Live feed</span>
+          <span class="feed-caret">&#9662;</span>
+        </div>
+        <div class="feed-list" id="feed-list"></div>
+      </div>
+    `;
+    el.hudPanel = document.getElementById("hud-panel");
+    el.hudRingFill = document.getElementById("hud-ring-fill");
+    el.hudPercent = document.getElementById("hud-percent");
+    el.hudSummary = document.getElementById("hud-summary");
+    el.hudStepper = document.getElementById("hud-stepper");
+    el.feedToggle = document.getElementById("feed-toggle");
+    el.feedList = document.getElementById("feed-list");
+    el.feedToggle.addEventListener("click", () => {
+      hud.feedCollapsed = !hud.feedCollapsed;
+      el.feedToggle.classList.toggle("collapsed", hud.feedCollapsed);
+      el.feedList.classList.toggle("collapsed", hud.feedCollapsed);
+    });
+    hud.built = true;
+  }
+
+  function setHudVisible(visible) {
+    hud.visible = visible;
+    ensureHudSkeleton();
+    el.progressSection.hidden = !visible;
+  }
+
+  function setHudPercent(percent) {
+    ensureHudSkeleton();
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+    const offset = RING_CIRCUMFERENCE * (1 - clamped / 100);
+    el.hudRingFill.style.strokeDashoffset = String(offset);
+    el.hudPercent.innerHTML = `${clamped}<span class="progress-percent-sign">%</span>`;
+    el.hudPanel.classList.toggle("active", clamped < 100);
+  }
+
+  function setHudSummary(text) {
+    ensureHudSkeleton();
+    el.hudSummary.textContent = text;
+  }
+
+  function formatFeedAge(ts) {
+    const secs = Math.floor((Date.now() - ts) / 1000);
+    if (secs < 1) return "now";
+    if (secs < 60) return `${secs}s ago`;
+    return `${Math.floor(secs / 60)}m ago`;
+  }
+
+  function jumpToToolCard(toolId) {
+    const card = state.toolCards.get(toolId);
+    if (!card) return;
+    card.classList.add("open");
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.add("tool-card-flash");
+    setTimeout(() => card.classList.remove("tool-card-flash"), 900);
+  }
+
+  function pushFeedItem(icon, text, kind, toolId) {
+    ensureHudSkeleton();
+    const item = { id: ++hud.feedSeq, icon, text, kind, ts: Date.now(), toolId };
+    hud.feed.unshift(item);
+    if (hud.feed.length > 40) hud.feed.length = 40;
+
+    const row = document.createElement("div");
+    row.className = `feed-item feed-item-${kind} feed-item-enter`;
+    row.dataset.id = String(item.id);
+    row.innerHTML = `
+      <span class="feed-icon">${icon}</span>
+      <span class="feed-text">${escapeHtml(text)}</span>
+      <span class="feed-time">now</span>
+    `;
+    if (toolId) {
+      row.classList.add("feed-item-clickable");
+      row.title = "Click to jump to this step";
+      row.addEventListener("click", () => jumpToToolCard(toolId));
+    }
+    el.feedList.insertBefore(row, el.feedList.firstChild);
+    requestAnimationFrame(() => row.classList.remove("feed-item-enter"));
+    while (el.feedList.children.length > 40) el.feedList.removeChild(el.feedList.lastChild);
+  }
+
+  setInterval(() => {
+    if (!hud.built) return;
+    for (const row of el.feedList.querySelectorAll(".feed-item")) {
+      const item = hud.feed.find((f) => String(f.id) === row.dataset.id);
+      const timeEl = row.querySelector(".feed-time");
+      if (item && timeEl) timeEl.textContent = formatFeedAge(item.ts);
+    }
+  }, 1000);
+
+  function stopFakeProgress() {
+    if (hud.fakeTimer) {
+      clearInterval(hud.fakeTimer);
+      hud.fakeTimer = null;
+    }
+  }
+
+  function startFakeProgress() {
+    stopFakeProgress();
+    hud.fakePercent = 5;
+    setHudPercent(hud.fakePercent);
+    hud.fakeTimer = setInterval(() => {
+      if (hud.tasks.length) return;
+      const remaining = 92 - hud.fakePercent;
+      hud.fakePercent = Math.min(92, hud.fakePercent + Math.max(0.3, remaining * 0.05));
+      setHudPercent(hud.fakePercent);
+    }, 240);
+  }
+
+  function bumpFakeProgress(amount) {
+    if (hud.tasks.length) return;
+    hud.fakePercent = Math.min(92, hud.fakePercent + amount);
+    setHudPercent(hud.fakePercent);
+  }
+
+  function renderStepper() {
+    ensureHudSkeleton();
+    if (!hud.tasks.length) {
+      el.hudStepper.hidden = true;
+      el.hudStepper.innerHTML = "";
       return;
     }
-
-    const total = tasks.length;
-    const completed = tasks.filter((t) => t.status === "completed").length;
-    const percent = Math.round((completed / total) * 100);
-    const offset = RING_CIRCUMFERENCE * (1 - percent / 100);
-    const anyActive = tasks.some((t) => t.status === "in_progress");
-
-    const steps = tasks
+    const steps = hud.tasks
       .map((t, i) => {
-        const isLast = i === tasks.length - 1;
+        const isLast = i === hud.tasks.length - 1;
         const dotContent = t.status === "completed" ? "&#10003;" : "";
         const line = isLast ? "" : `<span class="stepper-line ${t.status === "completed" ? "filled" : ""}"></span>`;
         return `
@@ -252,22 +399,77 @@
         `;
       })
       .join("");
+    el.hudStepper.hidden = false;
+    el.hudStepper.innerHTML = steps;
+  }
 
-    el.progressSection.innerHTML = `
-      <div class="sidebar-section-title">Progress</div>
-      <div class="progress-panel ${anyActive ? "active" : ""}">
-        <div class="progress-ring-wrap">
-          <svg class="progress-ring" viewBox="0 0 64 64">
-            <circle class="progress-ring-bg" cx="32" cy="32" r="${RING_RADIUS}"></circle>
-            <circle class="progress-ring-fill" cx="32" cy="32" r="${RING_RADIUS}"
-              stroke-dasharray="${RING_CIRCUMFERENCE}" stroke-dashoffset="${offset}"></circle>
-          </svg>
-          <div class="progress-percent">${percent}<span class="progress-percent-sign">%</span></div>
-        </div>
-        <div class="progress-summary">${completed} / ${total} steps complete</div>
-      </div>
-      <div class="progress-stepper">${steps}</div>
-    `;
+  function applyTasks(tasks) {
+    hud.tasks = Array.isArray(tasks) ? tasks : [];
+    if (hud.tasks.length) {
+      setHudVisible(true);
+      stopFakeProgress();
+      const total = hud.tasks.length;
+      const completed = hud.tasks.filter((t) => t.status === "completed").length;
+      setHudPercent(Math.round((completed / total) * 100));
+      setHudSummary(`${completed} / ${total} steps complete`);
+    } else if (!state.busy) {
+      setHudSummary("Idle");
+    }
+    renderStepper();
+  }
+
+  function hudReset() {
+    ensureHudSkeleton();
+    hud.tasks = [];
+    hud.feed = [];
+    hud.toolLabels.clear();
+    el.feedList.innerHTML = "";
+    stopFakeProgress();
+    setHudPercent(0);
+    setHudSummary("Idle");
+    renderStepper();
+    setHudVisible(false);
+  }
+
+  function hudOnTurnStart() {
+    hudReset();
+    setHudVisible(true);
+    setHudSummary("Starting…");
+    startFakeProgress();
+    pushFeedItem("🧠", "Sent to model", "start");
+  }
+
+  function hudOnThinking(isThinking) {
+    if (!hud.visible || !isThinking) return;
+    setHudSummary("Thinking…");
+    pushFeedItem("🧠", "Thinking…", "thinking");
+    bumpFakeProgress(4);
+  }
+
+  function hudOnToolCall(id, name, label) {
+    hud.toolLabels.set(id, label);
+    setHudSummary(`Running ${label}`);
+    pushFeedItem(TOOL_ICONS[name] || (name.startsWith("mcp__") ? "⚡" : "T"), `Running ${label}`, "tool", id);
+    bumpFakeProgress(9);
+  }
+
+  function hudOnToolResult(id, ok) {
+    const label = hud.toolLabels.get(id) || "step";
+    pushFeedItem(ok ? "✅" : "⚠️", `${label} — ${ok ? "done" : "failed"}`, ok ? "tool-ok" : "tool-fail", id);
+    bumpFakeProgress(6);
+  }
+
+  function hudOnTurnEnd(ok) {
+    if (!hud.visible) return;
+    stopFakeProgress();
+    if (!hud.tasks.length) {
+      setHudPercent(100);
+      setHudSummary(ok ? "Done" : "Stopped");
+    }
+    pushFeedItem(ok ? "🏁" : "⚠️", ok ? "Response ready" : "Turn ended with an error", ok ? "done" : "tool-fail");
+    setTimeout(() => {
+      if (!state.busy) setHudVisible(hud.tasks.length > 0);
+    }, 2200);
   }
 
   // ---------- History replay ----------
@@ -496,6 +698,7 @@
     el.composerInput.disabled = busy || disconnected;
     el.sendBtn.disabled = busy || disconnected;
     setStatus(disconnected ? "disconnected" : busy ? "busy" : "connected");
+    el.progressSection.classList.toggle("hud-busy", busy);
   }
 
   function autoGrow() {
@@ -511,6 +714,7 @@
     el.composerInput.value = "";
     autoGrow();
     setBusy(true);
+    hudOnTurnStart();
   }
 
   el.sendBtn.addEventListener("click", sendUserMessage);
