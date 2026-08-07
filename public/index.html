@@ -9,7 +9,15 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Wrexlyn</title>
-<link rel="stylesheet" href="style.css?v=6" />
+<script>
+(function () {
+  try {
+    var saved = localStorage.getItem("wrexlyn-theme");
+    if (saved && saved !== "space") document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="style.css?v=8" />
 </head>
 <body>
 <canvas id="bg-canvas" aria-hidden="true"></canvas>
@@ -52,6 +60,7 @@
       <div class="topbar-right">
         <button id="model-badge" class="badge badge-clickable" title="Click to choose a different model"></button>
         <span id="yolo-badge" class="badge badge-yolo" hidden>YOLO</span>
+        <button id="theme-btn" class="icon-btn" title="Change theme">&#127912;</button>
         <button id="folder-btn" class="icon-btn" title="Switch project folder">&#128193;</button>
       </div>
     </header>
@@ -150,7 +159,23 @@
   </div>
 </div>
 
-<script src="background.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<div id="theme-overlay" class="overlay" hidden>
+  <div class="permission-modal">
+    <div class="permission-header">
+      <span class="permission-icon">&#127912;</span>
+      <div>
+        <div class="permission-title">Choose a theme</div>
+        <div class="permission-tool">Saved on this device only.</div>
+      </div>
+    </div>
+    <div id="theme-list" class="recent-folders theme-list"></div>
+    <div class="permission-actions">
+      <button id="theme-cancel" class="btn btn-secondary">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="background.js?v=8"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

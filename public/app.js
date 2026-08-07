@@ -45,6 +45,10 @@
     modelList: document.getElementById("model-list"),
     modelCancel: document.getElementById("model-cancel"),
     modelProviderNote: document.getElementById("model-provider-note"),
+    themeBtn: document.getElementById("theme-btn"),
+    themeOverlay: document.getElementById("theme-overlay"),
+    themeList: document.getElementById("theme-list"),
+    themeCancel: document.getElementById("theme-cancel"),
   };
 
   const TOOL_ICONS = {
@@ -894,6 +898,60 @@
     if (state.modelCache) renderModelList(state.modelCache.models);
   });
 
+  // ---------- Theme picker ----------
+
+  const THEME_STORAGE_KEY = "wrexlyn-theme";
+  const THEMES = [
+    { id: "space", name: "Space", swatch: ["#0a0d12", "#22d3ee", "#a78bfa"] },
+    { id: "tech", name: "Tech", swatch: ["#05070a", "#39ff88", "#22d3ee"] },
+    { id: "aurora", name: "Aurora", swatch: ["#0a0a14", "#a78bfa", "#2dd4bf"] },
+    { id: "sunset", name: "Sunset", swatch: ["#120a0d", "#fb923c", "#f472b6"] },
+    { id: "midnight", name: "Midnight", swatch: ["#070a12", "#5b8def", "#7dd3fc"] },
+  ];
+
+  function applyTheme(themeId) {
+    if (themeId === "space") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", themeId);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, themeId);
+    } catch {
+      // best-effort — a private-browsing quota error just means the choice won't persist
+    }
+  }
+
+  function currentTheme() {
+    return document.documentElement.getAttribute("data-theme") || "space";
+  }
+
+  function renderThemeList() {
+    const active = currentTheme();
+    el.themeList.innerHTML = "";
+    for (const theme of THEMES) {
+      const row = document.createElement("div");
+      row.className = `theme-item${theme.id === active ? " active" : ""}`;
+      row.innerHTML = `
+        <span class="theme-swatch">
+          ${theme.swatch.map((c) => `<span class="theme-swatch-dot" style="background:${c}"></span>`).join("")}
+        </span>
+        <span class="theme-item-name">${escapeHtml(theme.name)}</span>
+        ${theme.id === active ? '<span class="theme-item-check">&#10003;</span>' : ""}
+      `;
+      row.addEventListener("click", () => {
+        applyTheme(theme.id);
+        renderThemeList();
+      });
+      el.themeList.appendChild(row);
+    }
+  }
+
+  el.themeBtn.addEventListener("click", () => {
+    renderThemeList();
+    el.themeOverlay.hidden = false;
+  });
+  el.themeCancel.addEventListener("click", () => {
+    el.themeOverlay.hidden = true;
+  });
+
   // ---------- File upload ----------
 
   async function uploadFile(file) {
@@ -1099,6 +1157,7 @@
     if (!el.codePanel.hidden) el.codePanel.hidden = true;
     if (!el.folderOverlay.hidden) el.folderOverlay.hidden = true;
     if (!el.modelOverlay.hidden) el.modelOverlay.hidden = true;
+    if (!el.themeOverlay.hidden) el.themeOverlay.hidden = true;
   });
 
   // ---------- Init ----------
