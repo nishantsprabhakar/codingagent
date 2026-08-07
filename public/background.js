@@ -10,6 +10,7 @@
   if (!canvas || !canvas.getContext) return;
   const ctx = canvas.getContext("2d");
   const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const DEG = Math.PI / 180;
 
   let width = 0;
   let height = 0;
@@ -39,31 +40,73 @@
     drift: Math.random() * 0.6 + 0.2,
   }));
 
-  const meteors = [];
-  let nextMeteorAt = 4 + Math.random() * 6;
   let clock = 0;
-
-  function spawnMeteor() {
-    const startX = Math.random() * width * 0.6 + width * 0.2;
-    meteors.push({
-      x: startX,
-      y: -20,
-      vx: -260 - Math.random() * 140,
-      vy: 180 + Math.random() * 100,
-      life: 1,
-    });
-  }
 
   // ---------- Sun ----------
 
   const sun = { xf: 0.87, yf: 0.15 };
 
-  // ---------- Globe ----------
+  const SUN_GRANULES = Array.from({ length: 46 }, () => ({
+    angle: Math.random() * Math.PI * 2,
+    dist: Math.random() * 0.82,
+    r: Math.random() * 0.1 + 0.04,
+    tone: Math.random(),
+  }));
 
-  const GLOBE_MERIDIANS = 10;
-  const GLOBE_PARALLELS = 5;
-  const GLOBE_STEPS = 56;
-  const globe = { xf: 0.5, yf: 1.05, tilt: -0.38 };
+  const SUN_SPOTS = Array.from({ length: 3 }, () => ({
+    angle: Math.random() * Math.PI * 2,
+    dist: Math.random() * 0.55,
+    r: Math.random() * 0.09 + 0.05,
+  }));
+
+  const PROMINENCES = Array.from({ length: 4 }, (_, i) => ({
+    base: (i / 4) * Math.PI * 2 + Math.random() * 0.6,
+    span: 0.35 + Math.random() * 0.25,
+    reach: 0.35 + Math.random() * 0.3,
+    phase: Math.random() * Math.PI * 2,
+  }));
+
+  // ---------- Earth ----------
+
+  const GLOBE_STEPS = 40;
+  const globe = { xf: 0.5, yf: 1.06, tilt: -0.4 };
+  let cloudShift = 0;
+
+  // Very simplified, stylized continent silhouettes (lon, lat in degrees) — not surveyed coastlines.
+  const CONTINENTS = [
+    [
+      [-17, 35], [10, 37], [33, 31], [43, 12], [51, -2],
+      [40, -26], [20, -35], [12, -18], [9, 4], [-10, 10], [-17, 20],
+    ],
+    [
+      [-10, 71], [40, 70], [100, 72], [140, 60], [150, 45],
+      [130, 25], [105, 10], [80, 8], [60, 25], [45, 40], [30, 45], [15, 45], [-5, 60],
+    ],
+    [
+      [-165, 68], [-140, 60], [-125, 49], [-117, 33], [-97, 26],
+      [-80, 25], [-75, 45], [-95, 50], [-110, 60], [-140, 68],
+    ],
+    [
+      [-80, 10], [-60, 10], [-50, 0], [-35, -8], [-40, -20],
+      [-58, -35], [-70, -45], [-73, -20], [-80, -5],
+    ],
+    [
+      [113, -12], [135, -11], [145, -16], [153, -28], [140, -38], [120, -34], [113, -22],
+    ],
+  ];
+
+  const CLOUD_PUFFS = Array.from({ length: 8 }, () => ({
+    lon: Math.random() * 360 - 180,
+    lat: Math.random() * 130 - 65,
+    scale: Math.random() * 0.5 + 0.7,
+    speed: Math.random() * 0.4 + 0.6,
+  }));
+
+  function sphereFromLonLat(lonDeg, latDeg) {
+    const lon = lonDeg * DEG;
+    const lat = latDeg * DEG;
+    return { x: Math.cos(lat) * Math.sin(lon), y: Math.sin(lat), z: Math.cos(lat) * Math.cos(lon) };
+  }
 
   // ---------- Interaction: touch/pointer speeds everything up ----------
 
@@ -135,30 +178,24 @@
 
     if (!reduceMotion) {
       boost *= Math.pow(0.05, dt);
-      const speed = 0.1 + boost * 0.85;
+      const speed = 0.08 + boost * 0.7;
       angle += speed * dt;
-
-      nextMeteorAt -= dt;
-      if (nextMeteorAt <= 0) {
-        spawnMeteor();
-        nextMeteorAt = 5 + Math.random() * 7;
-      }
+      cloudShift += dt * (0.015 + boost * 0.05);
     }
 
-    draw(dt);
+    draw();
     if (!reduceMotion) requestAnimationFrame(frame);
   }
 
-  function draw(dt) {
+  function draw() {
     ctx.clearRect(0, 0, width, height);
-    drawStars(dt);
-    drawMeteors(dt);
+    drawStars();
     drawSun();
     drawGlobe();
   }
 
-  function drawStars(dt) {
-    const driftSpeed = (0.15 + boost * 0.7) * dt * 0.02;
+  function drawStars() {
+    const driftSpeed = (0.15 + boost * 0.7) * 0.0006;
     ctx.save();
     for (const s of stars) {
       s.x -= s.drift * driftSpeed;
@@ -173,69 +210,102 @@
     ctx.restore();
   }
 
-  function drawMeteors(dt) {
-    ctx.save();
-    for (let i = meteors.length - 1; i >= 0; i--) {
-      const m = meteors[i];
-      m.x += m.vx * dt;
-      m.y += m.vy * dt;
-      m.life -= dt * 0.6;
-      if (m.life <= 0 || m.y > height + 40) {
-        meteors.splice(i, 1);
-        continue;
-      }
-      const grad = ctx.createLinearGradient(m.x, m.y, m.x - m.vx * 0.08, m.y - m.vy * 0.08);
-      grad.addColorStop(0, `rgba(224, 246, 255, ${Math.max(m.life, 0)})`);
-      grad.addColorStop(1, "rgba(224, 246, 255, 0)");
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(m.x, m.y);
-      ctx.lineTo(m.x - m.vx * 0.08, m.y - m.vy * 0.08);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
   function drawSun() {
     const cx = sun.xf * width;
     const cy = sun.yf * height;
-    const r = (width < 700 ? 30 : 44) * (width < 700 ? 0.85 : 1);
-    const pulse = 1 + 0.05 * Math.sin(clock * 1.4);
+    const r = width < 700 ? 34 : 46;
+    const pulse = 1 + 0.035 * Math.sin(clock * 1.1);
+    const spin = angle * 0.12;
 
     ctx.save();
+
+    // Outer corona — soft, slightly irregular rather than a perfect ring.
     const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 4.4 * pulse);
-    glow.addColorStop(0, "rgba(255, 214, 120, 0.5)");
-    glow.addColorStop(0.35, "rgba(255, 170, 80, 0.16)");
-    glow.addColorStop(1, "rgba(255, 170, 80, 0)");
+    glow.addColorStop(0, "rgba(255, 214, 130, 0.5)");
+    glow.addColorStop(0.35, "rgba(255, 165, 80, 0.15)");
+    glow.addColorStop(1, "rgba(255, 140, 60, 0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(cx, cy, r * 4.4 * pulse, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.globalAlpha = 0.35;
-    ctx.strokeStyle = "#ffd27a";
-    ctx.lineWidth = 1;
-    const rayCount = 10;
-    for (let i = 0; i < rayCount; i++) {
-      const a = angle * 0.5 + (i / rayCount) * Math.PI * 2;
-      const inner = r * 1.35;
-      const outer = r * (2.05 + 0.12 * Math.sin(clock * 2 + i));
+    // Prominence loops arcing off the limb.
+    ctx.globalAlpha = 0.5;
+    for (const p of PROMINENCES) {
+      const wobble = 0.06 * Math.sin(clock * 0.8 + p.phase);
+      const a0 = p.base + spin;
+      const a1 = a0 + p.span + wobble;
+      const reach = r * (1.15 + p.reach + 0.06 * Math.sin(clock * 1.3 + p.phase));
+      const x0 = cx + Math.cos(a0) * r * 1.02;
+      const y0 = cy + Math.sin(a0) * r * 1.02;
+      const x1 = cx + Math.cos(a1) * r * 1.02;
+      const y1 = cy + Math.sin(a1) * r * 1.02;
+      const midA = (a0 + a1) / 2;
+      const cxp = cx + Math.cos(midA) * reach;
+      const cyp = cy + Math.sin(midA) * reach;
+      const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+      grad.addColorStop(0, "rgba(255, 120, 60, 0)");
+      grad.addColorStop(0.5, "rgba(255, 160, 90, 0.65)");
+      grad.addColorStop(1, "rgba(255, 120, 60, 0)");
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
-      ctx.lineTo(cx + Math.cos(a) * outer, cy + Math.sin(a) * outer);
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo(cxp, cyp, x1, y1);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
-    const core = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, 0, cx, cy, r * pulse);
-    core.addColorStop(0, "#fff6e0");
-    core.addColorStop(0.5, "#ffd27a");
-    core.addColorStop(1, "#ff9d4d");
-    ctx.fillStyle = core;
+    // Photosphere disc, clipped so granulation/spots stay inside it.
+    ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, r * pulse, 0, Math.PI * 2);
+    ctx.clip();
+
+    const core = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, 0, cx, cy, r * pulse);
+    core.addColorStop(0, "#fff8e4");
+    core.addColorStop(0.45, "#ffd27a");
+    core.addColorStop(1, "#f9862f");
+    ctx.fillStyle = core;
+    ctx.fillRect(cx - r * 1.2, cy - r * 1.2, r * 2.4, r * 2.4);
+
+    for (const g of SUN_GRANULES) {
+      const a = g.angle + spin;
+      const gx = cx + Math.cos(a) * g.dist * r;
+      const gy = cy + Math.sin(a) * g.dist * r;
+      const gr = g.r * r;
+      ctx.globalAlpha = 0.18 + g.tone * 0.12;
+      ctx.fillStyle = g.tone > 0.5 ? "#fff3cf" : "#e8730f";
+      ctx.beginPath();
+      ctx.arc(gx, gy, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    for (const spot of SUN_SPOTS) {
+      const a = spot.angle + spin * 0.8;
+      const sx = cx + Math.cos(a) * spot.dist * r;
+      const sy = cy + Math.sin(a) * spot.dist * r;
+      const sr = spot.r * r;
+      const spotGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
+      spotGrad.addColorStop(0, "rgba(90, 30, 10, 0.55)");
+      spotGrad.addColorStop(1, "rgba(90, 30, 10, 0)");
+      ctx.fillStyle = spotGrad;
+      ctx.beginPath();
+      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Limb darkening — the edge of a real photosphere reads darker than the center.
+    const limb = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r);
+    limb.addColorStop(0, "rgba(0, 0, 0, 0)");
+    limb.addColorStop(1, "rgba(160, 50, 10, 0.35)");
+    ctx.fillStyle = limb;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.restore();
     ctx.restore();
   }
 
@@ -252,44 +322,44 @@
     return { x: cx + x * r, y: cy - y * r, z };
   }
 
-  function strokeSphereLine(points, cx, cy, r, tilt) {
+  function fillSmoothPolygon(points) {
+    if (points.length < 3) return;
+    const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
     ctx.beginPath();
-    let started = false;
-    for (const p3 of points) {
-      const proj = project(p3, cx, cy, r, tilt);
-      if (proj.z < -0.04) {
-        started = false;
-        continue;
-      }
-      if (!started) {
-        ctx.moveTo(proj.x, proj.y);
-        started = true;
-      } else {
-        ctx.lineTo(proj.x, proj.y);
-      }
+    const m0 = mid(points[points.length - 1], points[0]);
+    ctx.moveTo(m0.x, m0.y);
+    for (let i = 0; i < points.length; i++) {
+      const cur = points[i];
+      const next = points[(i + 1) % points.length];
+      const m = mid(cur, next);
+      ctx.quadraticCurveTo(cur.x, cur.y, m.x, m.y);
     }
-    ctx.stroke();
+    ctx.closePath();
+    ctx.fill();
   }
 
   function drawGlobe() {
     const cx = width * globe.xf;
     const cy = height * globe.yf;
-    const r = Math.min(width, height) * (width < 700 ? 0.42 : 0.32);
+    const r = Math.min(width, height) * (width < 700 ? 0.44 : 0.34);
 
     ctx.save();
 
-    const atmo = ctx.createRadialGradient(cx, cy, r * 0.85, cx, cy, r * 1.4);
-    atmo.addColorStop(0, "rgba(34, 211, 238, 0.22)");
-    atmo.addColorStop(1, "rgba(34, 211, 238, 0)");
+    // Atmosphere glow beyond the limb.
+    const atmo = ctx.createRadialGradient(cx, cy, r * 0.9, cx, cy, r * 1.35);
+    atmo.addColorStop(0, "rgba(120, 200, 255, 0.28)");
+    atmo.addColorStop(1, "rgba(120, 200, 255, 0)");
     ctx.fillStyle = atmo;
     ctx.beginPath();
-    ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r * 1.35, 0, Math.PI * 2);
     ctx.fill();
 
-    const base = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
-    base.addColorStop(0, "rgba(30, 41, 59, 0.92)");
-    base.addColorStop(1, "rgba(6, 10, 16, 0.96)");
-    ctx.fillStyle = base;
+    // Ocean base.
+    const ocean = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r);
+    ocean.addColorStop(0, "#2f7db8");
+    ocean.addColorStop(0.55, "#1c5c8c");
+    ocean.addColorStop(1, "#0c2f4d");
+    ctx.fillStyle = ocean;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
@@ -299,31 +369,65 @@
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.clip();
 
-    ctx.strokeStyle = "rgba(103, 232, 249, 0.5)";
-    ctx.lineWidth = 1;
-    for (let m = 0; m < GLOBE_MERIDIANS; m++) {
-      const theta = (m / GLOBE_MERIDIANS) * Math.PI * 2;
-      const points = [];
-      for (let t = 0; t <= GLOBE_STEPS; t++) {
-        const phi = (t / GLOBE_STEPS) * Math.PI * 2;
-        points.push({ x: Math.sin(phi) * Math.cos(theta), y: Math.cos(phi), z: Math.sin(phi) * Math.sin(theta) });
-      }
-      strokeSphereLine(points, cx, cy, r, globe.tilt);
+    // Continents.
+    ctx.fillStyle = "#3d7a3f";
+    for (const shape of CONTINENTS) {
+      const points3 = shape.map(([lon, lat]) => sphereFromLonLat(lon, lat));
+      const avgZ = points3.reduce((sum, p) => sum + project(p, 0, 0, 1, globe.tilt).z, 0) / points3.length;
+      if (avgZ < -0.15) continue;
+      const projected = points3.map((p) => project(p, cx, cy, r, globe.tilt));
+      fillSmoothPolygon(projected);
     }
 
-    ctx.strokeStyle = "rgba(103, 232, 249, 0.4)";
-    for (let p = 1; p < GLOBE_PARALLELS; p++) {
-      const lat = (p / GLOBE_PARALLELS) * Math.PI - Math.PI / 2;
-      const points = [];
-      for (let t = 0; t <= GLOBE_STEPS; t++) {
-        const theta = (t / GLOBE_STEPS) * Math.PI * 2;
-        points.push({ x: Math.cos(lat) * Math.cos(theta), y: Math.sin(lat), z: Math.cos(lat) * Math.sin(theta) });
+    // Polar ice caps — small, fixed near the top/bottom rim (the tilt keeps
+    // poles there regardless of yaw, so deriving this from the raw 3D
+    // projection is unnecessary and was producing an oversized, misplaced cap).
+    ctx.fillStyle = "rgba(235, 245, 250, 0.85)";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - r * 0.86, r * 0.3, r * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + r * 0.86, r * 0.32, r * 0.13, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cloud cover, drifting at its own slow pace over the terrain.
+    for (const puff of CLOUD_PUFFS) {
+      const lon = puff.lon + cloudShift * 40 * puff.speed;
+      const p3 = sphereFromLonLat(lon, puff.lat);
+      const proj = project(p3, cx, cy, r, globe.tilt);
+      if (proj.z < -0.1) continue;
+      const size = r * 0.065 * puff.scale;
+      for (let i = 0; i < 4; i++) {
+        const ox = (i - 1.5) * size * 0.8 + Math.sin(i * 2) * size * 0.2;
+        const oy = Math.cos(i * 1.7) * size * 0.25;
+        const puffR = size * (0.7 + 0.3 * Math.sin(i * 3.1));
+        const puffGrad = ctx.createRadialGradient(
+          proj.x + ox, proj.y + oy, 0,
+          proj.x + ox, proj.y + oy, puffR
+        );
+        puffGrad.addColorStop(0, "rgba(255, 255, 255, 0.5)");
+        puffGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+        ctx.fillStyle = puffGrad;
+        ctx.beginPath();
+        ctx.arc(proj.x + ox, proj.y + oy, puffR, 0, Math.PI * 2);
+        ctx.fill();
       }
-      strokeSphereLine(points, cx, cy, r, globe.tilt);
     }
+
+    // Day/night terminator — fixed to screen space since the sun sits in a fixed corner.
+    const shade = ctx.createLinearGradient(cx - r, cy + r, cx + r * 0.6, cy - r * 0.6);
+    shade.addColorStop(0, "rgba(2, 6, 12, 0.6)");
+    shade.addColorStop(0.55, "rgba(2, 6, 12, 0.18)");
+    shade.addColorStop(1, "rgba(2, 6, 12, 0)");
+    ctx.fillStyle = shade;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
 
-    ctx.strokeStyle = "rgba(167, 139, 250, 0.55)";
+    // Rim light.
+    ctx.strokeStyle = "rgba(180, 225, 255, 0.5)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -333,5 +437,5 @@
   }
 
   requestAnimationFrame(frame);
-  if (reduceMotion) draw(0);
+  if (reduceMotion) draw();
 })();

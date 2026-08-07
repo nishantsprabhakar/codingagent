@@ -18,6 +18,7 @@ interface PersistedSession extends SessionMeta {
   messages: ChatMessage[];
   historyLog: HistoryItem[];
   tasks: TaskItem[];
+  createdFiles: string[];
 }
 
 const LEGACY_SESSION_FILE = "session.json";
@@ -82,6 +83,7 @@ export function loadSession(root: string, id: string): PersistedSession | null {
       messages: data.messages,
       historyLog: Array.isArray(data.historyLog) ? data.historyLog : [],
       tasks: Array.isArray(data.tasks) ? data.tasks : [],
+      createdFiles: Array.isArray(data.createdFiles) ? data.createdFiles : [],
     };
   } catch {
     return null;
@@ -95,7 +97,8 @@ export function saveSession(
   title: string,
   messages: ChatMessage[],
   historyLog: HistoryItem[],
-  tasks: TaskItem[]
+  tasks: TaskItem[],
+  createdFiles: string[]
 ): void {
   try {
     const dir = sessionsDir(root);
@@ -108,7 +111,16 @@ export function saveSession(
 
     const existing = loadSession(root, id);
     const createdAt = existing?.createdAt ?? Date.now();
-    const payload: PersistedSession = { id, title, createdAt, updatedAt: Date.now(), messages, historyLog, tasks };
+    const payload: PersistedSession = {
+      id,
+      title,
+      createdAt,
+      updatedAt: Date.now(),
+      messages,
+      historyLog,
+      tasks,
+      createdFiles,
+    };
     fs.writeFileSync(sessionPath(root, id), JSON.stringify(payload, null, 2), "utf-8");
   } catch (err: any) {
     console.error("[coding-agent] warning: failed to save session:", err.message ?? err);
@@ -144,7 +156,7 @@ function migrateLegacySession(root: string): void {
       const id = createSessionId();
       const firstUser = (data.historyLog ?? []).find((item: any) => item.type === "user");
       const title = firstUser ? deriveTitle(firstUser.text) : "Imported chat";
-      saveSession(root, id, title, data.messages, data.historyLog ?? [], data.tasks ?? []);
+      saveSession(root, id, title, data.messages, data.historyLog ?? [], data.tasks ?? [], data.createdFiles ?? []);
     }
   } catch {
     // if it's unreadable there's nothing to migrate

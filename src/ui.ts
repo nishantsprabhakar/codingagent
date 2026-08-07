@@ -129,6 +129,10 @@ export class ConsoleReporter implements Reporter {
     printHistory(items);
   }
 
+  files(_files: string[]): void {
+    // The CLI already shows each write/edit as a tool call; a separate file list adds no new information here.
+  }
+
   private startSpinner(): void {
     if (this.spinnerTimer) return;
     this.spinnerTimer = setInterval(() => {

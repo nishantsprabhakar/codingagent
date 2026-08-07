@@ -16,6 +16,7 @@ export type ServerMessage =
   | { type: "error"; text: string }
   | { type: "thinking"; value: boolean }
   | { type: "tasks"; tasks: TaskItem[] }
+  | { type: "files"; files: string[] }
   | { type: "history"; items: HistoryItem[] }
   | { type: "model_changed"; model: string }
   | { type: "sessions"; sessions: SessionMeta[]; activeId: string };

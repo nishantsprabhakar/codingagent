@@ -14,6 +14,9 @@ import type { ChatMessage, ToolContext, Reporter, LlmConfig, TaskItem, HistoryIt
 
 const MAX_TOOL_ITERATIONS = 30;
 
+/** Tool calls whose `path` argument should surface in the "Created Files" panel. */
+const FILE_PRODUCING_TOOLS = new Set(["write_file", "edit_file", "create_docx", "create_pptx", "create_xlsx"]);
+
 function systemPrompt(root: string, projectContext: string): string {
   return [
     "You are a terminal-based AI coding agent operating on a real project directory.",
@@ -59,6 +62,7 @@ export class Agent {
   private messages: ChatMessage[] = [];
   private historyLog: HistoryItem[] = [];
   private tasks: TaskItem[] = [];
+  private createdFiles: string[] = [];
   private ctx: ToolContext;
   private mcpManager = new McpManager();
   private sysMessage: ChatMessage;
@@ -84,19 +88,22 @@ export class Agent {
       this.messages = [this.sysMessage, ...restored.messages];
       this.historyLog = restored.historyLog;
       this.tasks = restored.tasks;
+      this.createdFiles = restored.createdFiles;
       this.sessionTitle = restored.title;
     } else {
       this.messages = [this.sysMessage];
       this.historyLog = [];
       this.tasks = [];
+      this.createdFiles = [];
       this.sessionTitle = "New chat";
     }
   }
 
-  /** Pushes this session's history/tasks to the reporter — call after construction or a session switch. */
+  /** Pushes this session's history/tasks/files to the reporter — call after construction or a session switch. */
   replayCurrentState(): void {
     this.reporter.history(this.historyLog);
     this.reporter.tasks(this.tasks);
+    this.reporter.files(this.createdFiles);
   }
 
   getSessionId(): string {
@@ -119,6 +126,7 @@ export class Agent {
     this.messages = [this.sysMessage];
     this.historyLog = [];
     this.tasks = [];
+    this.createdFiles = [];
     this.sessionTitle = "New chat";
     return this.sessionId;
   }
@@ -209,7 +217,23 @@ export class Agent {
 
   private persist(): void {
     // this.messages[0] is always the system prompt — persist everything after it.
-    saveSession(this.ctx.root, this.sessionId, this.sessionTitle, this.messages.slice(1), this.historyLog, this.tasks);
+    saveSession(
+      this.ctx.root,
+      this.sessionId,
+      this.sessionTitle,
+      this.messages.slice(1),
+      this.historyLog,
+      this.tasks,
+      this.createdFiles
+    );
+  }
+
+  /** Surfaces a file the agent just wrote/edited/generated in the "Created Files" panel, most-recent first. */
+  private trackFile(relPath: string): void {
+    const existing = this.createdFiles.indexOf(relPath);
+    if (existing !== -1) this.createdFiles.splice(existing, 1);
+    this.createdFiles.unshift(relPath);
+    this.reporter.files(this.createdFiles);
   }
 
   private recordTool(id: string, name: string, label: string, args: unknown, output: string, ok: boolean): string {
@@ -275,6 +299,9 @@ export class Agent {
 
     try {
       const result = await tool.run(args, this.ctx);
+      if (result.ok && FILE_PRODUCING_TOOLS.has(name) && typeof args.path === "string") {
+        this.trackFile(args.path);
+      }
       return this.recordTool(id, name, label, args, result.output, result.ok);
     } catch (err: any) {
       const message = `Tool ${name} threw an error: ${err.message ?? err}`;

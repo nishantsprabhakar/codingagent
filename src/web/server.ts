@@ -174,6 +174,7 @@ function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: s
 
   if (url.pathname === "/api/tree") return handleTree(url, res, root);
   if (url.pathname === "/api/file") return handleFile(url, res, root);
+  if (url.pathname === "/api/download") return handleDownload(url, res, root);
   if (url.pathname === "/api/upload" && req.method === "POST") return handleUpload(req, url, res, root);
   if (url.pathname === "/api/models") return void handleModels(res, provider);
 
@@ -249,6 +250,29 @@ function handleFile(url: URL, res: http.ServerResponse, root: string): void {
   } catch {
     sendJson(res, 200, { path: relPath, truncated: false, content: "(binary file, cannot preview)" });
   }
+}
+
+function handleDownload(url: URL, res: http.ServerResponse, root: string): void {
+  const relPath = url.searchParams.get("path");
+  if (!relPath) return sendJson(res, 400, { error: "missing path" });
+
+  let filePath: string;
+  try {
+    filePath = resolveInRoot(root, relPath);
+  } catch (err: any) {
+    return sendJson(res, 400, { error: err.message });
+  }
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return sendJson(res, 404, { error: "file not found" });
+  }
+
+  const filename = path.basename(filePath);
+  res.writeHead(200, {
+    "Content-Type": "application/octet-stream",
+    "Content-Disposition": `attachment; filename="${filename.replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+  });
+  fs.createReadStream(filePath).pipe(res);
 }
 
 function handleUpload(req: http.IncomingMessage, url: URL, res: http.ServerResponse, root: string): void {

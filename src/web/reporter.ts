@@ -41,6 +41,10 @@ export class WebSocketReporter implements Reporter {
     this.send({ type: "tasks", tasks });
   }
 
+  files(files: string[]): void {
+    this.send({ type: "files", files });
+  }
+
   history(items: HistoryItem[]): void {
     this.send({ type: "history", items });
   }

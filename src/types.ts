@@ -92,4 +92,5 @@ export interface Reporter {
   thinking(isThinking: boolean): void;
   tasks(tasks: TaskItem[]): void;
   history(items: HistoryItem[]): void;
+  files(files: string[]): void;
 }
