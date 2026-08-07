@@ -3,7 +3,8 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { ChatMessage, ToolDefinition, ToolCallRequest, ChatCompletionResult } from "../types";
+import type { ChatMessage, ToolDefinition, ChatCompletionResult } from "../types";
+import { consumeSseStream } from "./sseStream";
 
 const BASE_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -12,7 +13,8 @@ export async function chatCompletion(
   tools: ToolDefinition[],
   model: string,
   apiKey: string,
-  maxRetries = 5
+  maxRetries = 5,
+  onDelta?: (chunk: string) => void
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
@@ -29,8 +31,9 @@ export async function chatCompletion(
           messages,
           tools: tools.length ? tools : undefined,
           tool_choice: tools.length ? "auto" : undefined,
-          temperature: 0.2,
+          temperature: 0.15,
           max_tokens: 8000,
+          stream: true,
         }),
       });
 
@@ -50,21 +53,16 @@ export async function chatCompletion(
         throwFatal(`Groq API error ${res.status}: ${text.slice(0, 800)}`);
       }
 
-      const data: any = await res.json();
-      const choice = data.choices?.[0];
-      const message = choice?.message ?? {};
+      // Once the stream starts, its content may already be visible to the user via
+      // onDelta — retrying from here would re-emit/duplicate that, so a failure past
+      // this point surfaces as a real error instead of being silently retried.
+      const { content, toolCalls, finishReason } = await consumeSseStream(res, onDelta);
 
-      const toolCalls: ToolCallRequest[] = (message.tool_calls ?? []).map((tc: any) => ({
-        id: tc.id,
-        name: tc.function?.name,
-        arguments: tc.function?.arguments ?? "{}",
-      }));
-
-      if (choice?.finish_reason === "length") {
+      if (finishReason === "length") {
         console.error("[coding-agent] warning: response was truncated by the token limit (finish_reason=length)");
       }
 
-      return { content: message.content ?? null, toolCalls };
+      return { content, toolCalls };
     } catch (err: any) {
       lastError = err;
       if (err.fatal) throw err;

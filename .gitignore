@@ -5,3 +5,4 @@ dist/
 agent.config.json
 mcp.json
 .coding-agent/
+installer/windows/output/

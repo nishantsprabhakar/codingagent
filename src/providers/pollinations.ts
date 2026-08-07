@@ -3,7 +3,8 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { ChatMessage, ToolDefinition, ToolCallRequest, ChatCompletionResult } from "../types";
+import type { ChatMessage, ToolDefinition, ChatCompletionResult } from "../types";
+import { consumeSseStream } from "./sseStream";
 
 const BASE_URL = "https://text.pollinations.ai/openai";
 
@@ -18,7 +19,8 @@ export async function chatCompletion(
   messages: ChatMessage[],
   tools: ToolDefinition[],
   model: string,
-  maxRetries = 5
+  maxRetries = 5,
+  onDelta?: (chunk: string) => void
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
@@ -32,8 +34,9 @@ export async function chatCompletion(
           messages,
           tools: tools.length ? tools : undefined,
           tool_choice: tools.length ? "auto" : undefined,
-          temperature: 0.2,
+          temperature: 0.15,
           max_tokens: 8000,
+          stream: true,
         }),
       });
 
@@ -63,19 +66,10 @@ export async function chatCompletion(
         throwFatal(`Pollinations API error ${res.status}: ${text.slice(0, 800)}`);
       }
 
-      const data: any = await res.json();
-      const choice = data.choices?.[0];
-      const message = choice?.message ?? {};
+      const { content, reasoning, toolCalls, finishReason } = await consumeSseStream(res, onDelta);
+      const rawContent = content?.trim() ? content : reasoning?.trim() ? reasoning : null;
 
-      const toolCalls: ToolCallRequest[] = (message.tool_calls ?? []).map((tc: any) => ({
-        id: tc.id,
-        name: tc.function?.name,
-        arguments: tc.function?.arguments ?? "{}",
-      }));
-
-      const rawContent = message.content?.trim() ? message.content : message.reasoning?.trim() ? message.reasoning : null;
-
-      if (choice?.finish_reason === "length") {
+      if (finishReason === "length") {
         console.error("[coding-agent] warning: response was truncated by the token limit (finish_reason=length)");
       }
 

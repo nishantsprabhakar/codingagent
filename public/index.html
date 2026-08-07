@@ -13,14 +13,23 @@
 (function () {
   try {
     var saved = localStorage.getItem("wrexlyn-theme");
-    if (saved && saved !== "space") document.documentElement.setAttribute("data-theme", saved);
+    var theme = saved || "tactical";
+    if (theme !== "space") document.documentElement.setAttribute("data-theme", theme);
   } catch (e) {}
 })();
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+/>
 <link rel="stylesheet" href="style.css?v=9" />
 </head>
 <body>
 <canvas id="bg-canvas" aria-hidden="true"></canvas>
+<div id="tactical-grid" aria-hidden="true"></div>
+<div id="tactical-scanline" aria-hidden="true"></div>
 <div class="app">
   <button id="sidebar-toggle" class="mobile-toggle" title="Toggle files">☰</button>
 
@@ -53,6 +62,7 @@
       <div class="topbar-left">
         <span id="status-dot" class="status-dot"></span>
         <span id="status-text" class="status-text">connecting&hellip;</span>
+        <span id="hud-diagnostic" class="hud-diagnostic" aria-hidden="true"></span>
       </div>
       <div class="topbar-center">
         <span id="cwd-label" class="cwd-label"></span>

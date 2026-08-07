@@ -98,6 +98,227 @@
   --accent-2: #7dd3fc;
 }
 
+/* ---------- Tactical Cockpit theme ---------- */
+
+:root[data-theme="tactical"] {
+  --bg: #030303;
+  --bg-elevated: #0c0d0e;
+  --bg-panel: #0c0d0e;
+  --bg-hover: #14171a;
+  --grid-rgb: 57, 255, 20;
+  --border: rgba(var(--grid-rgb), 0.55);
+  --border-soft: rgba(var(--grid-rgb), 0.22);
+  --text: #e2e8f0;
+  --text-dim: #9aa5b4;
+  --text-faint: #4a5568;
+  --accent-rgb: 0, 240, 255;
+  --accent: #00f0ff;
+  --accent-soft: rgba(0, 240, 255, 0.12);
+  --accent-2-rgb: 255, 107, 0;
+  --accent-2: #ff6b00;
+  --success: #00ff66;
+  --success-soft: rgba(0, 255, 102, 0.12);
+  --danger: #ff6b00;
+  --danger-soft: rgba(255, 107, 0, 0.14);
+  --warn: #ff6b00;
+  --radius: 0px;
+  --mono: "JetBrains Mono", "Fira Code", ui-monospace, Consolas, monospace;
+  --sans: "Space Grotesk", "Orbitron", system-ui, sans-serif;
+}
+
+/* Zero-radius mandate: override every hardcoded pill/rounded-corner value in
+   one sweep rather than chasing each component's own radius. Circular status
+   blips are re-excepted below — those read as radar indicators, not pills. */
+[data-theme="tactical"] * {
+  border-radius: 0 !important;
+}
+[data-theme="tactical"] .status-dot,
+[data-theme="tactical"] .feed-live-dot,
+[data-theme="tactical"] .stepper-dot,
+[data-theme="tactical"] .theme-swatch-dot,
+[data-theme="tactical"] .dots span {
+  border-radius: 50% !important;
+}
+
+/* Instant, linear, zero-delay micro-interactions instead of eased eases. */
+[data-theme="tactical"] .icon-btn,
+[data-theme="tactical"] .badge-clickable,
+[data-theme="tactical"] .new-chat-btn,
+[data-theme="tactical"] .send-btn,
+[data-theme="tactical"] .upload-btn,
+[data-theme="tactical"] .session-item,
+[data-theme="tactical"] .tree-row,
+[data-theme="tactical"] .model-item,
+[data-theme="tactical"] .theme-item,
+[data-theme="tactical"] .feed-item-clickable,
+[data-theme="tactical"] .btn,
+[data-theme="tactical"] .composer-input,
+[data-theme="tactical"] .folder-input {
+  transition: none !important;
+}
+[data-theme="tactical"] .btn:hover,
+[data-theme="tactical"] .send-btn:hover:not(:disabled) {
+  transform: none !important;
+}
+
+[data-theme="tactical"] body {
+  font-family: var(--sans);
+  letter-spacing: 0.01em;
+}
+
+[data-theme="tactical"] h1,
+[data-theme="tactical"] .logo-text,
+[data-theme="tactical"] .empty-state-title,
+[data-theme="tactical"] .permission-title {
+  font-family: "Orbitron", var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+[data-theme="tactical"] .sidebar-section-title,
+[data-theme="tactical"] .feed-title,
+[data-theme="tactical"] .status-text,
+[data-theme="tactical"] .code-panel-title,
+[data-theme="tactical"] .permission-tool {
+  font-family: var(--mono);
+  letter-spacing: 0.12em;
+}
+
+/* Neon focus glow, replacing the soft ambient box-shadow of other themes. */
+[data-theme="tactical"] .composer-input:focus,
+[data-theme="tactical"] .folder-input:focus,
+[data-theme="tactical"] .icon-btn:focus-visible,
+[data-theme="tactical"] .btn:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+[data-theme="tactical"] .composer-input {
+  caret-color: var(--accent);
+}
+
+/* Pane frames: crisp corner-bracket accents, tactical-console style. */
+[data-theme="tactical"] .sidebar,
+[data-theme="tactical"] .main,
+[data-theme="tactical"] #code-panel {
+  position: relative;
+}
+[data-theme="tactical"] .sidebar::before,
+[data-theme="tactical"] .sidebar::after,
+[data-theme="tactical"] .main::before,
+[data-theme="tactical"] .main::after,
+[data-theme="tactical"] #code-panel::before,
+[data-theme="tactical"] #code-panel::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.55;
+}
+[data-theme="tactical"] .sidebar::before,
+[data-theme="tactical"] .main::before,
+[data-theme="tactical"] #code-panel::before {
+  top: 6px;
+  left: 6px;
+  border-top: 2px solid rgb(var(--grid-rgb));
+  border-left: 2px solid rgb(var(--grid-rgb));
+}
+[data-theme="tactical"] .sidebar::after,
+[data-theme="tactical"] .main::after,
+[data-theme="tactical"] #code-panel::after {
+  bottom: 6px;
+  right: 6px;
+  border-bottom: 2px solid rgb(var(--grid-rgb));
+  border-right: 2px solid rgb(var(--grid-rgb));
+}
+
+/* Small technical crosshair, tucked beside the topbar status readout. */
+[data-theme="tactical"] .topbar-left {
+  position: relative;
+  padding-left: 16px;
+}
+[data-theme="tactical"] .topbar-left::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translateY(-50%);
+  background:
+    linear-gradient(rgb(var(--grid-rgb)) 0 0) center / 100% 1px no-repeat,
+    linear-gradient(rgb(var(--grid-rgb)) 0 0) center / 1px 100% no-repeat;
+  opacity: 0.85;
+}
+
+.hud-diagnostic { display: none; }
+[data-theme="tactical"] .hud-diagnostic {
+  display: inline-flex;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  margin-left: 4px;
+  white-space: nowrap;
+}
+[data-theme="tactical"] .hud-diagnostic .hud-diag-ok { color: var(--success); }
+[data-theme="tactical"] .hud-diagnostic .hud-diag-busy { color: var(--accent); }
+[data-theme="tactical"] .hud-diagnostic .hud-diag-fail { color: var(--danger); }
+
+/* Full-viewport pixel-grid + scanline overlays, dormant outside this theme. */
+#tactical-grid, #tactical-scanline { display: none; }
+[data-theme="tactical"] #tactical-grid {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(var(--grid-rgb), 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--grid-rgb), 0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+[data-theme="tactical"] #tactical-scanline {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  mix-blend-mode: plus-lighter;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 240, 255, 0.035) 0px,
+    rgba(0, 240, 255, 0.035) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  animation: tactical-scan 3.2s linear infinite;
+}
+@keyframes tactical-scan {
+  from { background-position-y: 0; }
+  to { background-position-y: 120px; }
+}
+
+[data-theme="tactical"] .msg-code,
+[data-theme="tactical"] .tool-card-body,
+[data-theme="tactical"] .permission-preview {
+  background: #030303;
+}
+
+/* Digital pulsing badges, retuned to the telemetry palette. */
+[data-theme="tactical"] .badge-yolo {
+  animation: tactical-pulse 1s steps(2, jump-none) infinite;
+}
+[data-theme="tactical"] .status-dot.busy {
+  animation: tactical-pulse 0.9s steps(2, jump-none) infinite;
+}
+@keyframes tactical-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
 * { box-sizing: border-box; }
 
 [hidden] { display: none !important; }
@@ -894,6 +1115,18 @@ body {
 }
 
 .thinking-row { display: flex; align-items: center; gap: 8px; color: var(--text-faint); font-size: 15px; padding: 2px 0; }
+
+.stream-caret {
+  display: inline-block;
+  color: var(--accent);
+  font-weight: 700;
+  margin-left: 1px;
+  animation: stream-caret-blink 1s step-end infinite;
+}
+@keyframes stream-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
 
 .history-divider {
   display: flex;

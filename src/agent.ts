@@ -10,7 +10,7 @@ import { PermissionManager } from "./permissions";
 import { gatherProjectContext } from "./projectContext";
 import { loadSession, saveSession, deleteSession, createSessionId, deriveTitle, pickMostRecentSessionId } from "./session";
 import { McpManager } from "./mcp";
-import type { ChatMessage, ToolContext, Reporter, LlmConfig, TaskItem, HistoryItem } from "./types";
+import type { ChatMessage, ToolContext, Reporter, LlmConfig, TaskItem, HistoryItem, ToolCallRequest } from "./types";
 
 const MAX_TOOL_ITERATIONS = 30;
 
@@ -22,10 +22,15 @@ function systemPrompt(root: string, projectContext: string): string {
     "You are a terminal-based AI coding agent operating on a real project directory.",
     `Your working directory (sandbox root) is: ${root}`,
     "",
-    "You have tools to read/write/edit files, list directories, search file contents, run shell commands, and",
-    "generate Word/PowerPoint/Excel documents. All file paths you pass to tools are relative to the working directory.",
+    "You have tools to read/write/edit files, list directories, search file contents, run shell commands, generate",
+    "Word/PowerPoint/Excel documents, and fetch pages from the internet (web_fetch). All file paths you pass to",
+    "tools are relative to the working directory.",
     "If any tools named mcp__<server>__<tool> are available, they come from user-configured MCP servers (see",
     "mcp.json) — use them the same way as any other tool when they fit the task.",
+    "",
+    "- Use web_fetch when you need current information, documentation, or an API reference you're not certain of —",
+    "  don't guess at API shapes or library versions when you can look them up. It runs without a permission prompt",
+    "  (it's read-only), so use it freely, but always tell the user what you looked up and where from.",
     "",
     projectContext ? `Project context (gathered automatically, may be incomplete — verify before relying on it):\n${projectContext}` : "",
     "",
@@ -35,8 +40,31 @@ function systemPrompt(root: string, projectContext: string): string {
     "- Make the smallest change that correctly accomplishes the task. Don't add unrelated refactors.",
     "- Mutating actions (write_file, edit_file, run_shell_command) require user permission — the harness handles that; just call the tool.",
     "- Be concise in your final explanations; show, don't narrate excessively.",
-    "- For anything more than a single trivial step, call update_tasks to lay out your plan up front, and again as",
-    "  each task's status changes — the user sees this as a live checklist.",
+    "- For anything with more than one real step, call update_tasks to lay out your plan up front, and again as each",
+    "  task's status changes — the user sees this as a live checklist. Break the plan into small steps you can each",
+    "  verify individually, rather than one big step you only check at the very end — a mistake caught after step 1",
+    "  is cheap to fix; the same mistake discovered after step 5 has already been built on.",
+    "",
+    "Reliability discipline — this is what makes your output trustworthy no matter how capable the underlying model",
+    "is. Treat every one of these as mandatory, not aspirational:",
+    "- Never rely on memory alone for anything you're not fully certain of: an unfamiliar API, a library's current",
+    "  version/signature, a framework convention, a fact that could be stale. Check it — grep/read the actual code",
+    "  in this project, or web_fetch the real documentation. A wrong guess presented as fact is a worse outcome than",
+    "  taking the extra step to look it up.",
+    "- Never claim something is done, fixed, or working without having verified it with a tool call, not just by",
+    "  re-reading your own reasoning. After writing or editing code, run something that would actually catch a",
+    "  mistake: the project's build/typecheck/lint/test command if one exists (check package.json/README first), or",
+    "  at minimum re-read the file you just wrote and check it against what you intended, line by line.",
+    "- If a build/test/run command fails, or a tool call errors, that is your bug, not noise to route around. Read",
+    "  the actual error text and fix the root cause. Never call the same tool again with the same arguments expecting",
+    "  a different result — if your first attempt at something failed, change your approach, don't repeat it.",
+    "- Before giving your final answer for anything that involved file changes, do one deliberate pass comparing what",
+    "  you actually did (the tool results you got back) against what was literally asked — not what you intended to",
+    "  do. Catch scope creep (unrelated changes you weren't asked for) and incompleteness (part of the request you",
+    "  didn't get to) here, before the user has to.",
+    "- State your actual confidence. If you're not sure a piece of code is correct — an API you're unsure about, a",
+    "  library version, a syntax detail you didn't verify — say so explicitly in your final response instead of",
+    "  presenting it as certain. A flagged uncertainty is useful; a confident wrong answer is not.",
     "",
     "Code quality — non-negotiable:",
     "- Never write placeholder code: no '// TODO', no '// rest of the code here', no '// ... implementation ...', no",
@@ -45,14 +73,11 @@ function systemPrompt(root: string, projectContext: string): string {
     "  truncating any single one.",
     "- Match language/framework conventions exactly (correct imports, correct syntax, correct file extensions).",
     "  Double-check import paths and package names against what you've actually seen in the project, not assumptions.",
-    "- Never claim something is done, fixed, or working without having verified it. After writing or editing code,",
-    "  always run something that would catch a mistake before declaring success: run_shell_command with the",
-    "  project's build/typecheck/lint/test command if one exists (check package.json/README first), or at minimum",
-    "  re-read the file you just wrote to sanity-check it.",
-    "- If a build/test/run command fails, treat that as your bug: read the actual error output and fix it before",
-    "  telling the user it's done. Do not report success after a failed verification step.",
-    "- If you are not confident a piece of code is correct (an API you're unsure about, a library version, a syntax",
-    "  detail), say so explicitly in your final response rather than presenting it as certain.",
+    "- For create_docx/create_pptx/create_xlsx: write complete, real content (never a one-line placeholder body),",
+    "  structure it with proper headings/sections/tables rather than one giant paragraph, and check the tool's",
+    "  returned block/slide/sheet count against what you intended before telling the user it's done — the tools",
+    "  apply consistent default styling (fonts, table borders, header shading) automatically, so focus your effort",
+    "  on getting the content and structure right.",
   ]
     .filter((line, i, arr) => !(line === "" && arr[i - 1] === ""))
     .join("\n");
@@ -166,7 +191,8 @@ export class Agent {
         result = await chatCompletion(
           this.messages,
           [...TOOL_DEFINITIONS, UPDATE_TASKS_DEFINITION, ...this.mcpManager.getToolDefinitions()],
-          this.llmConfig
+          this.llmConfig,
+          (chunk) => this.reporter.assistantDelta(chunk)
         );
       } catch (err: any) {
         this.reporter.thinking(false);
@@ -182,7 +208,7 @@ export class Agent {
         const text = result.content ?? "(no response)";
         this.messages.push({ role: "assistant", content: text });
         this.historyLog.push({ type: "assistant", text });
-        this.reporter.assistant(text);
+        this.reporter.assistantDeltaEnd(text, true);
         this.persist();
         return;
       }
@@ -197,13 +223,30 @@ export class Agent {
         })),
       });
 
-      for (const call of result.toolCalls) {
-        const output = await this.executeToolCall(call.id, call.name, call.arguments);
+      // The model sometimes narrates its reasoning in the same turn it calls
+      // tools (e.g. "I'll check the config first, then update it."). That text
+      // used to be silently dropped here — only ever seen if a turn happened
+      // to end without a tool call. Surface it now so intermediate thinking
+      // is visible, not just final answers. isFinal=false: this doesn't end
+      // the turn, the loop is about to run tool calls and go again.
+      //
+      // Always close out the streamed message when content is non-null (even
+      // if it trims to whitespace) — the client only knows to open a live
+      // bubble from seeing raw deltas, so it needs a matching close signal
+      // for every one of those, not just the ones with "real" content. Only
+      // whether we *persist* it to history depends on having real content.
+      if (result.content) {
+        if (result.content.trim()) this.historyLog.push({ type: "assistant", text: result.content });
+        this.reporter.assistantDeltaEnd(result.content, false);
+      }
+
+      const outputs = await this.runToolCalls(result.toolCalls);
+      for (let i = 0; i < result.toolCalls.length; i++) {
         this.messages.push({
           role: "tool",
-          tool_call_id: call.id,
-          name: call.name,
-          content: output,
+          tool_call_id: result.toolCalls[i].id,
+          name: result.toolCalls[i].name,
+          content: outputs[i],
         });
       }
       this.persist();
@@ -240,6 +283,39 @@ export class Agent {
     this.reporter.toolResult(id, output, ok);
     this.historyLog.push({ type: "tool", id, name, label, args, output, ok });
     return output;
+  }
+
+  /** A call is safe to run concurrently with its neighbors if it can never hit a permission prompt. */
+  private isReadOnlyCall(name: string): boolean {
+    if (name === "update_tasks") return true;
+    if (this.mcpManager.isMcpTool(name)) return false; // arbitrary third-party code — always confirmed, so always sequential
+    const tool = TOOLS[name];
+    return tool ? !tool.mutating : false;
+  }
+
+  /**
+   * Runs one turn's tool calls, batching consecutive read-only calls (e.g. a
+   * model reading three files in a row) together via Promise.all for lower
+   * latency, while keeping mutating calls — which may block on a permission
+   * prompt — strictly sequential. Output order always matches call order,
+   * regardless of which calls in a batch happen to resolve first.
+   */
+  private async runToolCalls(calls: ToolCallRequest[]): Promise<string[]> {
+    const outputs: string[] = new Array(calls.length);
+    let i = 0;
+    while (i < calls.length) {
+      if (this.isReadOnlyCall(calls[i].name)) {
+        const start = i;
+        while (i < calls.length && this.isReadOnlyCall(calls[i].name)) i++;
+        const batch = calls.slice(start, i);
+        const batchOutputs = await Promise.all(batch.map((c) => this.executeToolCall(c.id, c.name, c.arguments)));
+        batchOutputs.forEach((out, j) => (outputs[start + j] = out));
+      } else {
+        outputs[i] = await this.executeToolCall(calls[i].id, calls[i].name, calls[i].arguments);
+        i++;
+      }
+    }
+    return outputs;
   }
 
   private async executeToolCall(id: string, name: string, rawArgs: string): Promise<string> {

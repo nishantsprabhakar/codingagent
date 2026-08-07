@@ -10,22 +10,26 @@ import * as openrouter from "./providers/openrouter";
 
 export type { ChatCompletionResult } from "./types";
 
+/** Called with each chunk of assistant text as the model streams its response. */
+export type OnDelta = (chunk: string) => void;
+
 export async function chatCompletion(
   messages: ChatMessage[],
   tools: ToolDefinition[],
-  config: LlmConfig
+  config: LlmConfig,
+  onDelta?: OnDelta
 ): Promise<ChatCompletionResult> {
   if (config.provider === "groq") {
     if (!config.apiKey) {
       throw new Error("Groq provider selected but no API key was supplied (--api-key or GROQ_API_KEY).");
     }
-    return groq.chatCompletion(messages, tools, config.model, config.apiKey);
+    return groq.chatCompletion(messages, tools, config.model, config.apiKey, undefined, onDelta);
   }
   if (config.provider === "openrouter") {
     if (!config.apiKey) {
       throw new Error("OpenRouter provider selected but no API key was supplied (--api-key or OPENROUTER_API_KEY).");
     }
-    return openrouter.chatCompletion(messages, tools, config.model, config.apiKey);
+    return openrouter.chatCompletion(messages, tools, config.model, config.apiKey, undefined, onDelta);
   }
-  return pollinations.chatCompletion(messages, tools, config.model);
+  return pollinations.chatCompletion(messages, tools, config.model, undefined, onDelta);
 }

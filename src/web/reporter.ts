@@ -25,8 +25,12 @@ export class WebSocketReporter implements Reporter {
     this.send({ type: "tool_result", id, output, ok });
   }
 
-  assistant(text: string): void {
-    this.send({ type: "assistant", text });
+  assistantDelta(chunk: string): void {
+    this.send({ type: "assistant_delta", chunk });
+  }
+
+  assistantDeltaEnd(fullText: string, isFinal: boolean): void {
+    this.send({ type: "assistant_delta_end", text: fullText, final: isFinal });
   }
 
   error(text: string): void {

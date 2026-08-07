@@ -1,0 +1,5 @@
+# Shell scripts must keep LF endings regardless of a contributor's local git
+# autocrlf setting — a CRLF-corrupted shebang line ("#!/usr/bin/env bash\r")
+# fails with "bad interpreter" on Linux.
+*.sh text eol=lf
+*.bat text eol=crlf

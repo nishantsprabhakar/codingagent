@@ -9,12 +9,18 @@
   const canvas = document.getElementById("bg-canvas");
   if (!canvas || !canvas.getContext) return;
   const ctx = canvas.getContext("2d");
-  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduceMotion = false; // always animate, regardless of the OS-level reduced-motion setting
   const DEG = Math.PI / 180;
 
   let width = 0;
   let height = 0;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  // Hoisted above their original spot so syncVisibility() (below) can
+  // reference them during the synchronous, top-of-file setup pass.
+  let angle = 0.6;
+  let last = null;
+  let running = true;
 
   function resize() {
     width = window.innerWidth;
@@ -51,7 +57,24 @@
     if (a2) themeAccent2RGB = a2;
   }
   readThemeColors();
-  new MutationObserver(readThemeColors).observe(document.documentElement, {
+
+  // The tactical cockpit theme replaces this scene with a pixel-grid/scanline
+  // HUD overlay instead — a cyber-space Earth doesn't fit that console look.
+  function syncVisibility() {
+    const isTactical = document.documentElement.getAttribute("data-theme") === "tactical";
+    const wasRunning = running;
+    canvas.style.display = isTactical ? "none" : "block";
+    running = !isTactical && !document.hidden;
+    if (running && !wasRunning) {
+      last = null;
+      requestAnimationFrame(frame);
+    }
+  }
+  syncVisibility();
+  new MutationObserver(() => {
+    readThemeColors();
+    syncVisibility();
+  }).observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["data-theme"],
   });
@@ -409,11 +432,8 @@
 
   // ---------- Rotation / animation loop ----------
 
-  let angle = 0.6;
-  let last = null;
-  let running = true;
-
   document.addEventListener("visibilitychange", () => {
+    if (document.documentElement.getAttribute("data-theme") === "tactical") return;
     running = !document.hidden;
     if (running) {
       last = null;

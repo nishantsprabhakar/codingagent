@@ -12,6 +12,7 @@
     fileTree: document.getElementById("file-tree"),
     statusDot: document.getElementById("status-dot"),
     statusText: document.getElementById("status-text"),
+    hudDiagnostic: document.getElementById("hud-diagnostic"),
     cwdLabel: document.getElementById("cwd-label"),
     modelBadge: document.getElementById("model-badge"),
     yoloBadge: document.getElementById("yolo-badge"),
@@ -79,6 +80,7 @@
     sessionId: "",
     sessions: [],
     createdFiles: [],
+    streamingBubble: null,
   };
 
   const BINARY_FILE_EXTS = new Set(["docx", "pptx", "xlsx", "pdf", "png", "jpg", "jpeg", "gif", "ico", "zip", "wasm", "bin"]);
@@ -128,6 +130,7 @@
     ws.addEventListener("close", () => {
       const wasBusy = state.busy;
       showThinking(false);
+      state.streamingBubble = null;
       interruptPendingToolCards();
       if (state.pendingPermissionId) {
         el.permOverlay.hidden = true;
@@ -158,7 +161,49 @@
     el.statusDot.className = `status-dot ${kind}`;
     el.statusText.textContent =
       kind === "connected" ? "connected" : kind === "busy" ? "working…" : "disconnected";
+    renderHudDiagnostic(kind);
   }
+
+  // ---------- Tactical HUD diagnostic line (cosmetic — decorative telemetry, not a real metric) ----------
+
+  let hudDiagnosticKind = "disconnected";
+
+  function renderHudDiagnostic(kind) {
+    hudDiagnosticKind = kind;
+    if (!el.hudDiagnostic) return;
+    const ms = new Date();
+    const clock =
+      String(ms.getHours()).padStart(2, "0") +
+      ":" +
+      String(ms.getMinutes()).padStart(2, "0") +
+      ":" +
+      String(ms.getSeconds()).padStart(2, "0") +
+      "." +
+      String(ms.getMilliseconds()).padStart(3, "0");
+    let sys, line, cls;
+    if (kind === "disconnected") {
+      sys = "OFFLINE";
+      line = "LINK_LOST";
+      cls = "hud-diag-fail";
+    } else if (kind === "busy") {
+      sys = "ACTIVE";
+      const pct = (50 + 45 * Math.abs(Math.sin(Date.now() / 900))).toFixed(1);
+      line = `AGENT_THINKING [${pct}%]`;
+      cls = "hud-diag-busy";
+    } else {
+      sys = "OPTIMAL";
+      line = "STANDBY";
+      cls = "hud-diag-ok";
+    }
+    el.hudDiagnostic.innerHTML =
+      `${clock} // SYS_STATUS: <span class="${cls}">${sys}</span> // ${line}`;
+  }
+
+  setInterval(() => {
+    if (document.documentElement.getAttribute("data-theme") === "tactical") {
+      renderHudDiagnostic(hudDiagnosticKind);
+    }
+  }, 150);
 
   function send(msg) {
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
@@ -185,6 +230,7 @@
         // whatever session is now active — clear the view and let those
         // messages repopulate it (an empty history just leaves it empty).
         state.toolCards.clear();
+        state.streamingBubble = null;
         hudReset();
         renderCreatedFiles([]);
         el.codePanel.hidden = true;
@@ -209,11 +255,15 @@
         updateToolCard(msg.id, msg.output, msg.ok);
         hudOnToolResult(msg.id, msg.ok);
         break;
-      case "assistant":
-        showThinking(false);
-        appendAssistantMessage(msg.text);
-        setBusy(false);
-        hudOnTurnEnd(true);
+      case "assistant_delta":
+        appendAssistantDelta(msg.chunk);
+        break;
+      case "assistant_delta_end":
+        finalizeAssistantMessage(msg.text, msg.final);
+        if (msg.final) {
+          setBusy(false);
+          hudOnTurnEnd(true);
+        }
         break;
       case "error":
         showThinking(false);
@@ -591,6 +641,39 @@
     scrollToBottom();
   }
 
+  // ---------- Streaming assistant messages ----------
+  // The model's response arrives token-by-token over the socket. state.streamingBubble
+  // tracks the in-progress <div class="bubble"> so successive deltas append into the
+  // same element instead of creating a new message each time.
+
+  function appendAssistantDelta(chunk) {
+    showThinking(false);
+    if (!state.streamingBubble) {
+      clearEmptyState();
+      const row = document.createElement("div");
+      row.className = "msg msg-assistant";
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      row.appendChild(bubble);
+      el.chatLog.appendChild(row);
+      state.streamingBubble = { bubble, text: "" };
+    }
+    state.streamingBubble.text += chunk;
+    state.streamingBubble.bubble.innerHTML = renderMarkdown(state.streamingBubble.text) + '<span class="stream-caret">&#9615;</span>';
+    scrollToBottom();
+  }
+
+  function finalizeAssistantMessage(fullText, isFinal) {
+    if (state.streamingBubble) {
+      state.streamingBubble.bubble.innerHTML = renderMarkdown(fullText);
+      state.streamingBubble = null;
+    } else if (fullText) {
+      // Nothing streamed for this message (e.g. a provider with no delta content) — show it directly.
+      appendAssistantMessage(fullText);
+    }
+    if (isFinal) scrollToBottom();
+  }
+
   function appendErrorMessage(text) {
     clearEmptyState();
     const row = document.createElement("div");
@@ -902,6 +985,7 @@
 
   const THEME_STORAGE_KEY = "wrexlyn-theme";
   const THEMES = [
+    { id: "tactical", name: "Tactical Cockpit", swatch: ["#030303", "#00f0ff", "#ff6b00"] },
     { id: "space", name: "Space", swatch: ["#0a0d12", "#22d3ee", "#a78bfa"] },
     { id: "tech", name: "Tech", swatch: ["#05070a", "#39ff88", "#22d3ee"] },
     { id: "aurora", name: "Aurora", swatch: ["#0a0a14", "#a78bfa", "#2dd4bf"] },
@@ -1064,6 +1148,11 @@
       });
     } else {
       row.addEventListener("click", () => {
+        const ext = entry.name.split(".").pop().toLowerCase();
+        if (BINARY_FILE_EXTS.has(ext)) {
+          downloadFile(fullPath);
+          return;
+        }
         document.querySelectorAll(".tree-row.active").forEach((r) => r.classList.remove("active"));
         row.classList.add("active");
         openFile(fullPath);
@@ -1081,7 +1170,11 @@
     try {
       const res = await fetch(`/api/file?path=${encodeURIComponent(relPath)}`);
       const data = await res.json();
-      el.codePanelContent.textContent = data.content ?? data.error ?? "(empty)";
+      if (data.binary) {
+        el.codePanelContent.textContent = "(binary file — use the download button instead of previewing)";
+      } else {
+        el.codePanelContent.textContent = data.content ?? data.error ?? "(empty)";
+      }
     } catch {
       el.codePanelContent.textContent = "(failed to load file)";
     }

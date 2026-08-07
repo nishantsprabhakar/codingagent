@@ -61,8 +61,8 @@ function colorizeDiffish(text: string, ok: boolean): string {
     .join("\n");
 }
 
-export function printAssistant(text: string): void {
-  console.log(color.bold(color.blue("\nagent> ")) + text + "\n");
+export function printAssistantPrefix(): void {
+  process.stdout.write(color.bold(color.blue("\nagent> ")));
 }
 
 export function printError(text: string): void {
@@ -96,9 +96,11 @@ const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", 
 export class ConsoleReporter implements Reporter {
   private spinnerTimer: ReturnType<typeof setInterval> | null = null;
   private spinnerFrame = 0;
+  private streaming = false;
 
   toolCall(_id: string, _name: string, label: string, _args: unknown): void {
     this.stopSpinner();
+    this.streaming = false; // a tool call ends any in-progress streamed line without a trailing newline printed for it
     printToolCall(label);
   }
 
@@ -106,13 +108,31 @@ export class ConsoleReporter implements Reporter {
     printToolResult(output, ok);
   }
 
-  assistant(text: string): void {
+  assistantDelta(chunk: string): void {
     this.stopSpinner();
-    printAssistant(text);
+    if (!this.streaming) {
+      this.streaming = true;
+      printAssistantPrefix();
+    }
+    process.stdout.write(chunk);
+  }
+
+  assistantDeltaEnd(fullText: string, _isFinal: boolean): void {
+    if (this.streaming) {
+      process.stdout.write("\n\n");
+    } else if (fullText) {
+      // Nothing streamed (e.g. a provider that returned no delta content at all) — print the
+      // authoritative final text directly rather than silently losing it.
+      printAssistantPrefix();
+      process.stdout.write(fullText + "\n\n");
+    }
+    this.streaming = false;
   }
 
   error(text: string): void {
     this.stopSpinner();
+    if (this.streaming) process.stdout.write("\n");
+    this.streaming = false;
     printError(text);
   }
 

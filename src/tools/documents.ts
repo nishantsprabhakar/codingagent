@@ -15,6 +15,8 @@ import {
   TableCell,
   Packer,
   WidthType,
+  BorderStyle,
+  ShadingType,
 } from "docx";
 import PptxGenJS from "pptxgenjs";
 import ExcelJS from "exceljs";
@@ -29,6 +31,22 @@ const HEADING_LEVELS = [
   HeadingLevel.HEADING_5,
   HeadingLevel.HEADING_6,
 ];
+
+/** Shared accent used across docx/pptx/xlsx output so generated documents look like one consistent house style. */
+const ACCENT_HEX = "2563EB";
+const ACCENT_DARK_HEX = "1E3A8A";
+const TEXT_HEX = "1F2937";
+const BODY_FONT = "Calibri";
+
+const THIN_BORDER = { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB" } as const;
+const TABLE_BORDERS = {
+  top: THIN_BORDER,
+  bottom: THIN_BORDER,
+  left: THIN_BORDER,
+  right: THIN_BORDER,
+  insideHorizontal: THIN_BORDER,
+  insideVertical: THIN_BORDER,
+};
 
 // ---------- Word (.docx) ----------
 
@@ -82,17 +100,23 @@ export const createDocxTool: ToolSpec = {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
 
     const children: (Paragraph | Table)[] = [];
-    if (args.title) children.push(new Paragraph({ text: String(args.title), heading: HeadingLevel.TITLE }));
+    if (args.title) {
+      children.push(
+        new Paragraph({ text: String(args.title), heading: HeadingLevel.TITLE, spacing: { after: 240 } })
+      );
+    }
 
     for (const block of args.blocks ?? []) {
       if (block.type === "heading") {
         const idx = Math.min(Math.max((block.level ?? 1) - 1, 0), HEADING_LEVELS.length - 1);
-        children.push(new Paragraph({ text: block.text ?? "", heading: HEADING_LEVELS[idx] }));
+        children.push(
+          new Paragraph({ text: block.text ?? "", heading: HEADING_LEVELS[idx], spacing: { before: 240, after: 120 } })
+        );
       } else if (block.type === "paragraph") {
-        children.push(new Paragraph({ children: [new TextRun(block.text ?? "")] }));
+        children.push(new Paragraph({ children: [new TextRun(block.text ?? "")], spacing: { after: 160 } }));
       } else if (block.type === "bullets") {
         for (const item of block.items ?? []) {
-          children.push(new Paragraph({ text: String(item), bullet: { level: 0 } }));
+          children.push(new Paragraph({ text: String(item), bullet: { level: 0 }, spacing: { after: 60 } }));
         }
       } else if (block.type === "table") {
         const headers: string[] = block.headers ?? [];
@@ -103,19 +127,47 @@ export const createDocxTool: ToolSpec = {
             new TableRow({
               tableHeader: true,
               children: headers.map(
-                (h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(h), bold: true })] })] })
+                (h) =>
+                  new TableCell({
+                    shading: { type: ShadingType.SOLID, fill: ACCENT_HEX },
+                    children: [new Paragraph({ children: [new TextRun({ text: String(h), bold: true, color: "FFFFFF" })] })],
+                  })
               ),
             })
           );
         }
-        for (const row of rows) {
-          tableRows.push(new TableRow({ children: row.map((cell) => new TableCell({ children: [new Paragraph(String(cell))] })) }));
+        rows.forEach((row, i) => {
+          tableRows.push(
+            new TableRow({
+              children: row.map(
+                (cell) =>
+                  new TableCell({
+                    shading: i % 2 === 1 ? { type: ShadingType.SOLID, fill: "F3F4F6" } : undefined,
+                    children: [new Paragraph(String(cell))],
+                  })
+              ),
+            })
+          );
+        });
+        if (tableRows.length) {
+          children.push(
+            new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE }, borders: TABLE_BORDERS })
+          );
         }
-        if (tableRows.length) children.push(new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
       }
     }
 
-    const doc = new Document({ sections: [{ children }] });
+    const doc = new Document({
+      styles: {
+        default: {
+          document: { run: { font: BODY_FONT, size: 22, color: TEXT_HEX } },
+          heading1: { run: { color: ACCENT_DARK_HEX, size: 32, bold: true } },
+          heading2: { run: { color: ACCENT_DARK_HEX, size: 28, bold: true } },
+          heading3: { run: { color: ACCENT_DARK_HEX, size: 24, bold: true } },
+        },
+      },
+      sections: [{ children }],
+    });
     const buffer = await Packer.toBuffer(doc);
     fs.writeFileSync(filePath, buffer);
 
@@ -195,14 +247,26 @@ export const createPptxTool: ToolSpec = {
     const pres = new PptxGenJS();
     for (const slideSpec of args.slides ?? []) {
       const slide = pres.addSlide();
+      slide.background = { color: "FFFFFF" };
       if (slideSpec.title) {
-        slide.addText(String(slideSpec.title), { x: 0.5, y: 0.35, w: 9, h: 1, fontSize: 28, bold: true, color: "1F2937" });
+        slide.addText(String(slideSpec.title), {
+          x: 0.5,
+          y: 0.35,
+          w: 9,
+          h: 0.9,
+          fontFace: BODY_FONT,
+          fontSize: 28,
+          bold: true,
+          color: TEXT_HEX,
+        });
+        // Thin accent bar under the title — the one recurring visual motif tying every slide to the same house style.
+        slide.addShape(pres.ShapeType.rect, { x: 0.5, y: 1.22, w: 1.4, h: 0.045, fill: { color: ACCENT_HEX }, line: { type: "none" } });
       }
       const bullets: string[] = slideSpec.bullets ?? [];
       if (bullets.length) {
         slide.addText(
-          bullets.map((b) => ({ text: String(b), options: { bullet: true, breakLine: true } })),
-          { x: 0.5, y: 1.6, w: 9, h: 5, fontSize: 18, color: "374151", valign: "top" }
+          bullets.map((b) => ({ text: String(b), options: { bullet: { code: "2022", color: ACCENT_HEX }, breakLine: true } })),
+          { x: 0.5, y: 1.55, w: 9, h: 5, fontFace: BODY_FONT, fontSize: 18, color: "374151", valign: "top" }
         );
       }
       if (slideSpec.notes) slide.addNotes(String(slideSpec.notes));
@@ -282,14 +346,22 @@ export const createXlsxTool: ToolSpec = {
       const headers: string[] = sheetSpec.headers ?? [];
       const rows: any[][] = sheetSpec.rows ?? [];
 
+      const THIN: Partial<ExcelJS.Border> = { style: "thin", color: { argb: "FFD1D5DB" } };
+      const cellBorder = { top: THIN, bottom: THIN, left: THIN, right: THIN };
+
       if (headers.length) {
         const headerRow = sheet.addRow(headers);
         headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
         headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
         headerRow.alignment = { vertical: "middle" };
+        headerRow.eachCell((cell) => (cell.border = cellBorder));
         sheet.views = [{ state: "frozen", ySplit: 1 }];
       }
-      for (const row of rows) sheet.addRow(row);
+      rows.forEach((row, i) => {
+        const dataRow = sheet.addRow(row);
+        if (i % 2 === 1) dataRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+        dataRow.eachCell((cell) => (cell.border = cellBorder));
+      });
 
       const colCount = Math.max(headers.length, ...rows.map((r) => r.length), 1);
       for (let c = 0; c < colCount; c++) {

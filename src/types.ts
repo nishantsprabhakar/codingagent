@@ -87,10 +87,18 @@ export type HistoryItem =
 export interface Reporter {
   toolCall(id: string, name: string, label: string, args: unknown): void;
   toolResult(id: string, output: string, ok: boolean): void;
-  assistant(text: string): void;
   error(text: string): void;
   thinking(isThinking: boolean): void;
   tasks(tasks: TaskItem[]): void;
   history(items: HistoryItem[]): void;
   files(files: string[]): void;
+  /** A streamed chunk of the assistant's current message, as the model generates it token by token. */
+  assistantDelta(chunk: string): void;
+  /**
+   * Marks the end of one streamed message with its authoritative full text —
+   * fires both for reasoning that precedes tool calls (isFinal=false) and for
+   * the turn's true final answer (isFinal=true, which is what should unlock
+   * the composer / mark the turn complete on the client).
+   */
+  assistantDeltaEnd(fullText: string, isFinal: boolean): void;
 }

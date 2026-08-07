@@ -36,6 +36,37 @@ use). Comes with both a terminal REPL and a web UI.
 Everything else in this README (npm scripts, CLI flags, the terminal REPL) is
 for anyone who wants to run it manually or dig into how it works.
 
+## Installers
+
+**Windows** — `installer/windows/wrexlyn.iss` builds a real per-user installer
+(no admin rights needed) with Inno Setup:
+
+```
+"C:\Users\<you>\AppData\Local\Programs\Inno Setup 6\ISCC.exe" installer\windows\wrexlyn.iss
+```
+
+This produces `installer/windows/output/Wrexlyn-Setup.exe` — running it installs
+to `%LOCALAPPDATA%\Programs\Wrexlyn`, adds Desktop + Start Menu shortcuts for
+Coding Agent / Change Model Key / Change Project Folder, and registers a
+proper uninstaller. First launch still does the same one-time `npm install` /
+`npm run build` / folder-and-key setup described above.
+
+**Linux** — run the installer script from inside this project folder:
+
+```bash
+./install.sh
+```
+
+This copies the project to `~/.local/share/wrexlyn`, adds a `wrexlyn` command
+to `~/.local/bin`, and registers a desktop launcher entry. First launch (via
+`wrexlyn`, the desktop entry, or `Start Coding Agent.sh` directly) does the
+same first-time setup — installs dependencies, builds, then prompts in the
+terminal for a project folder and optional API key (equivalent to the Windows
+folder-picker/key dialogs, just via stdin instead of native dialogs). Use
+`Change Model Key.sh` / `Change Project Folder.sh` to update those later —
+both exist as standalone scripts too, for running directly without a full
+install.
+
 ## Requirements
 
 - Node.js 18+ (for global `fetch` and modern JS support). Install from
@@ -150,15 +181,19 @@ REPL commands:
   permanent errors like 401/402/404.
 - **Tools**: `read_file`, `write_file`, `edit_file`, `list_dir`, `glob_search`,
   `grep_search`, `run_shell_command`, `create_docx`, `create_pptx`,
-  `create_xlsx` — file paths are sandboxed to the `--cwd` root (a path that
-  resolves outside it is rejected).
-- **Permissions**: read-only tools run automatically. Mutating tools
-  (file writes, shell commands, MCP tool calls) print a preview (diff for
-  edits, full content for new files, the literal command for shell) and ask
-  `[y]es / [a]lways / [n]o` before running, unless `--yolo` is passed.
+  `create_xlsx`, `web_fetch` — file paths are sandboxed to the `--cwd` root (a
+  path that resolves outside it is rejected).
+- **Permissions**: read-only tools (including `web_fetch`) run automatically.
+  Mutating tools (file writes, shell commands, MCP tool calls) print a preview
+  (diff for edits, full content for new files, the literal command for shell)
+  and ask `[y]es / [a]lways / [n]o` before running, unless `--yolo` is passed.
+- **Streaming**: responses stream token-by-token (both the terminal and web
+  UI), including any reasoning the model narrates before calling a tool — not
+  just the final answer.
 - **Loop**: on each user message, the agent calls the model, executes any
-  requested tool calls, feeds the results back, and repeats until the model
-  responds with plain text instead of a tool call.
+  requested tool calls (independent read-only calls run concurrently), feeds
+  the results back, and repeats until the model responds with plain text
+  instead of a tool call.
 
 ## Features
 
@@ -219,7 +254,6 @@ REPL commands:
 - `run_shell_command` is sandboxed to the working directory via `cwd`, but the
   command itself is not restricted — it can still reference absolute paths.
   The permission prompt is your safety net; review commands before approving.
-- No streaming output yet — responses appear once the model finishes.
 - MCP support only covers stdio-based servers (spawned as a subprocess) — no HTTP/SSE remote servers yet.
 - Session persistence is per-project (one `.coding-agent/session.json`), not per-browser-tab — opening the same
   project from two tabs/terminals at once will race on the same history file.

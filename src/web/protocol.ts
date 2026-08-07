@@ -9,7 +9,8 @@ import type { SessionMeta } from "../session";
 
 export type ServerMessage =
   | { type: "init"; root: string; provider: string; model: string; yolo: boolean; recentFolders: string[]; sessionId: string; sessionTitle: string }
-  | { type: "assistant"; text: string }
+  | { type: "assistant_delta"; chunk: string }
+  | { type: "assistant_delta_end"; text: string; final: boolean }
   | { type: "tool_call"; id: string; name: string; label: string; args: unknown }
   | { type: "tool_result"; id: string; output: string; ok: boolean }
   | { type: "permission_request"; id: string; toolName: string; label: string; preview?: string }

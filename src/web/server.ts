@@ -244,12 +244,17 @@ function handleFile(url: URL, res: http.ServerResponse, root: string): void {
     });
   }
 
-  try {
-    const content = fs.readFileSync(filePath, "utf-8");
-    sendJson(res, 200, { path: relPath, truncated: false, content });
-  } catch {
-    sendJson(res, 200, { path: relPath, truncated: false, content: "(binary file, cannot preview)" });
+  const buf = fs.readFileSync(filePath);
+  if (isBinaryBuffer(buf)) {
+    return sendJson(res, 200, { path: relPath, truncated: false, binary: true, content: null });
   }
+  sendJson(res, 200, { path: relPath, truncated: false, binary: false, content: buf.toString("utf-8") });
+}
+
+/** Git's own heuristic: a NUL byte in the first few KB means "don't treat this as text". */
+function isBinaryBuffer(buf: Buffer): boolean {
+  const sample = buf.subarray(0, 8000);
+  return sample.includes(0);
 }
 
 function handleDownload(url: URL, res: http.ServerResponse, root: string): void {
