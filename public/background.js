@@ -339,57 +339,6 @@
     }
   }
 
-  // A small fixed "digital twin" accent (orbit rings + a data-node network)
-  // layered over the realistic globe — deliberately not tied to lon/lat
-  // rotation math, since a screen-space HUD reads as intentional while a
-  // geometrically-simplified lat/lon grid would visibly not converge at the
-  // poles and look like a bug instead of a feature.
-  const TECH_NODES = [
-    { dx: -0.38, dy: -0.72 },
-    { dx: 0.22, dy: -0.88 },
-    { dx: 0.58, dy: -0.5 },
-    { dx: -0.05, dy: -0.98 },
-  ];
-  const TECH_LINKS = [
-    [0, 1],
-    [1, 2],
-    [1, 3],
-  ];
-
-  function drawTechOverlay(cx, cy, r) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(103, 232, 249, 0.22)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.62, Math.PI * 1.08, Math.PI * 1.92);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.85, Math.PI * 1.15, Math.PI * 1.85);
-    ctx.stroke();
-
-    const pts = TECH_NODES.map((n) => ({ x: cx + n.dx * r, y: cy + n.dy * r }));
-    ctx.strokeStyle = "rgba(103, 232, 249, 0.35)";
-    for (const [a, b] of TECH_LINKS) {
-      ctx.beginPath();
-      ctx.moveTo(pts[a].x, pts[a].y);
-      ctx.lineTo(pts[b].x, pts[b].y);
-      ctx.stroke();
-    }
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-      const pulse = 0.5 + 0.5 * Math.sin(clock * 2 + i * 1.3);
-      ctx.fillStyle = `rgba(160, 240, 255, ${0.5 + pulse * 0.4})`;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 1.6 + pulse * 1.1, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = `rgba(103, 232, 249, ${0.3 * (1 - pulse)})`;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 3.5 + pulse * 4.5, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
   // ---------- Interaction: touch/pointer speeds everything up ----------
 
   let boost = 0;
@@ -606,8 +555,6 @@
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
-
-    drawTechOverlay(cx, cy, r);
 
     ctx.restore();
 

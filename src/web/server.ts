@@ -332,7 +332,12 @@ function serveStatic(pathname: string, res: http.ServerResponse): void {
   }
 
   const ext = path.extname(filePath);
-  res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+  // This app iterates on public/ frequently; without this, browsers can keep
+  // serving a stale cached app.js/background.js/style.css after a restart.
+  res.writeHead(200, {
+    "Content-Type": MIME[ext] || "application/octet-stream",
+    "Cache-Control": "no-cache",
+  });
   fs.createReadStream(filePath).pipe(res);
 }
 
