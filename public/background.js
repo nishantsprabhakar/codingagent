@@ -35,6 +35,27 @@
     return c;
   }
 
+  // ---------- Theme-reactive accent colors ----------
+  // The Earth/sun stay realistic regardless of theme, but the atmosphere
+  // glow, limb rim, and nebula haze pick up the active theme's accent
+  // colors so switching themes visibly changes the background too.
+
+  let themeAccentRGB = "34, 211, 238";
+  let themeAccent2RGB = "167, 139, 250";
+
+  function readThemeColors() {
+    const cs = getComputedStyle(document.documentElement);
+    const a = cs.getPropertyValue("--accent-rgb").trim();
+    const a2 = cs.getPropertyValue("--accent-2-rgb").trim();
+    if (a) themeAccentRGB = a;
+    if (a2) themeAccent2RGB = a2;
+  }
+  readThemeColors();
+  new MutationObserver(readThemeColors).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+
   // ---------- Stars ----------
 
   const STAR_COUNT = 220;
@@ -49,9 +70,9 @@
 
   // Faint Milky-Way-style haze behind the stars, for depth.
   const NEBULA_BLOBS = [
-    { x: 0.12, y: 0.28, r: 0.42, color: "80, 90, 200" },
-    { x: 0.68, y: 0.62, r: 0.5, color: "120, 70, 170" },
-    { x: 0.35, y: 0.75, r: 0.38, color: "60, 110, 190" },
+    { x: 0.12, y: 0.28, r: 0.42, useAccent2: false },
+    { x: 0.68, y: 0.62, r: 0.5, useAccent2: true },
+    { x: 0.35, y: 0.75, r: 0.38, useAccent2: false },
   ];
 
   let clock = 0;
@@ -432,9 +453,10 @@
       const cx = n.x * width;
       const cy = n.y * height;
       const r = n.r * Math.max(width, height);
+      const rgb = n.useAccent2 ? themeAccent2RGB : themeAccentRGB;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      g.addColorStop(0, `rgba(${n.color}, 0.07)`);
-      g.addColorStop(1, `rgba(${n.color}, 0)`);
+      g.addColorStop(0, `rgba(${rgb}, 0.07)`);
+      g.addColorStop(1, `rgba(${rgb}, 0)`);
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -521,8 +543,8 @@
     ctx.save();
 
     const atmo = ctx.createRadialGradient(cx, cy, r * 0.9, cx, cy, r * 1.35);
-    atmo.addColorStop(0, "rgba(120, 200, 255, 0.28)");
-    atmo.addColorStop(1, "rgba(120, 200, 255, 0)");
+    atmo.addColorStop(0, `rgba(${themeAccent2RGB}, 0.28)`);
+    atmo.addColorStop(1, `rgba(${themeAccent2RGB}, 0)`);
     ctx.fillStyle = atmo;
     ctx.beginPath();
     ctx.arc(cx, cy, r * 1.35, 0, Math.PI * 2);
@@ -558,7 +580,7 @@
 
     ctx.restore();
 
-    ctx.strokeStyle = "rgba(140, 210, 255, 0.75)";
+    ctx.strokeStyle = `rgba(${themeAccentRGB}, 0.75)`;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
