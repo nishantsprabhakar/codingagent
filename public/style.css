@@ -102,11 +102,24 @@ body {
   font-size: 17.5px;
 }
 
+.logo-text-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
 .logo-text {
   font-weight: 600;
   letter-spacing: 0.2px;
   font-size: 16px;
   color: var(--text);
+}
+
+.logo-byline {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
 }
 
 .sidebar-section-title {
@@ -205,9 +218,11 @@ body {
 }
 
 .sidebar-footer {
-  padding: 8px 16px 12px;
-  font-size: 11px;
-  color: var(--text-faint);
+  padding: 10px 16px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: rgba(5, 8, 13, 0.55);
   border-top: 1px solid var(--border-soft);
 }
 
