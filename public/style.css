@@ -44,6 +44,17 @@ body {
     radial-gradient(circle at 15% 0%, rgba(34, 211, 238, 0.07), transparent 45%),
     radial-gradient(circle at 85% 100%, rgba(167, 139, 250, 0.06), transparent 45%);
   background-attachment: fixed;
+  overflow: hidden;
+}
+
+#bg-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  display: block;
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -52,6 +63,8 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: #2d3546; background-clip: padding-box; }
 
 .app {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 240px 1fr;
   height: 100vh;
@@ -65,7 +78,8 @@ body {
 /* ---------- Sidebar ---------- */
 
 .sidebar {
-  background: var(--bg-panel);
+  background: rgba(13, 17, 23, 0.78);
+  backdrop-filter: blur(14px);
   border-right: 1px solid var(--border-soft);
   display: flex;
   flex-direction: column;
