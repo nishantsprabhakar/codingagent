@@ -379,6 +379,11 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* Without this, a flex/grid item defaults to min-height:auto (its content's
+     natural size) instead of shrinking to the grid track — the sidebar would
+     grow past the viewport with many files/sessions instead of clipping its
+     children to their allotted space so *they* can scroll internally. */
+  min-height: 0;
 }
 
 .sidebar-header {
@@ -387,6 +392,56 @@ body {
   gap: 8px;
   padding: 16px 16px 12px;
   border-bottom: 1px solid var(--border-soft);
+}
+
+.project-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 12px;
+  padding: 9px 10px;
+  width: calc(100% - 24px);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--sans);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.project-card:hover { background: var(--bg-hover); border-color: rgba(var(--accent-rgb), 0.4); }
+
+.project-card-icon { font-size: 17px; flex-shrink: 0; }
+
+.project-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.project-card-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.project-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-group-title {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
 }
 
 .logo-mark {
@@ -506,6 +561,7 @@ body {
 
 .file-tree {
   flex: 1;
+  min-height: 0; /* same flex-shrink issue as .sidebar — this is the item that must actually scroll */
   overflow-y: auto;
   padding: 0 8px 16px;
   font-family: var(--mono);
@@ -526,7 +582,16 @@ body {
   align-items: center;
   gap: 12px;
   padding: 10px 16px 12px;
+  cursor: pointer;
 }
+
+.progress-caret {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+  transition: transform 0.2s ease;
+}
+.progress-caret.collapsed { transform: rotate(-90deg); }
 
 .progress-ring-wrap {
   position: relative;

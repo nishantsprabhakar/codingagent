@@ -14,6 +14,8 @@
     statusText: document.getElementById("status-text"),
     hudDiagnostic: document.getElementById("hud-diagnostic"),
     cwdLabel: document.getElementById("cwd-label"),
+    projectCard: document.getElementById("project-card"),
+    projectCardName: document.getElementById("project-card-name"),
     modelBadge: document.getElementById("model-badge"),
     yoloBadge: document.getElementById("yolo-badge"),
     chatLog: document.getElementById("chat-log"),
@@ -249,6 +251,7 @@
         state.sessionId = msg.sessionId;
         el.cwdLabel.textContent = msg.root;
         el.cwdLabel.title = msg.root;
+        updateProjectCard(msg.root);
         updateModelBadge();
         el.yoloBadge.hidden = !msg.yolo;
         // The server always follows "init" with fresh "history"/"tasks" for
@@ -327,6 +330,13 @@
     el.modelBadge.title = `${text} — click to change`;
   }
 
+  function updateProjectCard(root) {
+    if (!root) return;
+    const name = root.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || root;
+    el.projectCardName.textContent = name;
+    el.projectCardName.title = root;
+  }
+
   // ---------- Live activity HUD (percentage ring + live feed) ----------
 
   const RING_RADIUS = 26;
@@ -339,6 +349,8 @@
     feed: [],
     feedSeq: 0,
     feedCollapsed: false,
+    stepperCollapsed: false,
+    stepperUserToggled: false,
     toolLabels: new Map(),
     fakePercent: 0,
     fakeTimer: null,
@@ -348,7 +360,7 @@
     if (hud.built) return;
     el.progressSection.innerHTML = `
       <div class="sidebar-section-title">Live Activity</div>
-      <div class="progress-panel" id="hud-panel">
+      <div class="progress-panel" id="hud-panel" title="Click to expand/collapse the step list">
         <div class="progress-ring-wrap">
           <svg class="progress-ring" viewBox="0 0 64 64">
             <circle class="progress-ring-bg" cx="32" cy="32" r="${RING_RADIUS}"></circle>
@@ -358,6 +370,7 @@
           <div class="progress-percent" id="hud-percent">0<span class="progress-percent-sign">%</span></div>
         </div>
         <div class="progress-summary" id="hud-summary">Idle</div>
+        <span class="progress-caret" id="hud-caret">&#9662;</span>
       </div>
       <div class="progress-stepper" id="hud-stepper" hidden></div>
       <div class="feed-panel">
@@ -374,6 +387,13 @@
     el.hudPercent = document.getElementById("hud-percent");
     el.hudSummary = document.getElementById("hud-summary");
     el.hudStepper = document.getElementById("hud-stepper");
+    el.hudCaret = document.getElementById("hud-caret");
+    document.getElementById("hud-panel").addEventListener("click", () => {
+      if (!hud.tasks.length) return;
+      hud.stepperUserToggled = true;
+      hud.stepperCollapsed = !hud.stepperCollapsed;
+      applyStepperCollapse();
+    });
     el.feedToggle = document.getElementById("feed-toggle");
     el.feedList = document.getElementById("feed-list");
     el.feedToggle.addEventListener("click", () => {
@@ -478,11 +498,16 @@
     setHudPercent(hud.fakePercent);
   }
 
+  function applyStepperCollapse() {
+    el.hudStepper.hidden = !hud.tasks.length || hud.stepperCollapsed;
+    el.hudCaret.classList.toggle("collapsed", hud.stepperCollapsed);
+  }
+
   function renderStepper() {
     ensureHudSkeleton();
     if (!hud.tasks.length) {
-      el.hudStepper.hidden = true;
       el.hudStepper.innerHTML = "";
+      applyStepperCollapse();
       return;
     }
     const steps = hud.tasks
@@ -501,8 +526,8 @@
         `;
       })
       .join("");
-    el.hudStepper.hidden = false;
     el.hudStepper.innerHTML = steps;
+    applyStepperCollapse();
   }
 
   function applyTasks(tasks) {
@@ -514,6 +539,11 @@
       const completed = hud.tasks.filter((t) => t.status === "completed").length;
       setHudPercent(Math.round((completed / total) * 100));
       setHudSummary(`${completed} / ${total} steps complete`);
+      // A session that loads (or replays) with every step already done shouldn't
+      // spend permanent sidebar space on an expanded checklist — same declutter
+      // logic as the post-turn auto-collapse, just also covering the initial
+      // render. Once the user has clicked the toggle themselves, leave it alone.
+      if (completed === total && !hud.stepperUserToggled) hud.stepperCollapsed = true;
     } else if (!state.busy) {
       setHudSummary("Idle");
     }
@@ -571,6 +601,14 @@
     pushFeedItem(ok ? "🏁" : "⚠️", ok ? "Response ready" : "Turn ended with an error", ok ? "done" : "tool-fail");
     setTimeout(() => {
       if (!state.busy) setHudVisible(hud.tasks.length > 0);
+      // Once a turn with a real task list finishes, tuck the step-by-step
+      // detail away by default — the ring/summary line stays, one click
+      // re-expands it. Otherwise a completed checklist sits there taking up
+      // sidebar space for the rest of the session.
+      if (hud.tasks.length > 0 && !hud.stepperCollapsed) {
+        hud.stepperCollapsed = true;
+        applyStepperCollapse();
+      }
     }, 2200);
   }
 
@@ -863,30 +901,63 @@
 
   // ---------- Chats (sessions) ----------
 
+  // "Today" / "Yesterday" bucket by calendar date, not a rolling 24h window —
+  // matches how most chat apps group history (a chat from 11pm yesterday and
+  // one from 1am today are both "recent" but shouldn't both say "Today").
+  function sessionGroupLabel(timestamp) {
+    if (!timestamp) return "Older";
+    const startOfDay = (ms) => {
+      const d = new Date(ms);
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    };
+    const daysAgo = Math.round((startOfDay(Date.now()) - startOfDay(timestamp)) / 86400000);
+    if (daysAgo <= 0) return "Today";
+    if (daysAgo === 1) return "Yesterday";
+    if (daysAgo <= 7) return "Previous 7 Days";
+    return "Older";
+  }
+
   function renderSessionList() {
     el.sessionList.innerHTML = "";
     if (!state.sessions.length) {
       el.sessionList.innerHTML = `<div class="session-list-empty">No chats yet.</div>`;
       return;
     }
+    // state.sessions arrives sorted newest-first (server-side); grouping preserves that order.
+    const groups = new Map();
     for (const s of state.sessions) {
-      const row = document.createElement("div");
-      row.className = `session-item${s.id === state.sessionId ? " active" : ""}`;
-      row.innerHTML = `
-        <div class="session-item-text">
-          <div class="session-item-title">${escapeHtml(s.title)}</div>
-          <div class="session-item-time">${formatRelativeTime(s.updatedAt)}</div>
-        </div>
-        <span class="session-item-delete" title="Delete chat">&times;</span>
-      `;
-      row.addEventListener("click", () => {
-        if (s.id !== state.sessionId) send({ type: "switch_session", id: s.id });
-      });
-      row.querySelector(".session-item-delete").addEventListener("click", (e) => {
-        e.stopPropagation();
-        send({ type: "delete_session", id: s.id });
-      });
-      el.sessionList.appendChild(row);
+      const label = sessionGroupLabel(s.updatedAt);
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(s);
+    }
+    for (const label of ["Today", "Yesterday", "Previous 7 Days", "Older"]) {
+      const sessions = groups.get(label);
+      if (!sessions || !sessions.length) continue;
+
+      const heading = document.createElement("div");
+      heading.className = "session-group-title";
+      heading.textContent = label;
+      el.sessionList.appendChild(heading);
+
+      for (const s of sessions) {
+        const row = document.createElement("div");
+        row.className = `session-item${s.id === state.sessionId ? " active" : ""}`;
+        row.innerHTML = `
+          <div class="session-item-text">
+            <div class="session-item-title">${escapeHtml(s.title)}</div>
+            <div class="session-item-time">${formatRelativeTime(s.updatedAt)}</div>
+          </div>
+          <span class="session-item-delete" title="Delete chat">&times;</span>
+        `;
+        row.addEventListener("click", () => {
+          if (s.id !== state.sessionId) send({ type: "switch_session", id: s.id });
+        });
+        row.querySelector(".session-item-delete").addEventListener("click", (e) => {
+          e.stopPropagation();
+          send({ type: "delete_session", id: s.id });
+        });
+        el.sessionList.appendChild(row);
+      }
     }
   }
 
@@ -972,6 +1043,7 @@
   }
 
   el.folderBtn.addEventListener("click", openFolderModal);
+  el.projectCard.addEventListener("click", openFolderModal);
   el.folderCancel.addEventListener("click", () => {
     el.folderOverlay.hidden = true;
   });
