@@ -27,6 +27,9 @@ echo "        Coding Agent"
 echo "==================================="
 echo ""
 
+# Best-effort — never blocks startup even if this fails or times out.
+node "$ROOT/scripts/check-update.js"
+
 if [ ! -d "$ROOT/node_modules" ]; then
   echo "First-time setup: installing dependencies (this can take a minute)..."
   npm install

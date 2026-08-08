@@ -6,3 +6,4 @@ agent.config.json
 mcp.json
 .coding-agent/
 installer/windows/output/
+version.json

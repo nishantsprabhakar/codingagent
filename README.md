@@ -38,10 +38,10 @@ for anyone who wants to run it manually or dig into how it works.
 
 ## Installers
 
-**Windows** — `installer/windows/wrexlyn.iss` builds a real per-user installer
-(no admin rights needed) with Inno Setup:
+**Windows** — stamp the version, then build with Inno Setup:
 
 ```
+node scripts\write-version.js
 "C:\Users\<you>\AppData\Local\Programs\Inno Setup 6\ISCC.exe" installer\windows\wrexlyn.iss
 ```
 
@@ -66,6 +66,20 @@ folder-picker/key dialogs, just via stdin instead of native dialogs). Use
 `Change Model Key.sh` / `Change Project Folder.sh` to update those later —
 both exist as standalone scripts too, for running directly without a full
 install.
+
+**Update checks**: every launch (both platforms) checks GitHub for a newer
+commit on `main` — a fast, best-effort check with a 5s timeout that never
+blocks startup (offline just means it's skipped silently). Behavior depends
+on how you're running it:
+- **Git checkout** (cloned the repo directly): if behind, prompts
+  `Update now? [y/N]` — accepting runs `git pull --ff-only` + `npm install` +
+  `npm run build` before continuing. A non-fast-forward pull (e.g. local
+  commits) fails safely and just continues on the current version.
+- **Installed via Setup.exe/install.sh**: reports that an update exists and
+  links to the repo, but doesn't apply it automatically — replacing an
+  installed copy's files while it's the thing currently running is a real
+  footgun (locked files, no rollback), so this stays a manual re-download for
+  now.
 
 ## Requirements
 

@@ -44,6 +44,9 @@ Write-Host "        Coding Agent" -ForegroundColor DarkCyan
 Write-Host "===================================" -ForegroundColor DarkCyan
 Write-Host ""
 
+# Best-effort — never blocks startup even if this fails or times out.
+& $nodePath "$root\scripts\check-update.js"
+
 if (-not (Test-Path "$root\node_modules")) {
     Write-Step "First-time setup: installing dependencies (this can take a minute)..."
     & $npmPath install

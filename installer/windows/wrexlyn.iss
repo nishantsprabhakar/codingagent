@@ -47,6 +47,10 @@ Source: "..\..\mcp.json.example"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\Start Coding Agent.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\Change Model Key.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\Change Project Folder.bat"; DestDir: "{app}"; Flags: ignoreversion
+; Stamps the source commit so check-update.js has something to compare against on
+; every launch — regenerate this (node scripts/write-version.js) right before
+; recompiling, so the installer always ships the commit it was actually built from.
+Source: "..\..\version.json"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autodesktop}\Coding Agent"; Filename: "{app}\Start Coding Agent.bat"; WorkingDir: "{app}"

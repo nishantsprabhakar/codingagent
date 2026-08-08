@@ -49,6 +49,15 @@ chmod +x \
   "$INSTALL_DIR/scripts/open-browser-when-ready.sh" \
   "$INSTALL_DIR/scripts/launch-config.js"
 
+# Stamp the source commit into the installed copy so check-update.js (run on every
+# launch) has something to compare against — the installed copy has no .git of its own.
+if command -v git >/dev/null 2>&1 && [ -d "$SOURCE_DIR/.git" ]; then
+  commit="$(cd "$SOURCE_DIR" && git rev-parse HEAD 2>/dev/null || true)"
+  if [ -n "$commit" ]; then
+    printf '{\n  "commit": "%s"\n}\n' "$commit" > "$INSTALL_DIR/version.json"
+  fi
+fi
+
 cat > "$BIN_DIR/wrexlyn" <<EOF
 #!/usr/bin/env bash
 exec "$INSTALL_DIR/Start Coding Agent.sh" "\$@"
