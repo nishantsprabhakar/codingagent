@@ -1,0 +1,12 @@
+{
+  "name": "Wrexlyn",
+  "short_name": "Wrexlyn",
+  "description": "Free AI coding agent with a web UI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030303",
+  "theme_color": "#030303",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -263,6 +263,14 @@ REPL commands:
   small, stable lineup is listed directly. Your choice is remembered per
   provider (`~/.coding-agent/preferences.json`) and reused on the next
   launch.
+- **Phone access**: Settings → "Connect from Phone" shows a QR code and the
+  URL for reaching this machine from any device on the same Wi-Fi (the server
+  already listens on all interfaces, not just localhost) — scan it from an
+  iPhone, then Share → Add to Home Screen for a standalone, app-like icon. The
+  UI is responsive down to phone widths, and iOS-specific quirks (input
+  auto-zoom, dynamic viewport height, Dynamic Island/home-indicator overlap in
+  standalone mode) are handled. If it doesn't load, check Windows Firewall
+  hasn't blocked Node.js on private networks.
 
 ## Known limitations
 

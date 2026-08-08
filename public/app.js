@@ -61,8 +61,12 @@
     settingsClose: document.getElementById("settings-close"),
     settingsTabInstructions: document.getElementById("settings-tab-instructions"),
     settingsTabMcp: document.getElementById("settings-tab-mcp"),
+    settingsTabPhone: document.getElementById("settings-tab-phone"),
     settingsPanelInstructions: document.getElementById("settings-panel-instructions"),
     settingsPanelMcp: document.getElementById("settings-panel-mcp"),
+    settingsPanelPhone: document.getElementById("settings-panel-phone"),
+    phoneQrcode: document.getElementById("phone-qrcode"),
+    phoneConnectUrl: document.getElementById("phone-connect-url"),
     settingsInstructionsInput: document.getElementById("settings-instructions-input"),
     settingsInstructionsSave: document.getElementById("settings-instructions-save"),
     settingsInstructionsStatus: document.getElementById("settings-instructions-status"),
@@ -1147,11 +1151,33 @@
   let mcpServers = {};
 
   function showSettingsTab(tab) {
-    const isInstructions = tab === "instructions";
-    el.settingsTabInstructions.classList.toggle("active", isInstructions);
-    el.settingsTabMcp.classList.toggle("active", !isInstructions);
-    el.settingsPanelInstructions.hidden = !isInstructions;
-    el.settingsPanelMcp.hidden = isInstructions;
+    el.settingsTabInstructions.classList.toggle("active", tab === "instructions");
+    el.settingsTabMcp.classList.toggle("active", tab === "mcp");
+    el.settingsTabPhone.classList.toggle("active", tab === "phone");
+    el.settingsPanelInstructions.hidden = tab !== "instructions";
+    el.settingsPanelMcp.hidden = tab !== "mcp";
+    el.settingsPanelPhone.hidden = tab !== "phone";
+  }
+
+  async function loadPhoneConnectInfo() {
+    el.phoneQrcode.innerHTML = "";
+    el.phoneConnectUrl.textContent = "Loading…";
+    try {
+      const res = await fetch("/api/lan-info");
+      const data = await res.json();
+      if (!data.addresses || !data.addresses.length) {
+        el.phoneConnectUrl.textContent = "No network address found — connect this computer to Wi-Fi first.";
+        return;
+      }
+      const url = `http://${data.addresses[0]}:${data.port}`;
+      el.phoneConnectUrl.textContent = url;
+      const img = document.createElement("img");
+      img.src = `/api/lan-qrcode?_=${Date.now()}`;
+      img.alt = "QR code to open Wrexlyn on your phone";
+      el.phoneQrcode.appendChild(img);
+    } catch {
+      el.phoneConnectUrl.textContent = "Failed to look up this computer's network address.";
+    }
   }
 
   function flashStatus(statusEl, text) {
@@ -1304,6 +1330,10 @@
   });
   el.settingsTabInstructions.addEventListener("click", () => showSettingsTab("instructions"));
   el.settingsTabMcp.addEventListener("click", () => showSettingsTab("mcp"));
+  el.settingsTabPhone.addEventListener("click", () => {
+    showSettingsTab("phone");
+    loadPhoneConnectInfo();
+  });
 
   el.settingsInstructionsSave.addEventListener("click", () => {
     send({ type: "update_global_instructions", text: el.settingsInstructionsInput.value });

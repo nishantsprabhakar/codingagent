@@ -7,7 +7,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#030303" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Wrexlyn" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" href="/icon-512.png" />
+<link rel="icon" href="/icon-512.png" />
 <title>Wrexlyn</title>
 <script>
 (function () {
@@ -213,6 +221,7 @@
     <div class="settings-tabs">
       <button id="settings-tab-instructions" class="settings-tab active">Global Instructions</button>
       <button id="settings-tab-mcp" class="settings-tab">MCP Servers</button>
+      <button id="settings-tab-phone" class="settings-tab">Connect from Phone</button>
     </div>
 
     <div id="settings-panel-instructions" class="settings-panel">
@@ -246,6 +255,23 @@
       <div class="settings-panel-actions">
         <span id="settings-mcp-status" class="settings-save-status"></span>
         <button id="settings-mcp-save" class="btn btn-primary">Save &amp; reconnect</button>
+      </div>
+    </div>
+
+    <div id="settings-panel-phone" class="settings-panel" hidden>
+      <p class="settings-hint">
+        Scan this with your iPhone's camera (same Wi-Fi network) to open Wrexlyn in Safari. For the best experience,
+        tap Share &rarr; <strong>Add to Home Screen</strong> once it loads.
+      </p>
+      <div class="phone-connect">
+        <div id="phone-qrcode" class="phone-qrcode"></div>
+        <div class="phone-connect-info">
+          <div id="phone-connect-url" class="phone-connect-url">Loading…</div>
+          <p class="settings-hint">
+            If it doesn't load, your firewall may be blocking the connection — allow Node.js/Wrexlyn on private
+            networks when Windows prompts you, or check your router isn't isolating devices from each other.
+          </p>
+        </div>
       </div>
     </div>
 

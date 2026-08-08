@@ -7,6 +7,7 @@ import * as http from "http";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import * as QRCode from "qrcode";
 import { WebSocketServer, WebSocket } from "ws";
 import { Agent } from "../agent";
 import { PermissionManager, type PermissionDecision } from "../permissions";
@@ -32,7 +33,23 @@ const MIME: Record<string, string> = {
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
+  ".png": "image/png",
 };
+
+/**
+ * Node's http server listens on all interfaces by default (no host passed to
+ * .listen()), so this is purely about *telling* the user how to reach it from
+ * another device on the same network — a phone can't use "localhost".
+ */
+function getLanAddresses(): string[] {
+  const results: string[] = [];
+  for (const addrs of Object.values(os.networkInterfaces())) {
+    for (const addr of addrs ?? []) {
+      if (addr.family === "IPv4" && !addr.internal) results.push(addr.address);
+    }
+  }
+  return results;
+}
 
 export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: boolean, port: number): void {
   let currentRoot = initialRoot;
@@ -41,7 +58,7 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
 
   const httpServer = http.createServer((req, res) => {
     try {
-      handleHttp(req, res, currentRoot, llmConfig.provider);
+      handleHttp(req, res, currentRoot, llmConfig.provider, port);
     } catch (err: any) {
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end(`Internal error: ${err.message ?? err}`);
@@ -172,6 +189,9 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
 
   httpServer.listen(port, () => {
     console.log(`\nWrexlyn web UI running at http://localhost:${port}`);
+    for (const addr of getLanAddresses()) {
+      console.log(`  also reachable on your network at: http://${addr}:${port}  (e.g. from a phone on the same Wi-Fi)`);
+    }
     console.log(`root: ${currentRoot}`);
     console.log(
       `model: ${llmConfig.provider} · ${currentModel}${yolo ? "  (yolo mode: all actions auto-approved)" : ""}\n`
@@ -179,7 +199,7 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
   });
 }
 
-function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: string, provider: string): void {
+function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: string, provider: string, port: number): void {
   const url = new URL(req.url ?? "/", "http://localhost");
 
   if (url.pathname === "/api/tree") return handleTree(url, res, root);
@@ -191,8 +211,30 @@ function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: s
   if (url.pathname === "/api/browse/mkdir" && req.method === "POST") return handleMkdir(req, res);
   if (url.pathname === "/api/global-instructions") return handleGlobalInstructions(res);
   if (url.pathname === "/api/mcp-config") return handleMcpConfig(res, root);
+  if (url.pathname === "/api/lan-info") return handleLanInfo(res, port);
+  if (url.pathname === "/api/lan-qrcode") return void handleLanQrCode(res, port);
 
   serveStatic(url.pathname, res);
+}
+
+function handleLanInfo(res: http.ServerResponse, port: number): void {
+  sendJson(res, 200, { port, addresses: getLanAddresses() });
+}
+
+/** SVG QR code encoding this machine's LAN URL, for scan-to-connect from a phone on the same network. */
+async function handleLanQrCode(res: http.ServerResponse, port: number): Promise<void> {
+  const [address] = getLanAddresses();
+  if (!address) {
+    res.writeHead(404, { "Content-Type": "text/plain" }).end("No LAN address found");
+    return;
+  }
+  try {
+    const svg = await QRCode.toString(`http://${address}:${port}`, { type: "svg", margin: 1, width: 220 });
+    res.writeHead(200, { "Content-Type": "image/svg+xml", "Cache-Control": "no-cache" });
+    res.end(svg);
+  } catch (err: any) {
+    res.writeHead(500, { "Content-Type": "text/plain" }).end(`Failed to generate QR code: ${err.message ?? err}`);
+  }
 }
 
 /**
