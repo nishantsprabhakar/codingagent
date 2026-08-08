@@ -295,6 +295,14 @@ function checkPptxHasContent(slides: any[] | undefined): string | null {
 
 // ---------- Excel (.xlsx) ----------
 
+/** A cell value of "=SOME_FORMULA" becomes a live Excel formula instead of a literal string. */
+function toFormulaAwareCellValue(v: any): any {
+  if (typeof v === "string" && v.startsWith("=") && v.length > 1) {
+    return { formula: v.slice(1) };
+  }
+  return v;
+}
+
 export const createXlsxTool: ToolSpec = {
   mutating: true,
   definition: {
@@ -319,7 +327,11 @@ export const createXlsxTool: ToolSpec = {
                 rows: {
                   type: "array",
                   items: { type: "array", items: {} },
-                  description: "Data rows, each an array of cell values (string or number).",
+                  description:
+                    "Data rows, each an array of cell values (string or number). A string starting with '=' is " +
+                    "written as a live, recalculating Excel formula (e.g. '=SUM(B2:B10)', '=B2*C2') instead of a " +
+                    "literal string — use this for anything that should stay an auditable, formula-driven model " +
+                    "(financial models, running totals) rather than baked-in numbers.",
                 },
               },
             },
@@ -358,7 +370,9 @@ export const createXlsxTool: ToolSpec = {
         sheet.views = [{ state: "frozen", ySplit: 1 }];
       }
       rows.forEach((row, i) => {
-        const dataRow = sheet.addRow(row);
+        // Column widths below are measured from the raw (pre-formula) values, so a cell
+        // like "=SUM(B2:B10)" sizes the column by the formula text, not "[object Object]".
+        const dataRow = sheet.addRow(row.map(toFormulaAwareCellValue));
         if (i % 2 === 1) dataRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
         dataRow.eachCell((cell) => (cell.border = cellBorder));
       });

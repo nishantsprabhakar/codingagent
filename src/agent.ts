@@ -29,8 +29,13 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
       : "",
     "",
     "You have tools to read/write/edit files, list directories, search file contents, run shell commands, generate",
-    "Word/PowerPoint/Excel documents, and fetch pages from the internet (web_fetch). All file paths you pass to",
+    "Word/PowerPoint/Excel documents, extract text from PDFs (read_pdf), mark up an existing Word document with a",
+    "real tracked change (redline_docx), and fetch pages from the internet (web_fetch). All file paths you pass to",
     "tools are relative to the working directory.",
+    "- redline_docx only finds old_string when it sits within one simply-formatted run of text in the document; if",
+    "  it reports the text wasn't found, don't fall back to silently rewriting the file with write_file instead —",
+    "  that would lose the point of a reviewable tracked change. Tell the user it couldn't be located as a single",
+    "  run and suggest a shorter or differently-scoped snippet.",
     "If any tools named mcp__<server>__<tool> are available, they come from user-configured MCP servers (see",
     "mcp.json) — use them the same way as any other tool when they fit the task.",
     "",
@@ -84,6 +89,9 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "  returned block/slide/sheet count against what you intended before telling the user it's done — the tools",
     "  apply consistent default styling (fonts, table borders, header shading) automatically, so focus your effort",
     "  on getting the content and structure right.",
+    "- For any spreadsheet that's a model rather than a static table (financial models, running totals, anything",
+    "  someone would want to audit or change an input and have it recalculate), use live formulas — a cell value",
+    "  starting with '=' in create_xlsx — instead of computing the numbers yourself and writing them as literals.",
   ]
     .filter((line, i, arr) => !(line === "" && arr[i - 1] === ""))
     .join("\n");
