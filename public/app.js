@@ -66,6 +66,7 @@
     settingsInstructionsInput: document.getElementById("settings-instructions-input"),
     settingsInstructionsSave: document.getElementById("settings-instructions-save"),
     settingsInstructionsStatus: document.getElementById("settings-instructions-status"),
+    mcpGallery: document.getElementById("mcp-gallery"),
     mcpServerList: document.getElementById("mcp-server-list"),
     mcpAddBtn: document.getElementById("mcp-add-btn"),
     settingsMcpSave: document.getElementById("settings-mcp-save"),
@@ -1188,6 +1189,78 @@
     for (const name of names) el.mcpServerList.appendChild(buildMcpServerRow(name, mcpServers[name]));
   }
 
+  // Deliberately a short, conservative list: only servers confirmed current and
+  // official in the modelcontextprotocol/servers registry at the time this was
+  // written. These run via npx/uvx — i.e. they execute code — so this list isn't
+  // padded with unverified third-party packages just to look comprehensive.
+  const MCP_CONNECTOR_CATALOG = [
+    {
+      id: "filesystem",
+      name: "Filesystem",
+      icon: "&#128193;",
+      description: "Read/write files outside this project's sandbox.",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/folder"],
+    },
+    {
+      id: "git",
+      name: "Git",
+      icon: "&#127807;",
+      description: "History, diff, and commit tools for a specific repo.",
+      command: "uvx",
+      args: ["mcp-server-git", "--repository", "/path/to/repo"],
+    },
+    {
+      id: "memory",
+      name: "Memory",
+      icon: "&#129504;",
+      description: "Persistent knowledge graph memory across sessions.",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-memory"],
+    },
+    {
+      id: "sequential-thinking",
+      name: "Sequential Thinking",
+      icon: "&#129513;",
+      description: "Structured step-by-step reasoning tool.",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-sequentialthinking"],
+    },
+    {
+      id: "time",
+      name: "Time",
+      icon: "&#128337;",
+      description: "Current time and timezone conversion.",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-time"],
+    },
+  ];
+
+  function renderMcpGallery() {
+    el.mcpGallery.innerHTML = "";
+    for (const connector of MCP_CONNECTOR_CATALOG) {
+      const alreadyAdded = connector.name in mcpServers;
+      const card = document.createElement("div");
+      card.className = "mcp-gallery-card";
+      card.innerHTML = `
+        <div class="mcp-gallery-card-title"><span>${connector.icon}</span><span>${escapeHtml(connector.name)}</span></div>
+        <div class="mcp-gallery-card-desc">${escapeHtml(connector.description)}</div>
+        <button class="mcp-gallery-card-add" ${alreadyAdded ? "disabled" : ""}>${alreadyAdded ? "Added" : "+ Add"}</button>
+      `;
+      const addBtn = card.querySelector(".mcp-gallery-card-add");
+      addBtn.addEventListener("click", () => {
+        if (el.mcpServerList.querySelector(".mcp-empty")) el.mcpServerList.innerHTML = "";
+        mcpServers[connector.name] = { command: connector.command, args: connector.args };
+        const row = buildMcpServerRow(connector.name, mcpServers[connector.name]);
+        el.mcpServerList.appendChild(row);
+        row.scrollIntoView({ block: "nearest" });
+        addBtn.disabled = true;
+        addBtn.textContent = "Added";
+      });
+      el.mcpGallery.appendChild(card);
+    }
+  }
+
   function collectMcpServersFromForm() {
     const servers = {};
     for (const row of el.mcpServerList.querySelectorAll(".mcp-server-row")) {
@@ -1222,6 +1295,7 @@
       mcpServers = {};
     }
     renderMcpServerList();
+    renderMcpGallery();
   }
 
   el.settingsBtn.addEventListener("click", openSettingsModal);
