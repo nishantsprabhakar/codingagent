@@ -10,6 +10,7 @@ import { PermissionManager } from "./permissions";
 import { gatherProjectContext } from "./projectContext";
 import { loadSession, saveSession, deleteSession, createSessionId, deriveTitle, pickMostRecentSessionId } from "./session";
 import { McpManager } from "./mcp";
+import { loadGlobalInstructions, saveGlobalInstructions } from "./globalSettings";
 import type { ChatMessage, ToolContext, Reporter, LlmConfig, TaskItem, HistoryItem, ToolCallRequest } from "./types";
 
 const MAX_TOOL_ITERATIONS = 30;
@@ -17,10 +18,15 @@ const MAX_TOOL_ITERATIONS = 30;
 /** Tool calls whose `path` argument should surface in the "Created Files" panel. */
 const FILE_PRODUCING_TOOLS = new Set(["write_file", "edit_file", "create_docx", "create_pptx", "create_xlsx"]);
 
-function systemPrompt(root: string, projectContext: string): string {
+function systemPrompt(root: string, projectContext: string, globalInstructions: string): string {
   return [
     "You are a terminal-based AI coding agent operating on a real project directory.",
     `Your working directory (sandbox root) is: ${root}`,
+    "",
+    globalInstructions.trim()
+      ? `The user has set the following global instructions, which apply across every project (not just this one) —` +
+          ` follow them unless they conflict with a safety/tool constraint above:\n${globalInstructions.trim()}`
+      : "",
     "",
     "You have tools to read/write/edit files, list directories, search file contents, run shell commands, generate",
     "Word/PowerPoint/Excel documents, and fetch pages from the internet (web_fetch). All file paths you pass to",
@@ -91,6 +97,7 @@ export class Agent {
   private ctx: ToolContext;
   private mcpManager = new McpManager();
   private sysMessage: ChatMessage;
+  private projectContext: string;
   private sessionId: string;
   private sessionTitle = "New chat";
 
@@ -102,7 +109,11 @@ export class Agent {
     sessionId?: string
   ) {
     this.ctx = { root };
-    this.sysMessage = { role: "system", content: systemPrompt(root, gatherProjectContext(root)) };
+    this.projectContext = gatherProjectContext(root);
+    this.sysMessage = {
+      role: "system",
+      content: systemPrompt(root, this.projectContext, loadGlobalInstructions()),
+    };
     this.sessionId = sessionId ?? pickMostRecentSessionId(root) ?? createSessionId();
     this.loadSessionData();
   }
@@ -169,9 +180,32 @@ export class Agent {
     return this.llmConfig.model;
   }
 
+  /**
+   * Saves new global instructions (applied to every project) and rebuilds the
+   * system prompt in place, so the change takes effect on the very next
+   * message without needing to restart or switch folders.
+   */
+  setGlobalInstructions(text: string): void {
+    saveGlobalInstructions(text);
+    this.sysMessage = { role: "system", content: systemPrompt(this.ctx.root, this.projectContext, text) };
+    this.messages[0] = this.sysMessage;
+  }
+
   /** Connects any MCP servers configured in <root>/mcp.json. Safe to not await — runs in the background. */
   async connectMcp(): Promise<void> {
     await this.mcpManager.connectAll(this.ctx.root, (message) => console.error(`[coding-agent] ${message}`));
+  }
+
+  /**
+   * Disconnects and reconnects every MCP server from the current mcp.json —
+   * call this after the config file has been edited so the change takes
+   * effect without a full restart. Returns the number of tools now available.
+   */
+  async reloadMcp(): Promise<number> {
+    await this.mcpManager.closeAll();
+    this.mcpManager = new McpManager();
+    await this.connectMcp();
+    return this.mcpManager.getToolDefinitions().length;
   }
 
   /** Releases MCP server subprocesses. Call when this Agent instance is done (e.g. on disconnect). */

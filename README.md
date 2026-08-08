@@ -219,17 +219,26 @@ REPL commands:
   `.coding-agent/sessions/<id>.json`; closing the tab and reopening resumes
   whichever chat was active. Projects using the older single-session format
   are migrated automatically the first time they're opened.
-- **MCP support**: drop an `mcp.json` in your project root (see
-  `mcp.json.example` — same format as Claude Desktop/VS Code:
+- **MCP support / app connectors**: drop an `mcp.json` in your project root
+  (see `mcp.json.example` — same format as Claude Desktop/VS Code:
   `{"mcpServers": {"name": {"command", "args", "env"}}}`) and the agent
   connects to those servers on startup, merging their tools in as
   `mcp__<server>__<tool>`, gated behind the same permission prompts as
   everything else. A server that fails to start is skipped with a logged
-  warning, not fatal.
-- **Switch project folder**: the folder icon in the web UI's header opens a
-  modal to type/paste a different project path and switch to it live — no
-  need to close the app and use the desktop launcher's folder picker. It
-  remembers your last 10 folders for one-click switching back.
+  warning, not fatal. The settings modal (gear icon) has an "MCP Servers" tab
+  to add/edit/remove servers without hand-editing JSON — saving reconnects
+  live, no restart needed.
+- **Global instructions**: the settings modal's "Global Instructions" tab
+  holds free-text instructions applied to every project on this machine (the
+  same idea as a global CLAUDE.md) — stored once at
+  `~/.coding-agent/global-instructions.txt`, applied to the system prompt
+  immediately on save.
+- **Switch project folder / create a new project**: the folder icon in the
+  web UI's header opens a modal with an in-app folder browser (drives on
+  Windows, home directory on Linux/macOS — click a folder to descend, the up
+  arrow to go back), a "new folder" field to create and switch into a fresh
+  project directory in one step, plus your last 10 folders for one-click
+  switching back.
 - **File upload**: the paperclip icon next to the composer (or dragging a file
   onto the chat) uploads it straight into the project root, so you can hand
   the agent a reference file without it already being in the folder.

@@ -40,6 +40,12 @@
     recentFolders: document.getElementById("recent-folders"),
     folderCancel: document.getElementById("folder-cancel"),
     folderSwitch: document.getElementById("folder-switch"),
+    folderBrowserUp: document.getElementById("folder-browser-up"),
+    folderBrowserPath: document.getElementById("folder-browser-path"),
+    folderBrowserList: document.getElementById("folder-browser-list"),
+    folderNewName: document.getElementById("folder-new-name"),
+    folderNewCreate: document.getElementById("folder-new-create"),
+    folderNewError: document.getElementById("folder-new-error"),
     uploadInput: document.getElementById("upload-input"),
     modelOverlay: document.getElementById("model-overlay"),
     modelSearch: document.getElementById("model-search"),
@@ -50,6 +56,20 @@
     themeOverlay: document.getElementById("theme-overlay"),
     themeList: document.getElementById("theme-list"),
     themeCancel: document.getElementById("theme-cancel"),
+    settingsBtn: document.getElementById("settings-btn"),
+    settingsOverlay: document.getElementById("settings-overlay"),
+    settingsClose: document.getElementById("settings-close"),
+    settingsTabInstructions: document.getElementById("settings-tab-instructions"),
+    settingsTabMcp: document.getElementById("settings-tab-mcp"),
+    settingsPanelInstructions: document.getElementById("settings-panel-instructions"),
+    settingsPanelMcp: document.getElementById("settings-panel-mcp"),
+    settingsInstructionsInput: document.getElementById("settings-instructions-input"),
+    settingsInstructionsSave: document.getElementById("settings-instructions-save"),
+    settingsInstructionsStatus: document.getElementById("settings-instructions-status"),
+    mcpServerList: document.getElementById("mcp-server-list"),
+    mcpAddBtn: document.getElementById("mcp-add-btn"),
+    settingsMcpSave: document.getElementById("settings-mcp-save"),
+    settingsMcpStatus: document.getElementById("settings-mcp-status"),
   };
 
   const TOOL_ICONS = {
@@ -286,6 +306,12 @@
       case "model_changed":
         state.currentModel = msg.model;
         updateModelBadge();
+        break;
+      case "settings_saved":
+        if (msg.which === "instructions") flashStatus(el.settingsInstructionsStatus, "Saved.");
+        break;
+      case "mcp_reloaded":
+        flashStatus(el.settingsMcpStatus, `Saved — ${msg.toolCount} tool${msg.toolCount === 1 ? "" : "s"} available.`);
         break;
     }
   }
@@ -878,8 +904,44 @@
 
   // ---------- Switch project folder ----------
 
+  const browseState = { path: null, parent: null };
+
+  async function browseTo(targetPath) {
+    try {
+      const res = await fetch(`/api/browse?path=${encodeURIComponent(targetPath || "")}`);
+      const data = await res.json();
+      if (data.error) {
+        el.folderBrowserList.innerHTML = `<div class="folder-browser-empty">${escapeHtml(data.error)}</div>`;
+        return;
+      }
+      browseState.path = data.path;
+      browseState.parent = data.parent;
+      el.folderBrowserPath.textContent = data.path || "Drives";
+      el.folderBrowserPath.title = data.path || "";
+      el.folderBrowserUp.disabled = data.parent === null;
+
+      el.folderBrowserList.innerHTML = "";
+      if (!data.entries.length) {
+        el.folderBrowserList.innerHTML = `<div class="folder-browser-empty">No subfolders</div>`;
+      }
+      for (const entry of data.entries) {
+        const row = document.createElement("div");
+        row.className = "folder-browser-item";
+        row.title = entry.path;
+        row.innerHTML = `<span>&#128193;</span><span>${escapeHtml(entry.name)}</span>`;
+        row.addEventListener("click", () => browseTo(entry.path));
+        el.folderBrowserList.appendChild(row);
+      }
+      if (data.path) el.folderInput.value = data.path;
+    } catch {
+      el.folderBrowserList.innerHTML = `<div class="folder-browser-empty">Failed to browse.</div>`;
+    }
+  }
+
   function openFolderModal() {
     el.folderInput.value = state.currentRoot;
+    el.folderNewName.value = "";
+    el.folderNewError.hidden = true;
     el.recentFolders.innerHTML = "";
     for (const folder of state.recentFolders) {
       const row = document.createElement("div");
@@ -888,11 +950,13 @@
       row.title = folder;
       row.addEventListener("click", () => {
         el.folderInput.value = folder;
+        browseTo(folder);
       });
       el.recentFolders.appendChild(row);
     }
     el.folderOverlay.hidden = false;
     el.folderInput.focus();
+    browseTo(state.currentRoot);
   }
 
   function switchFolder() {
@@ -911,6 +975,47 @@
     if (e.key === "Enter") {
       e.preventDefault();
       switchFolder();
+    }
+  });
+
+  el.folderBrowserUp.addEventListener("click", () => {
+    if (browseState.parent !== null) browseTo(browseState.parent);
+  });
+
+  async function createProjectFolder() {
+    const name = el.folderNewName.value.trim();
+    el.folderNewError.hidden = true;
+    if (!name) return;
+    if (!browseState.path) {
+      el.folderNewError.textContent = "Pick a drive/folder first.";
+      el.folderNewError.hidden = false;
+      return;
+    }
+    try {
+      const res = await fetch("/api/browse/mkdir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentPath: browseState.path, name }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        el.folderNewError.textContent = data.error;
+        el.folderNewError.hidden = false;
+        return;
+      }
+      el.folderNewName.value = "";
+      await browseTo(data.path);
+    } catch {
+      el.folderNewError.textContent = "Failed to create the folder.";
+      el.folderNewError.hidden = false;
+    }
+  }
+
+  el.folderNewCreate.addEventListener("click", createProjectFolder);
+  el.folderNewName.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      createProjectFolder();
     }
   });
 
@@ -1034,6 +1139,109 @@
   });
   el.themeCancel.addEventListener("click", () => {
     el.themeOverlay.hidden = true;
+  });
+
+  // ---------- Settings (global instructions + MCP servers / app connectors) ----------
+
+  let mcpServers = {};
+
+  function showSettingsTab(tab) {
+    const isInstructions = tab === "instructions";
+    el.settingsTabInstructions.classList.toggle("active", isInstructions);
+    el.settingsTabMcp.classList.toggle("active", !isInstructions);
+    el.settingsPanelInstructions.hidden = !isInstructions;
+    el.settingsPanelMcp.hidden = isInstructions;
+  }
+
+  function flashStatus(statusEl, text) {
+    statusEl.textContent = text;
+    statusEl.classList.add("visible");
+    setTimeout(() => statusEl.classList.remove("visible"), 2500);
+  }
+
+  function buildMcpServerRow(name, config) {
+    const row = document.createElement("div");
+    row.className = "mcp-server-row";
+    row.innerHTML = `
+      <div class="mcp-server-row-header">
+        <input class="folder-input mcp-name-input" type="text" value="${escapeHtml(name)}" placeholder="Server name" />
+        <span class="mcp-server-remove" title="Remove server">&times;</span>
+      </div>
+      <div class="mcp-server-fields">
+        <label>Command</label>
+        <input class="folder-input mcp-command-input" type="text" value="${escapeHtml(config.command || "")}" placeholder="e.g. npx" />
+        <label>Args</label>
+        <input class="folder-input mcp-args-input" type="text" value="${escapeHtml((config.args || []).join(" "))}" placeholder="space-separated args" />
+      </div>
+    `;
+    row.querySelector(".mcp-server-remove").addEventListener("click", () => row.remove());
+    return row;
+  }
+
+  function renderMcpServerList() {
+    el.mcpServerList.innerHTML = "";
+    const names = Object.keys(mcpServers);
+    if (!names.length) {
+      el.mcpServerList.innerHTML = `<div class="mcp-empty">No MCP servers or app connectors configured yet.</div>`;
+      return;
+    }
+    for (const name of names) el.mcpServerList.appendChild(buildMcpServerRow(name, mcpServers[name]));
+  }
+
+  function collectMcpServersFromForm() {
+    const servers = {};
+    for (const row of el.mcpServerList.querySelectorAll(".mcp-server-row")) {
+      const name = row.querySelector(".mcp-name-input").value.trim();
+      const command = row.querySelector(".mcp-command-input").value.trim();
+      const args = row.querySelector(".mcp-args-input").value.trim();
+      if (!name || !command) continue;
+      servers[name] = { command, args: args ? args.split(/\s+/) : [] };
+    }
+    return servers;
+  }
+
+  async function openSettingsModal() {
+    showSettingsTab("instructions");
+    el.settingsInstructionsStatus.classList.remove("visible");
+    el.settingsMcpStatus.classList.remove("visible");
+    el.settingsOverlay.hidden = false;
+
+    try {
+      const res = await fetch("/api/global-instructions");
+      const data = await res.json();
+      el.settingsInstructionsInput.value = data.text || "";
+    } catch {
+      el.settingsInstructionsInput.value = "";
+    }
+
+    try {
+      const res = await fetch("/api/mcp-config");
+      const data = await res.json();
+      mcpServers = data.mcpServers || {};
+    } catch {
+      mcpServers = {};
+    }
+    renderMcpServerList();
+  }
+
+  el.settingsBtn.addEventListener("click", openSettingsModal);
+  el.settingsClose.addEventListener("click", () => {
+    el.settingsOverlay.hidden = true;
+  });
+  el.settingsTabInstructions.addEventListener("click", () => showSettingsTab("instructions"));
+  el.settingsTabMcp.addEventListener("click", () => showSettingsTab("mcp"));
+
+  el.settingsInstructionsSave.addEventListener("click", () => {
+    send({ type: "update_global_instructions", text: el.settingsInstructionsInput.value });
+  });
+
+  el.mcpAddBtn.addEventListener("click", () => {
+    if (el.mcpServerList.querySelector(".mcp-empty")) el.mcpServerList.innerHTML = "";
+    el.mcpServerList.appendChild(buildMcpServerRow("", { command: "", args: [] }));
+  });
+
+  el.settingsMcpSave.addEventListener("click", () => {
+    send({ type: "update_mcp_config", mcpServers: collectMcpServersFromForm() });
   });
 
   // ---------- File upload ----------
@@ -1251,6 +1459,7 @@
     if (!el.folderOverlay.hidden) el.folderOverlay.hidden = true;
     if (!el.modelOverlay.hidden) el.modelOverlay.hidden = true;
     if (!el.themeOverlay.hidden) el.themeOverlay.hidden = true;
+    if (!el.settingsOverlay.hidden) el.settingsOverlay.hidden = true;
   });
 
   // ---------- Init ----------

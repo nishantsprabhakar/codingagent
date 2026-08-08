@@ -72,6 +72,7 @@
         <span id="yolo-badge" class="badge badge-yolo" hidden>YOLO</span>
         <button id="theme-btn" class="icon-btn" title="Change theme">&#127912;</button>
         <button id="folder-btn" class="icon-btn" title="Switch project folder">&#128193;</button>
+        <button id="settings-btn" class="icon-btn" title="Settings">&#9881;</button>
       </div>
     </header>
 
@@ -125,7 +126,7 @@
 </div>
 
 <div id="folder-overlay" class="overlay" hidden>
-  <div class="permission-modal">
+  <div class="permission-modal permission-modal-wide">
     <div class="permission-header">
       <span class="permission-icon">&#128193;</span>
       <div>
@@ -139,6 +140,20 @@
       type="text"
       placeholder="Paste or type a full folder path…"
     />
+
+    <div class="folder-browser">
+      <div class="folder-browser-toolbar">
+        <button id="folder-browser-up" class="icon-btn" title="Go up">&#8593;</button>
+        <span id="folder-browser-path" class="folder-browser-path"></span>
+      </div>
+      <div id="folder-browser-list" class="folder-browser-list"></div>
+      <div class="folder-browser-new">
+        <input id="folder-new-name" class="folder-input" type="text" placeholder="New project folder name…" />
+        <button id="folder-new-create" class="btn btn-secondary">Create</button>
+      </div>
+      <div id="folder-new-error" class="folder-new-error" hidden></div>
+    </div>
+
     <div id="recent-folders" class="recent-folders"></div>
     <div class="permission-actions">
       <button id="folder-cancel" class="btn btn-secondary">Cancel</button>
@@ -181,6 +196,54 @@
     <div id="theme-list" class="recent-folders theme-list"></div>
     <div class="permission-actions">
       <button id="theme-cancel" class="btn btn-secondary">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="settings-overlay" class="overlay" hidden>
+  <div class="permission-modal permission-modal-wide">
+    <div class="permission-header">
+      <span class="permission-icon">&#9881;</span>
+      <div>
+        <div class="permission-title">Settings</div>
+        <div class="permission-tool">Global instructions apply to every project; MCP servers apply to this one.</div>
+      </div>
+    </div>
+
+    <div class="settings-tabs">
+      <button id="settings-tab-instructions" class="settings-tab active">Global Instructions</button>
+      <button id="settings-tab-mcp" class="settings-tab">MCP Servers</button>
+    </div>
+
+    <div id="settings-panel-instructions" class="settings-panel">
+      <p class="settings-hint">
+        Added to every project's system prompt on this machine — the same idea as a global CLAUDE.md.
+      </p>
+      <textarea
+        id="settings-instructions-input"
+        class="settings-textarea"
+        placeholder="e.g. Always write tests for new functions. Prefer TypeScript. Explain reasoning briefly before big changes."
+      ></textarea>
+      <div class="settings-panel-actions">
+        <span id="settings-instructions-status" class="settings-save-status"></span>
+        <button id="settings-instructions-save" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+
+    <div id="settings-panel-mcp" class="settings-panel" hidden>
+      <p class="settings-hint">
+        MCP servers and app connectors give the agent extra tools. Saved to this project's <code>mcp.json</code>.
+      </p>
+      <div id="mcp-server-list" class="mcp-server-list"></div>
+      <button id="mcp-add-btn" class="btn btn-secondary">+ Add server</button>
+      <div class="settings-panel-actions">
+        <span id="settings-mcp-status" class="settings-save-status"></span>
+        <button id="settings-mcp-save" class="btn btn-primary">Save &amp; reconnect</button>
+      </div>
+    </div>
+
+    <div class="permission-actions">
+      <button id="settings-close" class="btn btn-secondary">Close</button>
     </div>
   </div>
 </div>

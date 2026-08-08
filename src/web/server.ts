@@ -5,6 +5,7 @@
  */
 import * as http from "http";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { WebSocketServer, WebSocket } from "ws";
 import { Agent } from "../agent";
@@ -13,6 +14,7 @@ import { resolveInRoot } from "../tools/paths";
 import { WebSocketReporter, createConfirmFn } from "./reporter";
 import { loadRecentFolders, addRecentFolder } from "../recentFolders";
 import { saveLastModel } from "../preferences";
+import { loadGlobalInstructions } from "../globalSettings";
 import { listOpenRouterModels, GROQ_MODELS } from "../providers/openrouterModels";
 import { listSessions } from "../session";
 import type { ClientMessage, ServerMessage } from "./protocol";
@@ -143,6 +145,14 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
           sendSessions();
         } else if (msg.type === "list_sessions") {
           sendSessions();
+        } else if (msg.type === "update_global_instructions") {
+          agent.setGlobalInstructions(msg.text);
+          send({ type: "settings_saved", which: "instructions" });
+        } else if (msg.type === "update_mcp_config") {
+          const mcpPath = path.join(currentRoot, "mcp.json");
+          fs.writeFileSync(mcpPath, JSON.stringify({ mcpServers: msg.mcpServers }, null, 2), "utf-8");
+          const toolCount = await agent.reloadMcp();
+          send({ type: "mcp_reloaded", toolCount });
         }
       } catch (err: any) {
         // A single bad request/response should never take the whole server
@@ -177,8 +187,105 @@ function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: s
   if (url.pathname === "/api/download") return handleDownload(url, res, root);
   if (url.pathname === "/api/upload" && req.method === "POST") return handleUpload(req, url, res, root);
   if (url.pathname === "/api/models") return void handleModels(res, provider);
+  if (url.pathname === "/api/browse") return handleBrowse(url, res);
+  if (url.pathname === "/api/browse/mkdir" && req.method === "POST") return handleMkdir(req, res);
+  if (url.pathname === "/api/global-instructions") return handleGlobalInstructions(res);
+  if (url.pathname === "/api/mcp-config") return handleMcpConfig(res, root);
 
   serveStatic(url.pathname, res);
+}
+
+/**
+ * Lists the subdirectories of `path` for the "choose a project folder"
+ * browser — deliberately not sandboxed to any project root, since its whole
+ * purpose is picking where a project root should be. An empty/missing path
+ * means "show the top level": drive letters on Windows, the home directory
+ * elsewhere.
+ */
+function handleBrowse(url: URL, res: http.ServerResponse): void {
+  let target = url.searchParams.get("path") || "";
+  if (!target && process.platform !== "win32") target = os.homedir();
+
+  if (!target) {
+    const drives: Array<{ name: string; path: string; isDir: boolean }> = [];
+    for (let i = 65; i <= 90; i++) {
+      const letter = String.fromCharCode(i);
+      const drivePath = `${letter}:\\`;
+      if (fs.existsSync(drivePath)) drives.push({ name: `${letter}:`, path: drivePath, isDir: true });
+    }
+    return sendJson(res, 200, { path: null, parent: null, entries: drives, isDriveList: true });
+  }
+
+  if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) {
+    return sendJson(res, 404, { error: `Not a directory: ${target}` });
+  }
+
+  let entries: Array<{ name: string; path: string; isDir: boolean }>;
+  try {
+    entries = fs
+      .readdirSync(target, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => ({ name: e.name, path: path.join(target, e.name), isDir: true }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err: any) {
+    return sendJson(res, 403, { error: `Cannot read directory: ${err.message ?? err}` });
+  }
+
+  const normalized = path.resolve(target);
+  const parentDir = path.dirname(normalized);
+  const atRoot = parentDir === normalized; // "C:\\" or "/" — dirname of a root is itself
+  const parent = atRoot ? (process.platform === "win32" ? "" : null) : parentDir;
+
+  sendJson(res, 200, { path: normalized, parent, entries, isDriveList: false });
+}
+
+function handleMkdir(req: http.IncomingMessage, res: http.ServerResponse): void {
+  let body = "";
+  req.on("data", (chunk) => (body += chunk));
+  req.on("end", () => {
+    let parentPath: string, name: string;
+    try {
+      const parsed = JSON.parse(body);
+      parentPath = parsed.parentPath;
+      name = parsed.name;
+    } catch {
+      return sendJson(res, 400, { error: "Invalid JSON body" });
+    }
+    if (!parentPath || !name || typeof name !== "string") {
+      return sendJson(res, 400, { error: "parentPath and name are required" });
+    }
+    if (name.includes("/") || name.includes("\\") || name === "." || name === "..") {
+      return sendJson(res, 400, { error: "Invalid folder name" });
+    }
+    if (!fs.existsSync(parentPath) || !fs.statSync(parentPath).isDirectory()) {
+      return sendJson(res, 400, { error: `Parent folder not found: ${parentPath}` });
+    }
+    const newPath = path.join(parentPath, name);
+    if (fs.existsSync(newPath)) {
+      return sendJson(res, 409, { error: "A file or folder with that name already exists" });
+    }
+    try {
+      fs.mkdirSync(newPath);
+      sendJson(res, 200, { path: newPath });
+    } catch (err: any) {
+      sendJson(res, 500, { error: err.message ?? String(err) });
+    }
+  });
+}
+
+function handleGlobalInstructions(res: http.ServerResponse): void {
+  sendJson(res, 200, { text: loadGlobalInstructions() });
+}
+
+function handleMcpConfig(res: http.ServerResponse, root: string): void {
+  const mcpPath = path.join(root, "mcp.json");
+  if (!fs.existsSync(mcpPath)) return sendJson(res, 200, { mcpServers: {} });
+  try {
+    const parsed = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
+    sendJson(res, 200, { mcpServers: parsed.mcpServers ?? {} });
+  } catch (err: any) {
+    sendJson(res, 200, { mcpServers: {}, error: `Failed to parse mcp.json: ${err.message ?? err}` });
+  }
 }
 
 async function handleModels(res: http.ServerResponse, provider: string): Promise<void> {

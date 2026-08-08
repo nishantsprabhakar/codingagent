@@ -20,7 +20,9 @@ export type ServerMessage =
   | { type: "files"; files: string[] }
   | { type: "history"; items: HistoryItem[] }
   | { type: "model_changed"; model: string }
-  | { type: "sessions"; sessions: SessionMeta[]; activeId: string };
+  | { type: "sessions"; sessions: SessionMeta[]; activeId: string }
+  | { type: "settings_saved"; which: "instructions" }
+  | { type: "mcp_reloaded"; toolCount: number };
 
 export type ClientMessage =
   | { type: "user_message"; text: string }
@@ -30,4 +32,6 @@ export type ClientMessage =
   | { type: "new_session" }
   | { type: "switch_session"; id: string }
   | { type: "delete_session"; id: string }
-  | { type: "list_sessions" };
+  | { type: "list_sessions" }
+  | { type: "update_global_instructions"; text: string }
+  | { type: "update_mcp_config"; mcpServers: Record<string, { command: string; args?: string[]; env?: Record<string, string> }> };
