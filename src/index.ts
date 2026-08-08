@@ -138,12 +138,14 @@ async function runRepl(options: CliOptions): Promise<void> {
   const ask = (question: string): Promise<string> =>
     new Promise((resolve) => rl.question(question, resolve));
 
-  const confirmFn: ConfirmFn = async (toolName, label, preview) => {
+  const confirmFn: ConfirmFn = async (toolName, label, risk, preview) => {
     if (preview) console.log(color.dim(preview));
-    const answer = (await ask(`Allow "${label}"? [y]es / [a]lways for ${toolName} / [n]o: `))
+    const riskTag = risk === "high" ? " " + color.red("[HIGH RISK — this cannot become an 'always allow']") : "";
+    const alwaysOption = risk === "high" ? "" : " / [a]lways";
+    const answer = (await ask(`Allow "${label}"?${riskTag} [y]es${alwaysOption} for ${toolName} / [n]o: `))
       .trim()
       .toLowerCase();
-    if (answer === "a" || answer === "always") return "always";
+    if (risk !== "high" && (answer === "a" || answer === "always")) return "always";
     if (answer === "y" || answer === "yes") return "once";
     return "deny";
   };

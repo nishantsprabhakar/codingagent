@@ -3,6 +3,8 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
+import * as fs from "fs";
+import * as path from "path";
 import { chatCompletion } from "./llm";
 import { TOOLS, TOOL_DEFINITIONS } from "./tools";
 import { UPDATE_TASKS_DEFINITION } from "./tools/tasks";
@@ -11,14 +13,47 @@ import { gatherProjectContext } from "./projectContext";
 import { loadSession, saveSession, deleteSession, createSessionId, deriveTitle, pickMostRecentSessionId } from "./session";
 import { McpManager } from "./mcp";
 import { loadGlobalInstructions, saveGlobalInstructions } from "./globalSettings";
-import type { ChatMessage, ToolContext, Reporter, LlmConfig, TaskItem, HistoryItem, ToolCallRequest } from "./types";
+import { gitStatusPorcelain, snapshotFile, restoreSnapshot, type FileSnapshot } from "./workspaceSnapshot";
+import { appendTransaction, loadTransaction } from "./transactionLog";
+import { detectProjectMemory, updateProjectMemory, formatProjectMemoryForPrompt } from "./projectMemory";
+import { runVerification } from "./verification";
+import { critiqueStep } from "./critic";
+import { withIdleTimeout } from "./timeout";
+import type {
+  ChatMessage,
+  ToolContext,
+  Reporter,
+  LlmConfig,
+  TaskItem,
+  HistoryItem,
+  ToolCallRequest,
+  RiskLevel,
+  ActionLogEntry,
+  TransactionRecord,
+  TransactionOutcome,
+  VerificationResult,
+  ProjectMemory,
+  ToolSpec,
+} from "./types";
 
 const MAX_TOOL_ITERATIONS = 30;
+const MAX_REPAIR_ATTEMPTS = 3;
+/** Hard cap on independent critique calls per turn — bounds latency/cost on a turn with many mutation rounds. */
+const MAX_CRITIC_CALLS = 5;
+const MAX_CRITIQUE_ACTION_CHARS = 800;
+/** No chunk and no completion for this long means the provider is stuck, not just slow — give up rather than hang forever. */
+const MODEL_IDLE_TIMEOUT_MS = 90_000;
 
 /** Tool calls whose `path` argument should surface in the "Created Files" panel. */
 const FILE_PRODUCING_TOOLS = new Set(["write_file", "edit_file", "create_docx", "create_pptx", "create_xlsx"]);
 
-function systemPrompt(root: string, projectContext: string, globalInstructions: string): string {
+/** Extensions worth an automatic verification pass; touching only a generated document shouldn't trigger a test run. */
+const CODE_FILE_RE = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|c|cpp|h|hpp|cs)$/i;
+
+/** Shell commands that just inspect state — running a build/test suite after one of these would be pure noise. */
+const READ_ONLY_ISH_SHELL = /^\s*(ls|dir|pwd|cat|type|echo|git\s+(status|log|diff|show|branch(\s|$)|remote)|node\s+-v|npm\s+-v|npx\s+--version|which|where)\b/i;
+
+function systemPrompt(root: string, projectContext: string, globalInstructions: string, projectMemoryBlock: string): string {
   return [
     "You are a terminal-based AI coding agent operating on a real project directory.",
     `Your working directory (sandbox root) is: ${root}`,
@@ -45,6 +80,8 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "",
     projectContext ? `Project context (gathered automatically, may be incomplete — verify before relying on it):\n${projectContext}` : "",
     "",
+    projectMemoryBlock,
+    "",
     "Guidelines:",
     "- Investigate before editing: read relevant files (or grep/glob for them) before changing code you haven't seen.",
     "- Prefer edit_file for targeted changes; use write_file for new files or full rewrites.",
@@ -55,6 +92,22 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "  task's status changes — the user sees this as a live checklist. Break the plan into small steps you can each",
     "  verify individually, rather than one big step you only check at the very end — a mistake caught after step 1",
     "  is cheap to fix; the same mistake discovered after step 5 has already been built on.",
+    "",
+    "V-Cycle runtime — this happens automatically, you don't need to invoke it, but you do need to cooperate with it:",
+    "- Every action you take is risk-classified (low/medium/high) and mutating actions require the user's permission,",
+    "  same as before. High-risk actions (recursive deletes, force pushes, DROP TABLE, etc.) always require a fresh",
+    "  confirmation — the user can never pre-approve those as a standing 'always allow'.",
+    "- After you finish a turn that touched code files or ran a non-trivial shell command, the harness automatically",
+    "  runs whatever verification is available (typecheck/build/test/lint) and tells you the result. If it fails, you",
+    "  will get a follow-up message describing the failure — treat that exactly like a real user report: diagnose the",
+    "  actual root cause from the error text, don't just retry the same thing. You get up to a few automatic repair",
+    "  rounds; if you're still stuck, say so plainly instead of declaring success.",
+    "- Every mutating file change is snapshotted before it happens, so the user can revert a turn's changes if",
+    "  verification ultimately fails — you don't need to build your own backup/undo mechanism.",
+    "- After a round of mutating actions, an independent reviewer (a separate, fresh model call with no stake in the",
+    "  outcome) checks whether that step actually accomplished its goal, not just whether it ran without erroring.",
+    "  If it flags a problem you'll get a follow-up message describing what it found — treat it as a real, credible",
+    "  report and fix the actual issue, not as noise to argue with or dismiss.",
     "",
     "Reliability discipline — this is what makes your output trustworthy no matter how capable the underlying model",
     "is. Treat every one of these as mandatory, not aspirational:",
@@ -89,11 +142,69 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "  returned block/slide/sheet count against what you intended before telling the user it's done — the tools",
     "  apply consistent default styling (fonts, table borders, header shading) automatically, so focus your effort",
     "  on getting the content and structure right.",
+    "- Actually use the formatting the user asks for instead of leaving everything as flat, uniform text — these",
+    "  tools have real formatting features, not just plain paragraphs:",
+    "  - Inline emphasis in any text field (docx and pptx): **bold**, _italic_, __underline__, ~~strikethrough~~,",
+    "    combinable (e.g. **_bold italic_**). Use this for labels, warnings, key figures — anything the user asked",
+    "    to stand out — instead of writing it as plain text and calling that 'formatted'.",
+    "  - create_docx: `align` (left/center/right/justify) and `color` (hex) per heading/paragraph block; `ordered`",
+    "    + per-item `level` (0-3) on bullets blocks for numbered and nested lists; an `image` block type for",
+    "    figures/logos/screenshots (path relative to the working directory — check it exists via list_dir/glob",
+    "    first); a `pagebreak` block type; per-cell `{text, align, bold}` in table headers/rows; a top-level",
+    "    `accentColor` (hex) when the user specifies a brand/theme color instead of the default blue.",
+    "  - create_pptx: `layout` per slide — 'section' for a divider slide between parts of the deck, 'two_column'",
+    "    (with `columns`) for side-by-side comparisons, default 'title_bullets' otherwise; `image` and `table`",
+    "    fields on any slide for figures/data (don't cram a table into bullet text as a wall of dashes); nested",
+    "    bullets via per-item `level`; a top-level `accentColor` (hex).",
+    "  - create_xlsx: header objects `{name, numberFormat, width, align}` — set numberFormat for anything that IS",
+    "    money, a percentage, or a date ('$#,##0.00', '0.0%', 'yyyy-mm-dd') rather than leaving it as a bare number;",
+    "    `merges` (e.g. ['A1:C1']) for a title spanning columns; `autoFilter` on sheets meant to be filtered/sorted",
+    "    interactively; a top-level `accentColor` (hex).",
+    "  - Before generating an image block/field, confirm the referenced file actually exists in the project (a",
+    "    guessed path that doesn't exist fails the whole document) — read the directory first if you're not certain.",
     "- For any spreadsheet that's a model rather than a static table (financial models, running totals, anything",
     "  someone would want to audit or change an input and have it recalculate), use live formulas — a cell value",
     "  starting with '=' in create_xlsx — instead of computing the numbers yourself and writing them as literals.",
   ]
     .filter((line, i, arr) => !(line === "" && arr[i - 1] === ""))
+    .join("\n");
+}
+
+function createTransactionId(): string {
+  return `tx_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** The file a mutating tool call actually writes to — redline_docx may target output_path instead of path. */
+function fileTargetPath(args: any): string | undefined {
+  if (typeof args?.output_path === "string") return args.output_path;
+  if (typeof args?.path === "string") return args.path;
+  return undefined;
+}
+
+function safeReadFile(root: string, relPath: string): string {
+  try {
+    return fs.readFileSync(path.join(root, relPath), "utf-8");
+  } catch {
+    return "";
+  }
+}
+
+/** Whether this turn's mutating actions are worth spending time verifying at all. */
+function shouldVerify(actions: ActionLogEntry[]): boolean {
+  return actions.some((a) => {
+    if (!a.ok) return false;
+    if (a.name === "run_shell_command") {
+      const cmd = typeof (a.args as any)?.command === "string" ? ((a.args as any).command as string) : "";
+      return cmd.trim() !== "" && !READ_ONLY_ISH_SHELL.test(cmd);
+    }
+    const p = a.fileSnapshot?.path;
+    return !!p && CODE_FILE_RE.test(p);
+  });
+}
+
+function summarizeVerification(v: VerificationResult): string {
+  return v.checks
+    .map((c) => `- ${c.name}: ${c.ok ? "PASSED" : "FAILED"}${c.ok ? "" : `\n${c.output.slice(0, 1500)}`}`)
     .join("\n");
 }
 
@@ -106,8 +217,16 @@ export class Agent {
   private mcpManager = new McpManager();
   private sysMessage: ChatMessage;
   private projectContext: string;
+  private projectMemory: ProjectMemory;
   private sessionId: string;
   private sessionTitle = "New chat";
+
+  /** The audit-trail record for the turn currently being processed by handleUserMessage; null between turns. */
+  private currentTransaction: TransactionRecord | null = null;
+  /** True once a mutating action has run since the transaction's verification state was last computed. */
+  private needsVerification = false;
+  /** Content signature of touched files after the last repair attempt, to detect a repair loop making no progress. */
+  private lastRepairSignature: string | null = null;
 
   constructor(
     root: string,
@@ -118,9 +237,10 @@ export class Agent {
   ) {
     this.ctx = { root };
     this.projectContext = gatherProjectContext(root);
+    this.projectMemory = detectProjectMemory(root);
     this.sysMessage = {
       role: "system",
-      content: systemPrompt(root, this.projectContext, loadGlobalInstructions()),
+      content: systemPrompt(root, this.projectContext, loadGlobalInstructions(), formatProjectMemoryForPrompt(this.projectMemory)),
     };
     this.sessionId = sessionId ?? pickMostRecentSessionId(root) ?? createSessionId();
     this.loadSessionData();
@@ -195,7 +315,10 @@ export class Agent {
    */
   setGlobalInstructions(text: string): void {
     saveGlobalInstructions(text);
-    this.sysMessage = { role: "system", content: systemPrompt(this.ctx.root, this.projectContext, text) };
+    this.sysMessage = {
+      role: "system",
+      content: systemPrompt(this.ctx.root, this.projectContext, text, formatProjectMemoryForPrompt(this.projectMemory)),
+    };
     this.messages[0] = this.sysMessage;
   }
 
@@ -221,26 +344,64 @@ export class Agent {
     await this.mcpManager.closeAll();
   }
 
+  /** Reverts a past transaction's file changes using its stored pre-change snapshots. Never touches git. */
+  rollbackTransaction(transactionId: string): { ok: boolean; restored: string[] } {
+    const tx = loadTransaction(this.ctx.root, this.sessionId, transactionId);
+    if (!tx) return { ok: false, restored: [] };
+
+    const snapshots: FileSnapshot[] = tx.actions
+      .filter((a) => a.ok && a.fileSnapshot)
+      .map((a) => a.fileSnapshot as FileSnapshot);
+    if (!snapshots.length) return { ok: false, restored: [] };
+
+    const results = restoreSnapshot(this.ctx.root, snapshots);
+    return { ok: results.every((r) => r.ok), restored: results.filter((r) => r.ok).map((r) => r.path) };
+  }
+
   async handleUserMessage(userText: string): Promise<void> {
     if (this.messages.length === 1) this.sessionTitle = deriveTitle(userText);
     this.messages.push({ role: "user", content: userText });
     this.historyLog.push({ type: "user", text: userText });
 
+    this.currentTransaction = {
+      id: createTransactionId(),
+      sessionId: this.sessionId,
+      startedAt: Date.now(),
+      intent: userText.length > 300 ? userText.slice(0, 300) + "…" : userText,
+      gitStatusBefore: gitStatusPorcelain(this.ctx.root),
+      actions: [],
+      repairAttempts: 0,
+      criticCalls: 0,
+      outcome: "no_changes",
+      confidence: 100,
+    };
+    this.needsVerification = false;
+    this.lastRepairSignature = null;
+
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       let result;
       try {
         this.reporter.thinking(true);
-        result = await chatCompletion(
-          this.messages,
-          [...TOOL_DEFINITIONS, UPDATE_TASKS_DEFINITION, ...this.mcpManager.getToolDefinitions()],
-          this.llmConfig,
-          (chunk) => this.reporter.assistantDelta(chunk)
+        result = await withIdleTimeout(
+          (heartbeat) =>
+            chatCompletion(
+              this.messages,
+              [...TOOL_DEFINITIONS, UPDATE_TASKS_DEFINITION, ...this.mcpManager.getToolDefinitions()],
+              this.llmConfig,
+              (chunk) => {
+                heartbeat();
+                this.reporter.assistantDelta(chunk);
+              }
+            ),
+          MODEL_IDLE_TIMEOUT_MS,
+          "model call"
         );
       } catch (err: any) {
         this.reporter.thinking(false);
         const message = err.message ?? String(err);
         this.reporter.error(message);
         this.historyLog.push({ type: "error", text: message });
+        this.finalizeTransaction("failed");
         this.persist();
         return;
       }
@@ -248,9 +409,53 @@ export class Agent {
 
       if (result.toolCalls.length === 0) {
         const text = result.content ?? "(no response)";
+        let verification: VerificationResult | undefined;
+        let willRepair = false;
+
+        const tx = this.currentTransaction!;
+        if (this.needsVerification && shouldVerify(tx.actions)) {
+          const touchedFiles = tx.actions.map((a) => a.fileSnapshot?.path).filter((p): p is string => !!p);
+          verification = await runVerification(this.ctx.root, this.projectMemory, touchedFiles);
+          tx.verification = verification;
+          this.needsVerification = false;
+
+          if (!verification.ok && verification.ranAny && tx.repairAttempts < MAX_REPAIR_ATTEMPTS) {
+            const signature = touchedFiles.map((f) => safeReadFile(this.ctx.root, f)).join(" ");
+            const stuck = signature !== "" && signature === this.lastRepairSignature;
+            this.lastRepairSignature = signature;
+            willRepair = !stuck;
+          }
+        } else if (this.needsVerification) {
+          this.needsVerification = false; // no applicable check for what changed — nothing to run, don't re-check every round
+        }
+
         this.messages.push({ role: "assistant", content: text });
-        this.historyLog.push({ type: "assistant", text });
-        this.reporter.assistantDeltaEnd(text, true);
+        if (text.trim()) this.historyLog.push({ type: "assistant", text });
+        this.reporter.assistantDeltaEnd(text, !willRepair);
+
+        if (verification) {
+          this.reporter.verification(verification);
+          this.historyLog.push({ type: "verification", result: verification });
+        }
+
+        if (willRepair) {
+          tx.repairAttempts++;
+          this.messages.push({
+            role: "user",
+            content:
+              `Automatic verification failed after your last changes:\n${summarizeVerification(verification!)}\n\n` +
+              `Fix the root cause (repair attempt ${tx.repairAttempts}/${MAX_REPAIR_ATTEMPTS}). Don't repeat a ` +
+              `command that already failed unchanged — diagnose why it failed first.`,
+          });
+          this.historyLog.push({
+            type: "user",
+            text: `(automatic) verification failed — requesting repair (${tx.repairAttempts}/${MAX_REPAIR_ATTEMPTS})`,
+          });
+          this.persist();
+          continue;
+        }
+
+        this.finalizeTransaction();
         this.persist();
         return;
       }
@@ -282,6 +487,7 @@ export class Agent {
         this.reporter.assistantDeltaEnd(result.content, false);
       }
 
+      const actionsBefore = this.currentTransaction!.actions.length;
       const outputs = await this.runToolCalls(result.toolCalls);
       for (let i = 0; i < result.toolCalls.length; i++) {
         this.messages.push({
@@ -291,12 +497,14 @@ export class Agent {
           content: outputs[i],
         });
       }
+      await this.critiqueRoundIfNeeded(actionsBefore);
       this.persist();
     }
 
     const message = `Stopped after ${MAX_TOOL_ITERATIONS} tool calls without a final response.`;
     this.reporter.error(message);
     this.historyLog.push({ type: "error", text: message });
+    this.finalizeTransaction("failed");
     this.persist();
   }
 
@@ -313,6 +521,138 @@ export class Agent {
     );
   }
 
+  /**
+   * Closes out the current transaction: derives an outcome + evidence-based
+   * confidence score from what actually happened this turn, persists the
+   * audit record, and (unless nothing mutating happened) tells the reporter.
+   * `forced` overrides the derived outcome for hard-stop paths (LLM error,
+   * iteration budget exhausted) where there was no clean verification phase.
+   */
+  private finalizeTransaction(forced?: TransactionOutcome): void {
+    const tx = this.currentTransaction;
+    if (!tx) return;
+
+    const mutatingHappened = tx.actions.length > 0;
+    const allDenied = mutatingHappened && tx.actions.every((a) => !a.ok && /denied permission/i.test(a.output));
+
+    let outcome: TransactionOutcome;
+    let confidence: number;
+
+    if (forced && mutatingHappened) {
+      outcome = forced;
+      confidence = 40;
+    } else if (!mutatingHappened) {
+      outcome = "no_changes";
+      confidence = 100;
+    } else if (allDenied) {
+      outcome = "blocked";
+      confidence = 20;
+    } else if (tx.verification?.ranAny) {
+      if (tx.verification.ok) {
+        const ranTest = tx.verification.checks.some((c) => /^test/i.test(c.name));
+        outcome = "verified";
+        confidence = ranTest ? 100 : 80;
+      } else {
+        outcome = "failed";
+        confidence = 40;
+      }
+    } else {
+      outcome = "unverified_changes";
+      confidence = 60;
+    }
+
+    tx.endedAt = Date.now();
+    tx.gitStatusAfter = gitStatusPorcelain(this.ctx.root);
+    tx.outcome = outcome;
+    tx.confidence = confidence;
+    appendTransaction(this.ctx.root, this.sessionId, tx);
+
+    if (outcome !== "no_changes") {
+      const rollbackAvailable = tx.actions.some((a) => a.ok && a.fileSnapshot);
+      this.reporter.transactionSummary(tx.id, confidence, outcome, rollbackAvailable);
+      this.historyLog.push({ type: "transaction_summary", transactionId: tx.id, confidence, outcome, rollbackAvailable });
+    }
+
+    this.learnFromActions(tx.actions);
+    this.currentTransaction = null;
+  }
+
+  /**
+   * Runs the independent per-step reviewer over whatever mutating actions
+   * succeeded in the round that just finished (actions[actionsBefore:]).
+   * Distinct from end-of-turn verification: this judges *intent*, not just
+   * "did it run without erroring" — the two catch different failure modes.
+   * Never throws and never blocks the turn; a FAIL just queues a follow-up
+   * message for the model to address on its next iteration.
+   */
+  private async critiqueRoundIfNeeded(actionsBefore: number): Promise<void> {
+    const tx = this.currentTransaction;
+    if (!tx || tx.criticCalls >= MAX_CRITIC_CALLS) return;
+
+    const roundActions = tx.actions.slice(actionsBefore).filter((a) => a.ok);
+    if (!roundActions.length) return;
+
+    const stepSummary = roundActions
+      .map((a) => `- ${a.label}\n  result: ${a.output.slice(0, MAX_CRITIQUE_ACTION_CHARS)}`)
+      .join("\n");
+
+    tx.criticCalls++;
+    const critique = await critiqueStep(this.llmConfig, tx.intent, stepSummary);
+
+    this.reporter.critique(critique.pass, critique.reason);
+    if (critique.reason) this.historyLog.push({ type: "critique", pass: critique.pass, reason: critique.reason });
+
+    if (!critique.pass) {
+      this.messages.push({
+        role: "user",
+        content:
+          `An independent reviewer checked your last step and found a problem:\n${critique.reason}\n\n` +
+          `Fix this before moving on (this doesn't count against your automatic build/test repair budget).`,
+      });
+      this.historyLog.push({ type: "user", text: `(automatic) independent review flagged an issue — requesting a fix` });
+    }
+  }
+
+  /** Folds newly-observed facts (a test command that just worked, a command the user denied) into project memory. */
+  private learnFromActions(actions: ActionLogEntry[]): void {
+    const patch: Partial<ProjectMemory> = {};
+    let changed = false;
+    const blockedAdds: string[] = [];
+
+    for (const a of actions) {
+      if (a.name !== "run_shell_command") continue;
+      const cmd = typeof (a.args as any)?.command === "string" ? ((a.args as any).command as string) : "";
+      if (!cmd) continue;
+
+      if (!a.ok && /denied permission/i.test(a.output)) {
+        if (!this.projectMemory.blockedCommands?.includes(cmd)) blockedAdds.push(cmd);
+        continue;
+      }
+      if (!a.ok) continue;
+
+      if (!this.projectMemory.testCommand && /\btest\b/i.test(cmd)) {
+        patch.testCommand = cmd;
+        changed = true;
+      } else if (!this.projectMemory.buildCommand && /\bbuild\b/i.test(cmd)) {
+        patch.buildCommand = cmd;
+        changed = true;
+      } else if (!this.projectMemory.lintCommand && /\blint\b/i.test(cmd)) {
+        patch.lintCommand = cmd;
+        changed = true;
+      }
+    }
+
+    if (blockedAdds.length) {
+      patch.blockedCommands = [...(this.projectMemory.blockedCommands ?? []), ...blockedAdds].slice(-20);
+      changed = true;
+    }
+
+    if (changed) {
+      this.projectMemory = { ...this.projectMemory, ...patch };
+      updateProjectMemory(this.ctx.root, patch);
+    }
+  }
+
   /** Surfaces a file the agent just wrote/edited/generated in the "Created Files" panel, most-recent first. */
   private trackFile(relPath: string): void {
     const existing = this.createdFiles.indexOf(relPath);
@@ -321,9 +661,32 @@ export class Agent {
     this.reporter.files(this.createdFiles);
   }
 
-  private recordTool(id: string, name: string, label: string, args: unknown, output: string, ok: boolean): string {
+  private recordTool(
+    id: string,
+    name: string,
+    label: string,
+    args: unknown,
+    output: string,
+    ok: boolean,
+    risk: RiskLevel = "low",
+    fileSnapshot?: FileSnapshot
+  ): string {
     this.reporter.toolResult(id, output, ok);
     this.historyLog.push({ type: "tool", id, name, label, args, output, ok });
+    if (risk !== "low" && this.currentTransaction) {
+      this.currentTransaction.actions.push({
+        toolCallId: id,
+        name,
+        label,
+        args,
+        risk,
+        ok,
+        output,
+        timestamp: Date.now(),
+        fileSnapshot,
+      });
+      if (ok) this.needsVerification = true;
+    }
     return output;
   }
 
@@ -360,13 +723,25 @@ export class Agent {
     return outputs;
   }
 
+  /** Falls back to "medium" for mutating tools / "low" for read-only ones when a tool doesn't classify its own risk. */
+  private resolveRisk(tool: Pick<ToolSpec, "mutating" | "riskOf">, args: any): RiskLevel {
+    if (tool.riskOf) {
+      try {
+        return tool.riskOf(args);
+      } catch {
+        // fall through to the default below
+      }
+    }
+    return tool.mutating ? "medium" : "low";
+  }
+
   private async executeToolCall(id: string, name: string, rawArgs: string): Promise<string> {
     let args: any;
     try {
       args = rawArgs ? JSON.parse(rawArgs) : {};
     } catch {
       const message = `Invalid JSON arguments for ${name}: ${rawArgs}`;
-      this.reporter.toolCall(id, name, name, {});
+      this.reporter.toolCall(id, name, name, {}, "low");
       return this.recordTool(id, name, name, {}, message, false);
     }
     // Models occasionally emit "null" or a non-object as arguments; normalize
@@ -386,7 +761,7 @@ export class Agent {
     const tool = TOOLS[name];
     if (!tool) {
       const label = `unknown tool: ${name}`;
-      this.reporter.toolCall(id, name, label, args);
+      this.reporter.toolCall(id, name, label, args, "low");
       return this.recordTool(id, name, label, args, `Unknown tool: ${name}`, false);
     }
 
@@ -395,61 +770,67 @@ export class Agent {
       label = tool.describe(args);
     } catch (err: any) {
       const message = `Tool ${name} rejected its arguments: ${err.message ?? err}`;
-      this.reporter.toolCall(id, name, name, args);
+      this.reporter.toolCall(id, name, name, args, "low");
       return this.recordTool(id, name, name, args, message, false);
     }
-    this.reporter.toolCall(id, name, label, args);
+
+    const risk = this.resolveRisk(tool, args);
+    this.reporter.toolCall(id, name, label, args, risk);
 
     if (tool.mutating) {
       const preview = tool.preview ? await safePreview(tool, args, this.ctx) : undefined;
 
       let allowed: boolean;
       try {
-        allowed = await this.permissions.confirm(name, label, preview);
+        allowed = await this.permissions.confirm(name, label, risk, preview);
       } catch (err: any) {
         const message = `Permission check failed for ${name}: ${err.message ?? err}`;
-        return this.recordTool(id, name, label, args, message, false);
+        return this.recordTool(id, name, label, args, message, false, risk);
       }
       if (!allowed) {
-        return this.recordTool(id, name, label, args, "User denied permission for this action.", false);
+        return this.recordTool(id, name, label, args, "User denied permission for this action.", false, risk);
       }
     }
+
+    const target = tool.mutating ? fileTargetPath(args) : undefined;
+    const fileSnapshot = target ? snapshotFile(this.ctx.root, target) : undefined;
 
     try {
       const result = await tool.run(args, this.ctx);
       if (result.ok && FILE_PRODUCING_TOOLS.has(name) && typeof args.path === "string") {
         this.trackFile(args.path);
       }
-      return this.recordTool(id, name, label, args, result.output, result.ok);
+      return this.recordTool(id, name, label, args, result.output, result.ok, risk, fileSnapshot);
     } catch (err: any) {
       const message = `Tool ${name} threw an error: ${err.message ?? err}`;
-      return this.recordTool(id, name, label, args, message, false);
+      return this.recordTool(id, name, label, args, message, false, risk, fileSnapshot);
     }
   }
 
   private async executeMcpTool(id: string, name: string, args: any): Promise<string> {
     const label = `mcp: ${name.replace(/^mcp__/, "").replace(/__/, " · ")}`;
-    this.reporter.toolCall(id, name, label, args);
+    const risk: RiskLevel = "medium";
+    this.reporter.toolCall(id, name, label, args, risk);
 
     // MCP tools are arbitrary third-party code we can't introspect the safety
     // of — always confirm, same as run_shell_command.
     let allowed: boolean;
     try {
-      allowed = await this.permissions.confirm(name, label, JSON.stringify(args, null, 2));
+      allowed = await this.permissions.confirm(name, label, risk, JSON.stringify(args, null, 2));
     } catch (err: any) {
-      return this.recordTool(id, name, label, args, `Permission check failed: ${err.message ?? err}`, false);
+      return this.recordTool(id, name, label, args, `Permission check failed: ${err.message ?? err}`, false, risk);
     }
     if (!allowed) {
-      return this.recordTool(id, name, label, args, "User denied permission for this action.", false);
+      return this.recordTool(id, name, label, args, "User denied permission for this action.", false, risk);
     }
 
     const result = await this.mcpManager.callTool(name, args);
-    return this.recordTool(id, name, label, args, result.output, result.ok);
+    return this.recordTool(id, name, label, args, result.output, result.ok, risk);
   }
 
   private handleUpdateTasks(id: string, args: any): string {
     const label = `update tasks (${Array.isArray(args.tasks) ? args.tasks.length : 0})`;
-    this.reporter.toolCall(id, "update_tasks", label, args);
+    this.reporter.toolCall(id, "update_tasks", label, args, "low");
 
     if (!Array.isArray(args.tasks)) {
       return this.recordTool(id, "update_tasks", label, args, "tasks must be an array", false);

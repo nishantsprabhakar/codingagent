@@ -130,8 +130,13 @@
         <div class="permission-title">Permission requested</div>
         <div id="permission-tool" class="permission-tool"></div>
       </div>
+      <span id="permission-risk" class="risk-badge risk-medium" hidden></span>
     </div>
     <div id="permission-label" class="permission-label"></div>
+    <div id="permission-high-risk-warning" class="high-risk-warning" hidden>
+      This action can destroy data or affect systems beyond this project and can't be undone automatically.
+      Review the command carefully before approving.
+    </div>
     <pre id="permission-preview" class="permission-preview" hidden></pre>
     <div class="permission-actions">
       <button id="perm-deny" class="btn btn-danger">Deny</button>

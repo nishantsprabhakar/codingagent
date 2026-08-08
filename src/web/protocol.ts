@@ -4,16 +4,16 @@
  * See LICENSE for details.
  */
 import type { PermissionDecision } from "../permissions";
-import type { TaskItem, HistoryItem } from "../types";
+import type { TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome } from "../types";
 import type { SessionMeta } from "../session";
 
 export type ServerMessage =
   | { type: "init"; root: string; provider: string; model: string; yolo: boolean; recentFolders: string[]; sessionId: string; sessionTitle: string }
   | { type: "assistant_delta"; chunk: string }
   | { type: "assistant_delta_end"; text: string; final: boolean }
-  | { type: "tool_call"; id: string; name: string; label: string; args: unknown }
+  | { type: "tool_call"; id: string; name: string; label: string; args: unknown; risk: RiskLevel }
   | { type: "tool_result"; id: string; output: string; ok: boolean }
-  | { type: "permission_request"; id: string; toolName: string; label: string; preview?: string }
+  | { type: "permission_request"; id: string; toolName: string; label: string; risk: RiskLevel; preview?: string }
   | { type: "error"; text: string }
   | { type: "thinking"; value: boolean }
   | { type: "tasks"; tasks: TaskItem[] }
@@ -22,7 +22,11 @@ export type ServerMessage =
   | { type: "model_changed"; model: string }
   | { type: "sessions"; sessions: SessionMeta[]; activeId: string }
   | { type: "settings_saved"; which: "instructions" }
-  | { type: "mcp_reloaded"; toolCount: number };
+  | { type: "mcp_reloaded"; toolCount: number }
+  | { type: "verification_result"; result: VerificationResult }
+  | { type: "critique_result"; pass: boolean; reason: string }
+  | { type: "transaction_summary"; transactionId: string; confidence: number; outcome: TransactionOutcome; rollbackAvailable: boolean }
+  | { type: "rollback_result"; transactionId: string; ok: boolean; restored: string[] };
 
 export type ClientMessage =
   | { type: "user_message"; text: string }
@@ -34,4 +38,5 @@ export type ClientMessage =
   | { type: "delete_session"; id: string }
   | { type: "list_sessions" }
   | { type: "update_global_instructions"; text: string }
-  | { type: "update_mcp_config"; mcpServers: Record<string, { command: string; args?: string[]; env?: Record<string, string> }> };
+  | { type: "update_mcp_config"; mcpServers: Record<string, { command: string; args?: string[]; env?: Record<string, string> }> }
+  | { type: "rollback_request"; transactionId: string };

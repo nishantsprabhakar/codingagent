@@ -3,7 +3,7 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { Reporter, TaskItem, HistoryItem } from "../types";
+import type { Reporter, TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome } from "../types";
 import type { ConfirmFn, PermissionDecision } from "../permissions";
 import type { ServerMessage } from "./protocol";
 
@@ -17,8 +17,20 @@ function nextId(prefix: string): string {
 export class WebSocketReporter implements Reporter {
   constructor(private send: (msg: ServerMessage) => void) {}
 
-  toolCall(id: string, name: string, label: string, args: unknown): void {
-    this.send({ type: "tool_call", id, name, label, args });
+  toolCall(id: string, name: string, label: string, args: unknown, risk: RiskLevel): void {
+    this.send({ type: "tool_call", id, name, label, args, risk });
+  }
+
+  verification(result: VerificationResult): void {
+    this.send({ type: "verification_result", result });
+  }
+
+  critique(pass: boolean, reason: string): void {
+    this.send({ type: "critique_result", pass, reason });
+  }
+
+  transactionSummary(transactionId: string, confidence: number, outcome: TransactionOutcome, rollbackAvailable: boolean): void {
+    this.send({ type: "transaction_summary", transactionId, confidence, outcome, rollbackAvailable });
   }
 
   toolResult(id: string, output: string, ok: boolean): void {
@@ -63,11 +75,11 @@ export function createConfirmFn(
   send: (msg: ServerMessage) => void,
   pending: Map<string, (decision: PermissionDecision) => void>
 ): ConfirmFn {
-  return (toolName, label, preview) => {
+  return (toolName, label, risk, preview) => {
     return new Promise<PermissionDecision>((resolve) => {
       const id = nextId("perm");
       pending.set(id, resolve);
-      send({ type: "permission_request", id, toolName, label, preview });
+      send({ type: "permission_request", id, toolName, label, risk, preview });
     });
   };
 }

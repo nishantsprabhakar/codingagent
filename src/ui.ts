@@ -3,7 +3,7 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { Reporter, TaskItem, HistoryItem } from "./types";
+import type { Reporter, TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome } from "./types";
 
 const CODES = {
   reset: "\x1b[0m",
@@ -98,14 +98,32 @@ export class ConsoleReporter implements Reporter {
   private spinnerFrame = 0;
   private streaming = false;
 
-  toolCall(_id: string, _name: string, label: string, _args: unknown): void {
+  toolCall(_id: string, _name: string, label: string, _args: unknown, risk: RiskLevel): void {
     this.stopSpinner();
     this.streaming = false; // a tool call ends any in-progress streamed line without a trailing newline printed for it
-    printToolCall(label);
+    printToolCall(risk === "high" ? `${label} ${color.red("[HIGH RISK]")}` : label);
   }
 
   toolResult(_id: string, output: string, ok: boolean): void {
     printToolResult(output, ok);
+  }
+
+  verification(result: VerificationResult): void {
+    if (!result.ranAny) return;
+    console.log(color.bold(`\nverification: ${result.ok ? color.green("passed") : color.red("failed")}`));
+    for (const check of result.checks) {
+      console.log(`  ${check.ok ? color.green("✓") : color.red("✗")} ${check.name}`);
+    }
+  }
+
+  transactionSummary(_transactionId: string, confidence: number, outcome: TransactionOutcome, rollbackAvailable: boolean): void {
+    if (outcome === "no_changes") return;
+    console.log(color.dim(`confidence: ${confidence}/100 (${outcome})${rollbackAvailable ? " — rollback available" : ""}`));
+  }
+
+  critique(pass: boolean, reason: string): void {
+    if (pass) return;
+    console.log(color.yellow(`\nindependent review: ${reason}`));
   }
 
   assistantDelta(chunk: string): void {

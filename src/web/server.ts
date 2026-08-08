@@ -170,6 +170,9 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
           fs.writeFileSync(mcpPath, JSON.stringify({ mcpServers: msg.mcpServers }, null, 2), "utf-8");
           const toolCount = await agent.reloadMcp();
           send({ type: "mcp_reloaded", toolCount });
+        } else if (msg.type === "rollback_request") {
+          const { ok, restored } = agent.rollbackTransaction(msg.transactionId);
+          send({ type: "rollback_result", transactionId: msg.transactionId, ok, restored });
         }
       } catch (err: any) {
         // A single bad request/response should never take the whole server

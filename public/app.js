@@ -29,6 +29,8 @@
     permTool: document.getElementById("permission-tool"),
     permLabel: document.getElementById("permission-label"),
     permPreview: document.getElementById("permission-preview"),
+    permRisk: document.getElementById("permission-risk"),
+    permHighRiskWarning: document.getElementById("permission-high-risk-warning"),
     permAllow: document.getElementById("perm-allow"),
     permAlways: document.getElementById("perm-always"),
     permDeny: document.getElementById("perm-deny"),
@@ -276,12 +278,24 @@
         hudOnThinking(msg.value);
         break;
       case "tool_call":
-        addToolCard(msg.id, msg.name, msg.label);
+        addToolCard(msg.id, msg.name, msg.label, msg.risk);
         hudOnToolCall(msg.id, msg.name, msg.label);
         break;
       case "tool_result":
         updateToolCard(msg.id, msg.output, msg.ok);
         hudOnToolResult(msg.id, msg.ok);
+        break;
+      case "verification_result":
+        renderVerificationResult(msg.result);
+        break;
+      case "critique_result":
+        renderCritiqueResult(msg.pass, msg.reason);
+        break;
+      case "transaction_summary":
+        renderTransactionSummary(msg.transactionId, msg.confidence, msg.outcome, msg.rollbackAvailable);
+        break;
+      case "rollback_result":
+        handleRollbackResult(msg.transactionId, msg.ok, msg.restored);
         break;
       case "assistant_delta":
         appendAssistantDelta(msg.chunk);
@@ -300,7 +314,7 @@
         hudOnTurnEnd(false);
         break;
       case "permission_request":
-        showPermissionModal(msg.id, msg.toolName, msg.label, msg.preview);
+        showPermissionModal(msg.id, msg.toolName, msg.label, msg.risk, msg.preview);
         break;
       case "tasks":
         applyTasks(msg.tasks);
@@ -630,6 +644,12 @@
       else if (item.type === "tool") {
         addToolCard(item.id, item.name, item.label);
         updateToolCard(item.id, item.output, item.ok);
+      } else if (item.type === "verification") {
+        renderVerificationResult(item.result);
+      } else if (item.type === "critique") {
+        renderCritiqueResult(item.pass, item.reason);
+      } else if (item.type === "transaction_summary") {
+        renderTransactionSummary(item.transactionId, item.confidence, item.outcome, item.rollbackAvailable);
       }
     }
     scrollToBottom();
@@ -782,7 +802,7 @@
     state.toolCards.clear();
   }
 
-  function addToolCard(id, name, label) {
+  function addToolCard(id, name, label, risk) {
     clearEmptyState();
     showThinking(false);
 
@@ -790,10 +810,13 @@
     card.className = "tool-card";
 
     const icon = TOOL_ICONS[name] || (name.startsWith("mcp__") ? "⚡" : "T");
+    const riskBadge =
+      risk && risk !== "low" ? `<span class="risk-badge risk-badge-sm risk-${risk}">${risk}</span>` : "";
     card.innerHTML = `
       <div class="tool-card-header">
         <span class="tool-icon">${escapeHtml(icon)}</span>
         <span class="tool-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+        ${riskBadge}
         <span class="tool-status pending">running…</span>
         <span class="tool-caret">&#9656;</span>
       </div>
@@ -823,6 +846,105 @@
     scrollToBottom();
   }
 
+  // ---------- Verification + transaction summary (V-Cycle) ----------
+
+  const OUTCOME_LABELS = {
+    verified: "Verified",
+    unverified_changes: "Changed — unverified",
+    failed: "Verification failed",
+    blocked: "Blocked",
+    no_changes: "No changes",
+  };
+
+  function renderVerificationResult(result) {
+    if (!result || !result.ranAny) return;
+    clearEmptyState();
+    const row = document.createElement("div");
+    row.className = `verification-card ${result.ok ? "verification-ok" : "verification-fail"}`;
+    const checksHtml = result.checks
+      .map(
+        (c) => `
+          <div class="verification-check">
+            <span class="verification-check-icon">${c.ok ? "✓" : "✗"}</span>
+            <span class="verification-check-name">${escapeHtml(c.name)}</span>
+          </div>`
+      )
+      .join("");
+    row.innerHTML = `
+      <div class="verification-header">
+        <span>${result.ok ? "✅" : "⚠️"}</span>
+        <span>Verification ${result.ok ? "passed" : "failed"}</span>
+      </div>
+      <div class="verification-checks">${checksHtml}</div>
+    `;
+    el.chatLog.appendChild(row);
+    scrollToBottom();
+  }
+
+  function renderCritiqueResult(pass, reason) {
+    // A PASS is routine and happens after every mutating round — the transient
+    // feed is enough. A FAIL is worth a permanent, visible entry in the chat
+    // log, since it means the model is about to get a correction message.
+    pushFeedItem(
+      pass ? "🔍" : "🛑",
+      pass ? "Independent review — looks correct" : `Independent review flagged an issue`,
+      pass ? "tool-ok" : "tool-fail"
+    );
+    if (pass) return;
+
+    clearEmptyState();
+    const row = document.createElement("div");
+    row.className = "verification-card verification-fail";
+    row.innerHTML = `
+      <div class="verification-header">
+        <span>🛑</span>
+        <span>Independent review found an issue</span>
+      </div>
+      <div class="verification-checks">
+        <div class="verification-check">
+          <span class="verification-check-icon">✗</span>
+          <span class="verification-check-name">${escapeHtml(reason)}</span>
+        </div>
+      </div>
+    `;
+    el.chatLog.appendChild(row);
+    scrollToBottom();
+  }
+
+  function renderTransactionSummary(transactionId, confidence, outcome, rollbackAvailable) {
+    clearEmptyState();
+    const row = document.createElement("div");
+    const band = confidence >= 80 ? "high" : confidence >= 50 ? "mid" : "low";
+    row.className = `transaction-summary transaction-${band}`;
+    row.dataset.transactionId = transactionId;
+    row.innerHTML = `
+      <div class="transaction-confidence">
+        <span class="transaction-confidence-value">${confidence}</span><span class="transaction-confidence-max">/100</span>
+      </div>
+      <div class="transaction-outcome">${escapeHtml(OUTCOME_LABELS[outcome] || outcome)}</div>
+      ${rollbackAvailable ? `<button class="btn btn-secondary transaction-revert-btn">Revert changes</button>` : ""}
+    `;
+    if (rollbackAvailable) {
+      row.querySelector(".transaction-revert-btn").addEventListener("click", (e) => {
+        e.target.disabled = true;
+        e.target.textContent = "Reverting…";
+        send({ type: "rollback_request", transactionId });
+      });
+    }
+    el.chatLog.appendChild(row);
+    scrollToBottom();
+  }
+
+  function handleRollbackResult(transactionId, ok, restored) {
+    const row = el.chatLog.querySelector(`.transaction-summary[data-transaction-id="${CSS.escape(transactionId)}"]`);
+    const btn = row ? row.querySelector(".transaction-revert-btn") : null;
+    if (btn) {
+      btn.textContent = ok ? `Reverted ${restored.length} file(s)` : "Revert failed";
+      btn.classList.toggle("revert-failed", !ok);
+    }
+    pushFeedItem(ok ? "↩️" : "⚠️", ok ? `Reverted ${restored.length} file(s)` : "Revert failed", ok ? "tool-ok" : "tool-fail");
+  }
+
   // ---------- Permission modal ----------
 
   function renderPreviewHtml(text) {
@@ -837,10 +959,22 @@
       .join("\n");
   }
 
-  function showPermissionModal(id, toolName, label, preview) {
+  const RISK_LABELS = { low: "LOW RISK", medium: "MEDIUM RISK", high: "HIGH RISK" };
+
+  function showPermissionModal(id, toolName, label, risk, preview) {
     state.pendingPermissionId = id;
     el.permTool.textContent = toolName;
     el.permLabel.textContent = label;
+
+    const r = risk || "medium";
+    el.permRisk.textContent = RISK_LABELS[r] || RISK_LABELS.medium;
+    el.permRisk.className = `risk-badge risk-${r}`;
+    el.permRisk.hidden = false;
+    el.permHighRiskWarning.hidden = r !== "high";
+    // A risky action can never become a silent standing approval — the
+    // server enforces this too, but hiding the button here avoids a
+    // confusing "it let me click Always but nothing changed" moment.
+    el.permAlways.hidden = r === "high";
 
     if (preview) {
       el.permPreview.innerHTML = renderPreviewHtml(preview);

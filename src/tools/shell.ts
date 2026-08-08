@@ -5,12 +5,14 @@
  */
 import { exec } from "child_process";
 import type { ToolSpec } from "../types";
+import { classifyShellCommand } from "../riskClassifier";
 
 const MAX_OUTPUT = 20_000;
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 export const runShellCommandTool: ToolSpec = {
   mutating: true,
+  riskOf: (args) => classifyShellCommand(String(args.command ?? "")),
   definition: {
     type: "function",
     function: {
