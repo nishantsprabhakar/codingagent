@@ -57,16 +57,24 @@ CORS headers allowing it — many provider APIs are built for server-to-
 server use and deliberately block direct browser requests. The desktop
 app's `src/providers/*.ts` prove nothing about this either way, since
 Node has no CORS restriction at all. Each provider in `providers.js` was confirmed with a live `OPTIONS`/`POST`
-request carrying a real `Origin` header before being added (Groq,
-OpenRouter, Gemini, Cerebras, and Mistral currently pass, as of 2026-08)
-— if you add another provider, verify its CORS behavior the same way
-first; a provider that worked when this was written can also change that
-behavior later. Pollinations was excluded even though it passed the CORS
-check: a real browser request hit a Cloudflare Turnstile bot-challenge
-requirement that curl-based testing didn't surface — CORS headers being
-present doesn't guarantee an unauthenticated endpoint stays open to
-scripted browser requests, so test with an actual `fetch()` before
-trusting curl alone.
+request carrying a real `Origin` header before being added (Pollinations,
+Groq, OpenRouter, Gemini, Cerebras, and Mistral currently pass, as of
+2026-08) — if you add another provider, verify its CORS behavior the same
+way first; a provider that worked when this was written can also change
+that behavior later.
+
+Pollinations is the default, no-key provider — plain chat requests (no
+tools) pass CORS and no longer hit the Cloudflare Turnstile bot-challenge
+that blocked it earlier in 2026-08. Its anonymous tier is still not fully
+dependable, though: the exact same request has been observed returning
+`200` and then `402 Payment Required` ("budget too low") seconds apart,
+and only one model is exposed anonymously — a reasoning model that
+sometimes streams its answer as a `reasoning` delta instead of `content`.
+`providers.js`'s `pollinationsStream()` handles both, and surfaces a
+"pick another provider and paste in a key" message on 402 instead of
+retrying forever. Re-verify with an actual browser `fetch()` before
+trusting curl alone, or before assuming this note is still accurate —
+free anonymous tiers change behavior without notice.
 
 ## Local preview
 
