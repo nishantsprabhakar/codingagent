@@ -262,6 +262,12 @@
   color: var(--text-faint);
   margin-left: 4px;
   white-space: nowrap;
+  /* Purely decorative telemetry — it must shrink and truncate rather than overflow .topbar-left's
+     shrunk flex box and paint over the center cwd-label, which happens for any deep project path. */
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 [data-theme="tactical"] .hud-diagnostic .hud-diag-ok { color: var(--success); }
 [data-theme="tactical"] .hud-diagnostic .hud-diag-busy { color: var(--accent); }
@@ -942,7 +948,10 @@ body {
   flex-shrink: 0;
 }
 
-.topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* overflow:hidden is load-bearing: min-width:0 lets this shrink below its content's natural width
+   when a long cwd path claims space in .topbar-center, and without clipping here that overflow
+   visually bleeds into — and garbles — the center label instead of just being cropped. */
+.topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
 
 .status-dot {
   width: 8px;
