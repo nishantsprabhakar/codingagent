@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Wrexlyn — Chat Demo</title>
+<meta name="description" content="Browser-only chat demo of Wrexlyn — sign in, bring your own API key, talk to the model. No file/shell tools; that requires the local desktop app." />
+<link rel="icon" href="icon-512.png" />
+<link rel="stylesheet" href="style.css" />
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <img src="icon-512.png" alt="" />
+    WREXLYN
+    <span class="brand-sub">// browser chat demo</span>
+  </div>
+  <div class="user-chip" id="user-chip" hidden>
+    <img id="user-avatar" alt="" hidden />
+    <span id="user-name"></span>
+    <span class="signout-link" id="signout-link">sign out</span>
+  </div>
+</div>
+
+<div class="gate" id="gate">
+  <div class="gate-card">
+
+    <div id="gate-signed-out">
+      <h1 class="gate-title">// SIGN IN TO CONTINUE</h1>
+      <p class="gate-desc">
+        This is a browser-only chat demo of Wrexlyn — sign in, then bring your own API key for whichever provider
+        you like, and talk to the model. It has no file or shell tools; that's what the
+        <a href="https://github.com/nishantsprabhakar/codingagent" target="_blank" rel="noopener">local desktop app</a>
+        is for — a static page genuinely can't run code on your machine.
+      </p>
+      <div id="google-signin-btn"></div>
+      <p class="disclaimer">
+        Sign-in runs entirely in your browser (Google Identity Services) — nothing about who you are is sent to or
+        stored on any server. It's just used to show your name here for this session.
+      </p>
+    </div>
+
+    <div id="gate-setup" hidden>
+      <h1 class="gate-title">// SET UP YOUR PROVIDER</h1>
+      <p class="gate-desc">Pick a provider and paste in your own API key. It's saved only in this browser's local storage and sent directly from your browser to that provider — never to us, because there's no "us" here to send it to.</p>
+
+      <label class="field-label" for="provider-select">Provider</label>
+      <select id="provider-select"></select>
+
+      <label class="field-label" id="api-key-label" for="api-key-input">API key</label>
+      <input type="password" id="api-key-input" autocomplete="off" placeholder="Paste your API key" />
+      <div class="provider-note" id="provider-note"></div>
+
+      <div class="error-text" id="setup-error"></div>
+      <button class="btn btn-primary btn-full" id="start-btn">Start chatting</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="chat-shell" id="chat-shell">
+  <div class="chat-meta">
+    <span id="chat-meta-provider"></span>
+    <a id="change-setup-link">change provider/key</a>
+  </div>
+  <div class="chat-log" id="chat-log"></div>
+  <div class="composer">
+    <textarea id="composer-input" rows="1" placeholder="Message Wrexlyn…"></textarea>
+    <button class="btn btn-primary" id="send-btn">Send</button>
+  </div>
+</div>
+
+<div class="footer-note">
+  Wrexlyn — chat-only browser demo. Full local agent: <a href="https://github.com/nishantsprabhakar/codingagent" target="_blank" rel="noopener">github.com/nishantsprabhakar/codingagent</a>
+</div>
+
+<script src="providers.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
