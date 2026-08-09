@@ -11,6 +11,7 @@ import { Agent } from "./agent";
 import { PermissionManager, type ConfirmFn } from "./permissions";
 import { printBanner, printError, ConsoleReporter, color } from "./ui";
 import { loadLastModel } from "./preferences";
+import { loadApiKey, API_KEY_PROVIDERS, type ApiKeyProvider } from "./apiKeys";
 import { listSessions } from "./session";
 import type { LlmConfig, LlmProvider } from "./types";
 
@@ -28,12 +29,18 @@ const DEFAULT_MODEL: Record<LlmProvider, string> = {
   pollinations: "openai",
   groq: "llama-3.3-70b-versatile",
   openrouter: "inclusionai/ling-3.0-flash:free",
+  gemini: "gemini-2.5-flash",
+  cerebras: "llama-3.3-70b",
+  mistral: "mistral-small-latest",
 };
 
 const API_KEY_ENV: Record<LlmProvider, string | null> = {
   pollinations: null,
   groq: "GROQ_API_KEY",
   openrouter: "OPENROUTER_API_KEY",
+  gemini: "GEMINI_API_KEY",
+  cerebras: "CEREBRAS_API_KEY",
+  mistral: "MISTRAL_API_KEY",
 };
 
 interface CliOptions {
@@ -65,7 +72,7 @@ function parseArgs(argv: string[]): CliOptions {
       model = argv[++i];
     } else if (arg === "--provider") {
       const value = argv[++i];
-      if (value === "pollinations" || value === "groq" || value === "openrouter") provider = value;
+      if (value === "pollinations" || API_KEY_PROVIDERS.includes(value as ApiKeyProvider)) provider = value as LlmProvider;
     } else if (arg === "--api-key") {
       apiKey = argv[++i];
     } else if (arg === "--yolo") {
@@ -82,6 +89,8 @@ function parseArgs(argv: string[]): CliOptions {
 
   const envVar = API_KEY_ENV[provider];
   if (!apiKey && envVar) apiKey = process.env[envVar];
+  // Explicit --api-key, then the env var, then whatever was saved via the web UI's Settings > API Keys tab.
+  if (!apiKey && API_KEY_PROVIDERS.includes(provider as ApiKeyProvider)) apiKey = loadApiKey(provider as ApiKeyProvider) ?? undefined;
 
   // Explicit --model/env wins; otherwise fall back to whatever was last
   // chosen for this provider via the web UI's model picker, then the
@@ -99,10 +108,11 @@ Usage: agent [options]
 Options:
   --cwd <path>      Working directory the agent may read/write (default: current directory)
   --provider <name> "pollinations" (default, free, no key, but tool-calling requires a paid account as of 2026-07),
-                    "groq", or "openrouter" (both free tier, need an API key, stronger models)
-  --model <name>    Model to use (default: "openai" for pollinations, "llama-3.3-70b-versatile" for groq,
-                    "inclusionai/ling-3.0-flash:free" for openrouter)
-  --api-key <key>   API key for --provider groq/openrouter (or set GROQ_API_KEY / OPENROUTER_API_KEY)
+                    "groq", "openrouter", "gemini", "cerebras", or "mistral" (all free tier, need an API key)
+  --model <name>    Model to use (default depends on --provider — see DEFAULT_MODEL in index.ts, or just omit this
+                    and pick a model from the web UI's model picker)
+  --api-key <key>   API key for the chosen --provider (or set GROQ_API_KEY / OPENROUTER_API_KEY / GEMINI_API_KEY /
+                    CEREBRAS_API_KEY / MISTRAL_API_KEY, or save one once via the web UI's Settings > API Keys tab)
   --yolo            Auto-approve all file writes / edits / shell commands (dangerous)
   --web             Serve the web UI instead of the terminal REPL
   --port <n>        Port for the web UI (default: 4390)
@@ -119,7 +129,9 @@ async function main(): Promise<void> {
   }
 
   const envVar = API_KEY_ENV[options.llmConfig.provider];
-  if (envVar && !options.llmConfig.apiKey) {
+  if (envVar && !options.llmConfig.apiKey && !options.web) {
+    // The web UI can't be reached to fix this without starting first — the CLI REPL has no such fallback,
+    // so failing fast here with a clear message beats a confusing runtime error on the first message.
     printError(`--provider ${options.llmConfig.provider} requires an API key: pass --api-key or set ${envVar}.`);
     process.exit(1);
   }

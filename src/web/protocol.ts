@@ -21,7 +21,7 @@ export type ServerMessage =
   | { type: "history"; items: HistoryItem[] }
   | { type: "model_changed"; model: string }
   | { type: "sessions"; sessions: SessionMeta[]; activeId: string }
-  | { type: "settings_saved"; which: "instructions" }
+  | { type: "settings_saved"; which: "instructions" | "api_keys" }
   | { type: "mcp_reloaded"; toolCount: number }
   | { type: "verification_result"; result: VerificationResult }
   | { type: "critique_result"; pass: boolean; reason: string }
@@ -39,4 +39,6 @@ export type ClientMessage =
   | { type: "list_sessions" }
   | { type: "update_global_instructions"; text: string }
   | { type: "update_mcp_config"; mcpServers: Record<string, { command: string; args?: string[]; env?: Record<string, string> }> }
-  | { type: "rollback_request"; transactionId: string };
+  | { type: "rollback_request"; transactionId: string }
+  | { type: "update_api_key"; provider: "groq" | "openrouter" | "gemini" | "cerebras" | "mistral"; apiKey: string }
+  | { type: "clear_api_key"; provider: "groq" | "openrouter" | "gemini" | "cerebras" | "mistral" };

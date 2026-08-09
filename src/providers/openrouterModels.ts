@@ -51,3 +51,20 @@ export const GROQ_MODELS: ModelSummary[] = [
   { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B", free: true, contextLength: 131072 },
   { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant", free: true, contextLength: 131072 },
 ];
+
+/** Gemini's model list also requires auth to query live, so this is a small curated set of current free-tier models. */
+export const GEMINI_MODELS: ModelSummary[] = [
+  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", free: true, contextLength: 1048576 },
+  { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite", free: true, contextLength: 1048576 },
+  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", free: true, contextLength: 1048576 },
+];
+
+export const CEREBRAS_MODELS: ModelSummary[] = [
+  { id: "llama-3.3-70b", name: "Llama 3.3 70B", free: true, contextLength: 65536 },
+  { id: "llama3.1-8b", name: "Llama 3.1 8B", free: true, contextLength: 32768 },
+];
+
+export const MISTRAL_MODELS: ModelSummary[] = [
+  { id: "mistral-small-latest", name: "Mistral Small", free: true, contextLength: 32768 },
+  { id: "open-mistral-nemo", name: "Mistral Nemo", free: true, contextLength: 131072 },
+];

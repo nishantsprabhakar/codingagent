@@ -16,7 +16,8 @@ import { WebSocketReporter, createConfirmFn } from "./reporter";
 import { loadRecentFolders, addRecentFolder } from "../recentFolders";
 import { saveLastModel } from "../preferences";
 import { loadGlobalInstructions } from "../globalSettings";
-import { listOpenRouterModels, GROQ_MODELS } from "../providers/openrouterModels";
+import { loadApiKey, saveApiKey, clearApiKey, maskApiKey, API_KEY_PROVIDERS, type ApiKeyProvider } from "../apiKeys";
+import { listOpenRouterModels, GROQ_MODELS, GEMINI_MODELS, CEREBRAS_MODELS, MISTRAL_MODELS } from "../providers/openrouterModels";
 import { listSessions } from "../session";
 import type { ClientMessage, ServerMessage } from "./protocol";
 import type { LlmConfig } from "../types";
@@ -54,6 +55,7 @@ function getLanAddresses(): string[] {
 export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: boolean, port: number): void {
   let currentRoot = initialRoot;
   let currentModel = llmConfig.model;
+  let currentApiKey = llmConfig.apiKey;
   addRecentFolder(currentRoot);
 
   const httpServer = http.createServer((req, res) => {
@@ -92,7 +94,7 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
     const reporter = new WebSocketReporter(send);
     const confirmFn = createConfirmFn(send, pending);
     const permissions = new PermissionManager(yolo, confirmFn);
-    let agent = new Agent(currentRoot, { ...llmConfig, model: currentModel }, permissions, reporter);
+    let agent = new Agent(currentRoot, { ...llmConfig, model: currentModel, apiKey: currentApiKey }, permissions, reporter);
     agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
 
     sendInit();
@@ -126,7 +128,7 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
           await agent.dispose();
           currentRoot = target;
           addRecentFolder(currentRoot);
-          agent = new Agent(currentRoot, { ...llmConfig, model: currentModel }, permissions, reporter);
+          agent = new Agent(currentRoot, { ...llmConfig, model: currentModel, apiKey: currentApiKey }, permissions, reporter);
           agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
           sendInit();
           sendSessions();
@@ -173,6 +175,19 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
         } else if (msg.type === "rollback_request") {
           const { ok, restored } = agent.rollbackTransaction(msg.transactionId);
           send({ type: "rollback_result", transactionId: msg.transactionId, ok, restored });
+        } else if (msg.type === "update_api_key") {
+          const key = msg.apiKey?.trim();
+          if (!key) {
+            reporter.error("No API key provided.");
+            return;
+          }
+          saveApiKey(msg.provider, key);
+          if (msg.provider === llmConfig.provider) currentApiKey = key;
+          send({ type: "settings_saved", which: "api_keys" });
+        } else if (msg.type === "clear_api_key") {
+          clearApiKey(msg.provider);
+          if (msg.provider === llmConfig.provider) currentApiKey = undefined;
+          send({ type: "settings_saved", which: "api_keys" });
         }
       } catch (err: any) {
         // A single bad request/response should never take the whole server
@@ -199,6 +214,9 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
     console.log(
       `model: ${llmConfig.provider} · ${currentModel}${yolo ? "  (yolo mode: all actions auto-approved)" : ""}\n`
     );
+    if (API_KEY_PROVIDERS.includes(llmConfig.provider as ApiKeyProvider) && !llmConfig.apiKey) {
+      console.log(`(no API key set for ${llmConfig.provider} yet — add one from Settings > API Keys in the web UI)\n`);
+    }
   });
 }
 
@@ -214,6 +232,7 @@ function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: s
   if (url.pathname === "/api/browse/mkdir" && req.method === "POST") return handleMkdir(req, res);
   if (url.pathname === "/api/global-instructions") return handleGlobalInstructions(res);
   if (url.pathname === "/api/mcp-config") return handleMcpConfig(res, root);
+  if (url.pathname === "/api/api-keys") return handleApiKeys(res);
   if (url.pathname === "/api/lan-info") return handleLanInfo(res, port);
   if (url.pathname === "/api/lan-qrcode") return void handleLanQrCode(res, port);
 
@@ -322,6 +341,17 @@ function handleGlobalInstructions(res: http.ServerResponse): void {
   sendJson(res, 200, { text: loadGlobalInstructions() });
 }
 
+/** Never returns raw keys — just whether one is set and a masked hint, so the client can never leak/log a real key. */
+function handleApiKeys(res: http.ServerResponse): void {
+  const providers = API_KEY_PROVIDERS;
+  const result: Record<string, { set: boolean; masked: string | null }> = {};
+  for (const provider of providers) {
+    const key = loadApiKey(provider);
+    result[provider] = { set: !!key, masked: key ? maskApiKey(key) : null };
+  }
+  sendJson(res, 200, result);
+}
+
 function handleMcpConfig(res: http.ServerResponse, root: string): void {
   const mcpPath = path.join(root, "mcp.json");
   if (!fs.existsSync(mcpPath)) return sendJson(res, 200, { mcpServers: {} });
@@ -337,6 +367,9 @@ async function handleModels(res: http.ServerResponse, provider: string): Promise
   try {
     if (provider === "groq") return sendJson(res, 200, { models: GROQ_MODELS });
     if (provider === "openrouter") return sendJson(res, 200, { models: await listOpenRouterModels() });
+    if (provider === "gemini") return sendJson(res, 200, { models: GEMINI_MODELS });
+    if (provider === "cerebras") return sendJson(res, 200, { models: CEREBRAS_MODELS });
+    if (provider === "mistral") return sendJson(res, 200, { models: MISTRAL_MODELS });
     return sendJson(res, 200, {
       models: [],
       note: "Pollinations doesn't support model selection for tool-calling.",

@@ -16,7 +16,7 @@ export interface ChatCompletionResult {
   toolCalls: ToolCallRequest[];
 }
 
-export type LlmProvider = "pollinations" | "groq" | "openrouter";
+export type LlmProvider = "pollinations" | "groq" | "openrouter" | "gemini" | "cerebras" | "mistral";
 
 export interface LlmConfig {
   provider: LlmProvider;

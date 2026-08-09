@@ -21,6 +21,7 @@ import {
   LevelFormat,
   PageBreak,
   ImageRun,
+  TableOfContents,
 } from "docx";
 import PptxGenJS from "pptxgenjs";
 import ExcelJS from "exceljs";
@@ -134,7 +135,10 @@ export const createDocxTool: ToolSpec = {
         "Create a well-formatted Word (.docx) document from structured content blocks. Use this instead of " +
         "write_file for any Word document request. `blocks` must contain the actual, complete content the user " +
         "asked for — never call this with an empty or placeholder body. Text fields support inline markup: " +
-        "**bold**, _italic_, __underline__, ~~strikethrough~~ (combinable, e.g. **_bold italic_**).",
+        "**bold**, _italic_, __underline__, ~~strikethrough~~ (combinable, e.g. **_bold italic_**). A `toc` block " +
+        "inserts a real, auto-updating, clickable table of contents generated from heading blocks placed earlier " +
+        "in `blocks` — use it for anything long enough to need one (reports, specs), and put actual heading blocks " +
+        "before it so it has something to list.",
       parameters: {
         type: "object",
         properties: {
@@ -150,9 +154,14 @@ export const createDocxTool: ToolSpec = {
             items: {
               type: "object",
               properties: {
-                type: { type: "string", enum: ["heading", "paragraph", "bullets", "table", "image", "pagebreak"] },
+                type: { type: "string", enum: ["heading", "paragraph", "bullets", "table", "image", "pagebreak", "toc"] },
                 level: { type: "number", description: "Heading level 1-6 (type=heading only)." },
-                text: { type: "string", description: "Text content, supports inline markup (type=heading or paragraph)." },
+                text: {
+                  type: "string",
+                  description:
+                    "Text content, supports inline markup (type=heading or paragraph). For type=toc, an optional " +
+                    "title (defaults to 'Table of Contents').",
+                },
                 align: { type: "string", enum: ["left", "center", "right", "justify"], description: "Text alignment (type=heading or paragraph)." },
                 color: { type: "string", description: "Optional hex color override for this block's text (type=heading or paragraph)." },
                 ordered: { type: "boolean", description: "Render as a numbered list instead of bulleted (type=bullets)." },
@@ -312,6 +321,12 @@ export const createDocxTool: ToolSpec = {
         }
       } else if (block.type === "pagebreak") {
         children.push(new Paragraph({ children: [new PageBreak()] }));
+      } else if (block.type === "toc") {
+        children.push(
+          new Paragraph({ text: block.text || "Table of Contents", heading: HeadingLevel.HEADING_1, spacing: { before: 240, after: 120 } })
+        );
+        children.push(new TableOfContents("Table of Contents", { hyperlink: true, headingStyleRange: "1-3" }));
+        children.push(new Paragraph({ children: [new PageBreak()] }));
       }
     }
 
@@ -337,6 +352,9 @@ export const createDocxTool: ToolSpec = {
           heading3: { run: { color: accentDark, size: 24, bold: true } },
         },
       },
+      // A table of contents is inserted as a field with no cached page numbers (we can't lay out pages
+      // ourselves) — this tells Word to compute them automatically the moment the file is opened.
+      features: { updateFields: (args.blocks ?? []).some((b: any) => b.type === "toc") },
       sections: [{ children }],
     });
     const buffer = await Packer.toBuffer(doc);
@@ -357,7 +375,7 @@ function checkDocxHasContent(blocks: any[] | undefined): string | null {
     if (b.type === "bullets") return Array.isArray(b.items) && b.items.some((i: any) => normalizeListItem(i).text.trim().length > 0);
     if (b.type === "table") return (Array.isArray(b.headers) && b.headers.length > 0) || (Array.isArray(b.rows) && b.rows.length > 0);
     if (b.type === "image") return typeof b.path === "string" && b.path.trim().length > 0;
-    if (b.type === "pagebreak") return true;
+    if (b.type === "pagebreak" || b.type === "toc") return true;
     return false;
   });
   if (!hasContent) {
@@ -508,7 +526,7 @@ export const createPptxTool: ToolSpec = {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
 
     const pres = new PptxGenJS();
-    const bodyBase: PptxTextBase = { fontFace: BODY_FONT, fontSize: 18, color: "374151" };
+    const bodyBase: PptxTextBase = { fontFace: BODY_FONT, fontSize: 16, color: "374151" };
 
     for (const spec of args.slides ?? []) {
       const slide = pres.addSlide();
@@ -533,6 +551,9 @@ export const createPptxTool: ToolSpec = {
         continue;
       }
 
+      // No decorative accent stripe/underline here on purpose — a repeated geometric flourish under every title
+      // is one of the most recognizable tells of an AI-generated deck. The accent color still does real work
+      // elsewhere (section backgrounds, table headers) instead of existing purely as decoration.
       if (spec.title) {
         slide.addText(String(spec.title), {
           x: 0.5,
@@ -540,11 +561,10 @@ export const createPptxTool: ToolSpec = {
           w: 9,
           h: 0.9,
           fontFace: BODY_FONT,
-          fontSize: 28,
+          fontSize: 36,
           bold: true,
           color: TEXT_HEX,
         });
-        slide.addShape(pres.ShapeType.rect, { x: 0.5, y: 1.22, w: 1.4, h: 0.045, fill: { color: accent }, line: { type: "none" } });
       }
 
       if (mode === "image") {

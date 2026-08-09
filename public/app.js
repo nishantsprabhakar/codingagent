@@ -65,10 +65,14 @@
     settingsClose: document.getElementById("settings-close"),
     settingsTabInstructions: document.getElementById("settings-tab-instructions"),
     settingsTabMcp: document.getElementById("settings-tab-mcp"),
+    settingsTabApiKeys: document.getElementById("settings-tab-apikeys"),
     settingsTabPhone: document.getElementById("settings-tab-phone"),
     settingsPanelInstructions: document.getElementById("settings-panel-instructions"),
     settingsPanelMcp: document.getElementById("settings-panel-mcp"),
+    settingsPanelApiKeys: document.getElementById("settings-panel-apikeys"),
     settingsPanelPhone: document.getElementById("settings-panel-phone"),
+    settingsApiKeysStatus: document.getElementById("settings-apikeys-status"),
+    apikeyRows: document.getElementById("apikey-rows"),
     phoneQrcode: document.getElementById("phone-qrcode"),
     phoneConnectUrl: document.getElementById("phone-connect-url"),
     settingsInstructionsInput: document.getElementById("settings-instructions-input"),
@@ -331,6 +335,10 @@
         break;
       case "settings_saved":
         if (msg.which === "instructions") flashStatus(el.settingsInstructionsStatus, "Saved.");
+        if (msg.which === "api_keys") {
+          flashStatus(el.settingsApiKeysStatus, "Saved.");
+          loadApiKeysStatus();
+        }
         break;
       case "mcp_reloaded":
         flashStatus(el.settingsMcpStatus, `Saved — ${msg.toolCount} tool${msg.toolCount === 1 ? "" : "s"} available.`);
@@ -1359,10 +1367,71 @@
   function showSettingsTab(tab) {
     el.settingsTabInstructions.classList.toggle("active", tab === "instructions");
     el.settingsTabMcp.classList.toggle("active", tab === "mcp");
+    el.settingsTabApiKeys.classList.toggle("active", tab === "apikeys");
     el.settingsTabPhone.classList.toggle("active", tab === "phone");
     el.settingsPanelInstructions.hidden = tab !== "instructions";
     el.settingsPanelMcp.hidden = tab !== "mcp";
+    el.settingsPanelApiKeys.hidden = tab !== "apikeys";
     el.settingsPanelPhone.hidden = tab !== "phone";
+  }
+
+  // Rows are built from this list rather than hand-duplicated HTML, so adding a future provider
+  // is a one-line addition here instead of touching index.html + three places in this file.
+  const API_KEY_PROVIDER_META = [
+    { id: "groq", label: "Groq", placeholder: "gsk_...", signupUrl: "https://console.groq.com/keys" },
+    { id: "openrouter", label: "OpenRouter", placeholder: "sk-or-...", signupUrl: "https://openrouter.ai/keys" },
+    { id: "gemini", label: "Google Gemini", placeholder: "AIza...", signupUrl: "https://aistudio.google.com/apikey" },
+    { id: "cerebras", label: "Cerebras", placeholder: "csk-...", signupUrl: "https://cloud.cerebras.ai" },
+    { id: "mistral", label: "Mistral", placeholder: "...", signupUrl: "https://console.mistral.ai" },
+  ];
+  const API_KEY_PROVIDERS = API_KEY_PROVIDER_META.map((m) => m.id);
+
+  function ensureApiKeyRows() {
+    if (el.apikeyRows.children.length) return;
+    for (const meta of API_KEY_PROVIDER_META) {
+      const row = document.createElement("div");
+      row.className = "apikey-row";
+      row.innerHTML = `
+        <div class="apikey-row-label">
+          <span>${escapeHtml(meta.label)}</span>
+          <span id="apikey-${meta.id}-current" class="apikey-current">Not set</span>
+        </div>
+        <div class="apikey-row-fields">
+          <input id="apikey-${meta.id}-input" class="folder-input" type="password" placeholder="${escapeHtml(meta.placeholder)}" autocomplete="off" />
+          <button id="apikey-${meta.id}-clear" class="btn btn-secondary">Clear</button>
+          <button id="apikey-${meta.id}-save" class="btn btn-primary">Save</button>
+        </div>
+        <a class="apikey-signup-link" href="${meta.signupUrl}" target="_blank" rel="noopener">Get a free key &rarr;</a>
+      `;
+      row.querySelector(`#apikey-${meta.id}-save`).addEventListener("click", () => {
+        const apiKey = row.querySelector(`#apikey-${meta.id}-input`).value.trim();
+        if (!apiKey) return;
+        send({ type: "update_api_key", provider: meta.id, apiKey });
+      });
+      row.querySelector(`#apikey-${meta.id}-clear`).addEventListener("click", () => {
+        send({ type: "clear_api_key", provider: meta.id });
+      });
+      el.apikeyRows.appendChild(row);
+    }
+  }
+
+  async function loadApiKeysStatus() {
+    ensureApiKeyRows();
+    let data = {};
+    try {
+      const res = await fetch("/api/api-keys");
+      data = await res.json();
+    } catch {
+      data = {};
+    }
+    for (const provider of API_KEY_PROVIDERS) {
+      const info = data[provider] || { set: false, masked: null };
+      const currentEl = document.getElementById(`apikey-${provider}-current`);
+      const inputEl = document.getElementById(`apikey-${provider}-input`);
+      currentEl.textContent = info.set ? `Set (${info.masked})` : "Not set";
+      currentEl.classList.toggle("apikey-current-set", info.set);
+      inputEl.value = "";
+    }
   }
 
   async function loadPhoneConnectInfo() {
@@ -1528,6 +1597,7 @@
     }
     renderMcpServerList();
     renderMcpGallery();
+    await loadApiKeysStatus();
   }
 
   el.settingsBtn.addEventListener("click", openSettingsModal);
@@ -1536,6 +1606,7 @@
   });
   el.settingsTabInstructions.addEventListener("click", () => showSettingsTab("instructions"));
   el.settingsTabMcp.addEventListener("click", () => showSettingsTab("mcp"));
+  el.settingsTabApiKeys.addEventListener("click", () => showSettingsTab("apikeys"));
   el.settingsTabPhone.addEventListener("click", () => {
     showSettingsTab("phone");
     loadPhoneConnectInfo();

@@ -234,6 +234,7 @@
     <div class="settings-tabs">
       <button id="settings-tab-instructions" class="settings-tab active">Global Instructions</button>
       <button id="settings-tab-mcp" class="settings-tab">MCP Servers</button>
+      <button id="settings-tab-apikeys" class="settings-tab">API Keys</button>
       <button id="settings-tab-phone" class="settings-tab">Connect from Phone</button>
     </div>
 
@@ -268,6 +269,19 @@
       <div class="settings-panel-actions">
         <span id="settings-mcp-status" class="settings-save-status"></span>
         <button id="settings-mcp-save" class="btn btn-primary">Save &amp; reconnect</button>
+      </div>
+    </div>
+
+    <div id="settings-panel-apikeys" class="settings-panel" hidden>
+      <p class="settings-hint">
+        Needed for every provider below except Pollinations. Stored locally on this machine only
+        (<code>~/.coding-agent/api-keys.json</code>), never sent anywhere but that provider's own API.
+      </p>
+
+      <div id="apikey-rows"></div>
+
+      <div class="settings-panel-actions">
+        <span id="settings-apikeys-status" class="settings-save-status"></span>
       </div>
     </div>
 

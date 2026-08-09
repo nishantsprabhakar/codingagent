@@ -1,0 +1,110 @@
+/**
+ * Wrexlyn — Copyright (c) 2026 Nishant Prabhakar. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * See LICENSE for details.
+ *
+ * Groq, OpenRouter, Gemini, Cerebras, and Mistral all speak the same
+ * OpenAI-compatible chat-completions shape — same request body, same SSE
+ * stream format — differing only in base URL and how they reject a bad key.
+ * This factory is that shared client; each provider file is just its config.
+ */
+import type { ChatMessage, ToolDefinition, ChatCompletionResult } from "../types";
+import { consumeSseStream } from "./sseStream";
+
+export interface OpenAiCompatibleConfig {
+  /** Full chat-completions endpoint URL. */
+  baseUrl: string;
+  /** Display name used in error messages, e.g. "Gemini". */
+  label: string;
+  /** Env var name mentioned in the "bad key" error, e.g. "GEMINI_API_KEY". */
+  apiKeyEnvHint: string;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Throws an error marked non-retryable — e.g. a rejected key that a backoff loop can't fix. */
+function throwFatal(message: string): never {
+  const err: any = new Error(message);
+  err.fatal = true;
+  throw err;
+}
+
+export function createOpenAiCompatibleProvider(config: OpenAiCompatibleConfig) {
+  return async function chatCompletion(
+    messages: ChatMessage[],
+    tools: ToolDefinition[],
+    model: string,
+    apiKey: string,
+    maxRetries = 5,
+    onDelta?: (chunk: string) => void
+  ): Promise<ChatCompletionResult> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await fetch(config.baseUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            tools: tools.length ? tools : undefined,
+            tool_choice: tools.length ? "auto" : undefined,
+            temperature: 0.15,
+            max_tokens: 8000,
+            stream: true,
+          }),
+        });
+
+        if (res.status === 401 || res.status === 403) {
+          throwFatal(
+            `${config.label} rejected the API key (401/403). Check that ${config.apiKeyEnvHint} / --api-key is correct and active.`
+          );
+        }
+
+        if (res.status === 404) {
+          throwFatal(
+            `${config.label} returned 404 for model "${model}" — it may be misspelled, renamed, or not available on ` +
+              `your account. Check ${config.label}'s current model list and pass the exact id with --model.`
+          );
+        }
+
+        if (res.status === 429 || res.status >= 500) {
+          const waitMs = Math.min(2000 * 2 ** attempt, 20000);
+          lastError = new Error(`${config.label} API returned ${res.status}`);
+          await sleep(waitMs);
+          continue;
+        }
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throwFatal(`${config.label} API error ${res.status}: ${text.slice(0, 800)}`);
+        }
+
+        // Once the stream starts, its content may already be visible to the user via
+        // onDelta — retrying from here would re-emit/duplicate that, so a failure past
+        // this point surfaces as a real error instead of being silently retried.
+        const { content, toolCalls, finishReason } = await consumeSseStream(res, onDelta);
+
+        if (finishReason === "length") {
+          console.error(`[coding-agent] warning: response was truncated by the token limit (finish_reason=length)`);
+        }
+
+        return { content, toolCalls };
+      } catch (err: any) {
+        lastError = err;
+        if (err.fatal) throw err;
+        if (attempt < maxRetries) {
+          await sleep(Math.min(1500 * 2 ** attempt, 15000));
+        }
+      }
+    }
+
+    throw lastError ?? new Error(`${config.label} API request failed`);
+  };
+}

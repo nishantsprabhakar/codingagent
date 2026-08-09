@@ -1735,6 +1735,53 @@ body {
   font-size: 14px;
 }
 
+/* ---------- API Keys settings panel ---------- */
+
+.apikey-row {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--bg-panel);
+  margin-bottom: 10px;
+}
+
+.apikey-row-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.apikey-current {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-faint);
+}
+.apikey-current.apikey-current-set { color: var(--success); }
+
+.apikey-row-fields {
+  display: flex;
+  gap: 8px;
+}
+.apikey-row-fields .folder-input {
+  flex: 1;
+  margin-bottom: 0;
+  font-size: 14px;
+  padding: 6px 10px;
+}
+
+.apikey-signup-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.apikey-signup-link:hover { text-decoration: underline; }
+
 .mcp-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
