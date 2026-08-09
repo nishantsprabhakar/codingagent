@@ -81,6 +81,16 @@ a { color: var(--accent); }
   margin-left: 4px;
 }
 
+.topbar-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.topbar-links a { color: var(--text-faint); text-decoration: none; }
+.topbar-links a:hover { color: var(--accent); }
+
 .user-chip {
   display: flex;
   align-items: center;
