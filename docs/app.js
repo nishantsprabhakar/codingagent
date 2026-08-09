@@ -33,6 +33,7 @@
     providerNote: document.getElementById("provider-note"),
     setupError: document.getElementById("setup-error"),
     startBtn: document.getElementById("start-btn"),
+    quickstartBtn: document.getElementById("quickstart-btn"),
     chatShell: document.getElementById("chat-shell"),
     chatMetaProvider: document.getElementById("chat-meta-provider"),
     changeSetupLink: document.getElementById("change-setup-link"),
@@ -149,6 +150,12 @@
     }
     el.setupError.textContent = "";
     setup = { provider, apiKey };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(setup));
+    startChat();
+  });
+
+  el.quickstartBtn.addEventListener("click", () => {
+    setup = { provider: "pollinations", apiKey: "" };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(setup));
     startChat();
   });

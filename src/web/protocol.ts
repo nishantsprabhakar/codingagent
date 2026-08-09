@@ -20,6 +20,7 @@ export type ServerMessage =
   | { type: "files"; files: string[] }
   | { type: "history"; items: HistoryItem[] }
   | { type: "model_changed"; model: string }
+  | { type: "provider_changed"; provider: string; model: string }
   | { type: "sessions"; sessions: SessionMeta[]; activeId: string }
   | { type: "settings_saved"; which: "instructions" | "api_keys" }
   | { type: "mcp_reloaded"; toolCount: number }
@@ -33,6 +34,7 @@ export type ClientMessage =
   | { type: "permission_response"; id: string; decision: PermissionDecision }
   | { type: "switch_folder"; path: string }
   | { type: "switch_model"; model: string }
+  | { type: "switch_provider"; provider: string; model?: string }
   | { type: "new_session" }
   | { type: "switch_session"; id: string }
   | { type: "delete_session"; id: string }

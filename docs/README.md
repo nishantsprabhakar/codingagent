@@ -63,18 +63,27 @@ Groq, OpenRouter, Gemini, Cerebras, and Mistral currently pass, as of
 way first; a provider that worked when this was written can also change
 that behavior later.
 
-Pollinations is the default, no-key provider — plain chat requests (no
-tools) pass CORS and no longer hit the Cloudflare Turnstile bot-challenge
-that blocked it earlier in 2026-08. Its anonymous tier is still not fully
-dependable, though: the exact same request has been observed returning
-`200` and then `402 Payment Required` ("budget too low") seconds apart,
-and only one model is exposed anonymously — a reasoning model that
-sometimes streams its answer as a `reasoning` delta instead of `content`.
-`providers.js`'s `pollinationsStream()` handles both, and surfaces a
-"pick another provider and paste in a key" message on 402 instead of
-retrying forever. Re-verify with an actual browser `fetch()` before
-trusting curl alone, or before assuming this note is still accurate —
-free anonymous tiers change behavior without notice.
+Groq is the default (first in the dropdown) despite needing a free key —
+Pollinations, the no-key option, has proven unreliable enough in testing
+that it makes a worse first impression than one minute of signup. Its
+anonymous tier still gets a prominent "try instantly, no signup" quick
+start button on the gate (`#quickstart-btn` in `app.js`) and stays in the
+provider dropdown for anyone who wants it as their saved default anyway.
+
+Pollinations' plain chat requests (no tools) pass CORS and no longer hit
+the Cloudflare Turnstile bot-challenge that blocked it earlier in 2026-08,
+but its anonymous tier is still not fully dependable: the exact same
+request has been observed returning `200` and then `402 Payment Required`
+("budget too low") seconds apart, and it 403'd with a Turnstile error from
+one test network but not another — it may be origin- or network-dependent
+rather than purely random. Only one model is exposed anonymously — a
+reasoning model that sometimes streams its answer as a `reasoning` delta
+instead of `content`. `providers.js`'s `pollinationsStream()` handles
+both quirks, and surfaces a "pick another provider and paste in a key"
+message on any hard failure instead of retrying forever. Re-verify with
+an actual browser `fetch()` before trusting curl alone, or before assuming
+this note is still accurate — free anonymous tiers change behavior
+without notice.
 
 ## Local preview
 

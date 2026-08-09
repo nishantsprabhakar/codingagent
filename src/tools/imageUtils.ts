@@ -109,25 +109,37 @@ function readIntrinsicDimensions(buf: Buffer, type: ImageType): { width: number;
  * the aspect ratio. Neither explicit -> a sensible default width, capped to
  * `maxWidthIn`, with height derived from the aspect ratio (or a 0.6 fallback
  * ratio if the file's intrinsic dimensions couldn't be read).
+ *
+ * `maxHeightIn`, when given, additionally caps the *derived* dimension —
+ * width is scaled back down to keep it under the height limit too. This
+ * only applies where height isn't itself the explicit, caller-chosen value:
+ * a portrait screenshot (tall aspect ratio) sized only by width would
+ * otherwise derive a height far taller than a slide/page actually has room
+ * for, running the image off the bottom edge.
  */
 export function fitImageBox(
   intrinsic: { width: number; height: number } | null,
   maxWidthIn: number,
   requestedWidthIn?: number,
-  requestedHeightIn?: number
+  requestedHeightIn?: number,
+  maxHeightIn?: number
 ): { widthIn: number; heightIn: number } {
   const aspect = intrinsic && intrinsic.width > 0 ? intrinsic.height / intrinsic.width : 0.6;
+  const capHeight = (widthIn: number, heightIn: number) => {
+    if (!maxHeightIn || heightIn <= maxHeightIn) return { widthIn, heightIn };
+    return { widthIn: widthIn * (maxHeightIn / heightIn), heightIn: maxHeightIn };
+  };
 
   if (requestedWidthIn && requestedWidthIn > 0 && requestedHeightIn && requestedHeightIn > 0) {
     return { widthIn: requestedWidthIn, heightIn: requestedHeightIn };
   }
   if (requestedWidthIn && requestedWidthIn > 0) {
     const widthIn = Math.min(requestedWidthIn, maxWidthIn);
-    return { widthIn, heightIn: widthIn * aspect };
+    return capHeight(widthIn, widthIn * aspect);
   }
   if (requestedHeightIn && requestedHeightIn > 0) {
     return { widthIn: Math.min(requestedHeightIn / aspect, maxWidthIn), heightIn: requestedHeightIn };
   }
   const widthIn = Math.min(4.5, maxWidthIn);
-  return { widthIn, heightIn: widthIn * aspect };
+  return capHeight(widthIn, widthIn * aspect);
 }

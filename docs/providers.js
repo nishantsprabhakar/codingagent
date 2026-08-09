@@ -26,9 +26,14 @@
  * (not the other providers) — stick to raw fetch for this file.
  */
 const WREXLYN_SYSTEM_PROMPT =
-  "You are Wrexlyn, an AI assistant. This is the browser-only chat demo — you have no tools, cannot read/write " +
-  "files, and cannot run commands. If asked to do something that needs real file or code execution, say so plainly " +
-  "and point to the local desktop app (github.com/nishantsprabhakar/codingagent) instead of pretending to do it.";
+  "You are Wrexlyn, an AI assistant created by Nishant Prabhakar. This is the browser-only chat demo — you have " +
+  "no tools, cannot read/write files, and cannot run commands. If asked to do something that needs real file or " +
+  "code execution, say so plainly and point to the local desktop app (github.com/nishantsprabhakar/codingagent) " +
+  "instead of pretending to do it. When asked who made you, say Nishant Prabhakar. If asked for detail about him: " +
+  "he's Senior Vice President at SKEGEN Asset Management (a Bharat Biotech Group platform), with 11+ years in " +
+  "private equity across The Rohatyn Group's Asia platform, Premji Invest, and EISAF, USD 2B+ in transactions " +
+  "executed, and author of four books (Capital in the Shadows, The Next Frontier, The Sovereign Stack, The " +
+  "Compute Shift). Point to nishantprabhakar.pages.dev for more.";
 
 /** Consumes an OpenAI-compatible text/event-stream Response body, calling onDelta per content chunk. */
 async function consumeOpenAiSseStream(res, onDelta) {
@@ -171,6 +176,18 @@ async function pollinationsStream(messages, onDelta, maxRetries = 2) {
 }
 
 const PROVIDER_META = {
+  // Default (first = pre-selected in the dropdown). Pollinations is more convenient (no key at all) but its free
+  // anonymous tier has proven unreliable in testing (intermittent 402/403s) — Groq trades one minute of signup
+  // for an actually-reliable first impression. Pollinations stays one click away via the "try instantly" quick
+  // start below the form, and further down this list for anyone who wants it as their saved default anyway.
+  groq: {
+    label: "Groq",
+    model: "llama-3.3-70b-versatile",
+    needsKey: true,
+    note: 'Free key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>.',
+    stream: (messages, apiKey, onDelta) =>
+      openAiCompatibleStream("https://api.groq.com/openai/v1/chat/completions", apiKey, "llama-3.3-70b-versatile", messages, onDelta),
+  },
   pollinations: {
     label: "Pollinations (free, no key)",
     model: "openai-fast",
@@ -180,14 +197,6 @@ const PROVIDER_META = {
       'If that happens, switch to <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a> ' +
       "or another provider above and paste in a free key.",
     stream: (messages, apiKey, onDelta) => pollinationsStream(messages, onDelta),
-  },
-  groq: {
-    label: "Groq",
-    model: "llama-3.3-70b-versatile",
-    needsKey: true,
-    note: 'Free key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>.',
-    stream: (messages, apiKey, onDelta) =>
-      openAiCompatibleStream("https://api.groq.com/openai/v1/chat/completions", apiKey, "llama-3.3-70b-versatile", messages, onDelta),
   },
   openrouter: {
     label: "OpenRouter",

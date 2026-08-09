@@ -59,7 +59,16 @@ export async function chatCompletion(
 
       if (res.status === 429 || res.status >= 500) {
         const waitMs = Math.min(2000 * 2 ** attempt, 20000);
-        lastError = new Error(`OpenRouter API returned ${res.status}`);
+        lastError =
+          res.status === 429
+            ? new Error(
+                `OpenRouter rate-limited this request (429) for "${model}". This is OpenRouter's own free-tier ` +
+                  "quota for that specific model (shared across all anonymous/free users, not tracked by this " +
+                  "app), not a local setting that needs resetting — it clears on OpenRouter's own schedule, " +
+                  "typically daily. If it keeps happening, switch to a different free model or provider from the " +
+                  "model picker."
+              )
+            : new Error(`OpenRouter API returned ${res.status}`);
         await sleep(waitMs);
         continue;
       }

@@ -14,13 +14,16 @@ import { PermissionManager, type PermissionDecision } from "../permissions";
 import { resolveInRoot } from "../tools/paths";
 import { WebSocketReporter, createConfirmFn } from "./reporter";
 import { loadRecentFolders, addRecentFolder } from "../recentFolders";
-import { saveLastModel } from "../preferences";
+import { saveLastModel, loadLastModel } from "../preferences";
 import { loadGlobalInstructions } from "../globalSettings";
 import { loadApiKey, saveApiKey, clearApiKey, maskApiKey, API_KEY_PROVIDERS, type ApiKeyProvider } from "../apiKeys";
 import { listOpenRouterModels, GROQ_MODELS, GEMINI_MODELS, CEREBRAS_MODELS, MISTRAL_MODELS } from "../providers/openrouterModels";
 import { listSessions } from "../session";
 import type { ClientMessage, ServerMessage } from "./protocol";
-import type { LlmConfig } from "../types";
+import { DEFAULT_MODEL } from "../types";
+import type { LlmConfig, LlmProvider } from "../types";
+
+const VALID_PROVIDERS: LlmProvider[] = ["pollinations", ...API_KEY_PROVIDERS];
 
 const PUBLIC_DIR = path.join(__dirname, "..", "..", "public");
 const IGNORED_ENTRIES = new Set(["node_modules", ".git", "dist", "build"]);
@@ -54,13 +57,14 @@ function getLanAddresses(): string[] {
 
 export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: boolean, port: number): void {
   let currentRoot = initialRoot;
+  let currentProvider = llmConfig.provider;
   let currentModel = llmConfig.model;
   let currentApiKey = llmConfig.apiKey;
   addRecentFolder(currentRoot);
 
   const httpServer = http.createServer((req, res) => {
     try {
-      handleHttp(req, res, currentRoot, llmConfig.provider, port);
+      handleHttp(req, res, currentRoot, currentProvider, port);
     } catch (err: any) {
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end(`Internal error: ${err.message ?? err}`);
@@ -78,7 +82,7 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
       send({
         type: "init",
         root: currentRoot,
-        provider: llmConfig.provider,
+        provider: currentProvider,
         model: currentModel,
         yolo,
         recentFolders: loadRecentFolders(),
@@ -94,7 +98,7 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
     const reporter = new WebSocketReporter(send);
     const confirmFn = createConfirmFn(send, pending);
     const permissions = new PermissionManager(yolo, confirmFn);
-    let agent = new Agent(currentRoot, { ...llmConfig, model: currentModel, apiKey: currentApiKey }, permissions, reporter);
+    let agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey }, permissions, reporter);
     agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
 
     sendInit();
@@ -128,7 +132,7 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
           await agent.dispose();
           currentRoot = target;
           addRecentFolder(currentRoot);
-          agent = new Agent(currentRoot, { ...llmConfig, model: currentModel, apiKey: currentApiKey }, permissions, reporter);
+          agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey }, permissions, reporter);
           agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
           sendInit();
           sendSessions();
@@ -141,8 +145,29 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
           }
           currentModel = model;
           agent.setModel(model);
-          saveLastModel(llmConfig.provider, model);
+          saveLastModel(currentProvider, model);
           send({ type: "model_changed", model });
+        } else if (msg.type === "switch_provider") {
+          const provider = msg.provider as LlmProvider;
+          if (!VALID_PROVIDERS.includes(provider)) {
+            reporter.error(`Unknown provider: ${provider}`);
+            return;
+          }
+          let apiKey: string | undefined;
+          if (provider !== "pollinations") {
+            apiKey = loadApiKey(provider as ApiKeyProvider) ?? undefined;
+            if (!apiKey) {
+              reporter.error(`No API key saved for ${provider} yet — add one from Settings > API Keys first.`);
+              return;
+            }
+          }
+          const model = msg.model?.trim() || loadLastModel(provider) || DEFAULT_MODEL[provider];
+          currentProvider = provider;
+          currentModel = model;
+          currentApiKey = apiKey;
+          agent.switchProvider(currentProvider, currentModel, currentApiKey);
+          saveLastModel(currentProvider, currentModel);
+          send({ type: "provider_changed", provider: currentProvider, model: currentModel });
         } else if (msg.type === "new_session") {
           agent.startNewSession();
           sendInit();
@@ -182,11 +207,17 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
             return;
           }
           saveApiKey(msg.provider, key);
-          if (msg.provider === llmConfig.provider) currentApiKey = key;
+          if (msg.provider === currentProvider) {
+            currentApiKey = key;
+            agent.switchProvider(currentProvider, currentModel, currentApiKey);
+          }
           send({ type: "settings_saved", which: "api_keys" });
         } else if (msg.type === "clear_api_key") {
           clearApiKey(msg.provider);
-          if (msg.provider === llmConfig.provider) currentApiKey = undefined;
+          if (msg.provider === currentProvider) {
+            currentApiKey = undefined;
+            agent.switchProvider(currentProvider, currentModel, currentApiKey);
+          }
           send({ type: "settings_saved", which: "api_keys" });
         }
       } catch (err: any) {
@@ -227,7 +258,7 @@ function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: s
   if (url.pathname === "/api/file") return handleFile(url, res, root);
   if (url.pathname === "/api/download") return handleDownload(url, res, root);
   if (url.pathname === "/api/upload" && req.method === "POST") return handleUpload(req, url, res, root);
-  if (url.pathname === "/api/models") return void handleModels(res, provider);
+  if (url.pathname === "/api/models") return void handleModels(res, url.searchParams.get("provider") || provider);
   if (url.pathname === "/api/browse") return handleBrowse(url, res);
   if (url.pathname === "/api/browse/mkdir" && req.method === "POST") return handleMkdir(req, res);
   if (url.pathname === "/api/global-instructions") return handleGlobalInstructions(res);

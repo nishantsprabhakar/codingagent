@@ -13,6 +13,7 @@ import { printBanner, printError, ConsoleReporter, color } from "./ui";
 import { loadLastModel } from "./preferences";
 import { loadApiKey, API_KEY_PROVIDERS, type ApiKeyProvider } from "./apiKeys";
 import { listSessions } from "./session";
+import { DEFAULT_MODEL } from "./types";
 import type { LlmConfig, LlmProvider } from "./types";
 
 // Last-resort safety net: modern Node terminates the whole process on an
@@ -24,15 +25,6 @@ process.on("unhandledRejection", (reason) => {
 process.on("uncaughtException", (err) => {
   printError(`Unexpected error (recovered): ${err.message ?? err}`);
 });
-
-const DEFAULT_MODEL: Record<LlmProvider, string> = {
-  pollinations: "openai",
-  groq: "llama-3.3-70b-versatile",
-  openrouter: "inclusionai/ling-3.0-flash:free",
-  gemini: "gemini-2.5-flash",
-  cerebras: "llama-3.3-70b",
-  mistral: "mistral-small-latest",
-};
 
 const API_KEY_ENV: Record<LlmProvider, string | null> = {
   pollinations: null,
@@ -101,7 +93,7 @@ function parseArgs(argv: string[]): CliOptions {
 }
 
 function printHelp(): void {
-  console.log(`coding-agent — free AI coding agent
+  console.log(`Wrexlyn — free AI coding agent, created by Nishant Prabhakar
 
 Usage: agent [options]
 

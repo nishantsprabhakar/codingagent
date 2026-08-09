@@ -25,6 +25,16 @@ export interface LlmConfig {
   apiKey?: string;
 }
 
+/** Fallback model when switching to a provider with no explicit model chosen yet. Shared by the CLI and the web server's live provider switch. */
+export const DEFAULT_MODEL: Record<LlmProvider, string> = {
+  pollinations: "openai",
+  groq: "llama-3.3-70b-versatile",
+  openrouter: "inclusionai/ling-3.0-flash:free",
+  gemini: "gemini-2.5-flash",
+  cerebras: "llama-3.3-70b",
+  mistral: "mistral-small-latest",
+};
+
 export interface ChatMessage {
   role: ChatRole;
   content: string | null;

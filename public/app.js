@@ -56,6 +56,7 @@
     modelList: document.getElementById("model-list"),
     modelCancel: document.getElementById("model-cancel"),
     modelProviderNote: document.getElementById("model-provider-note"),
+    modelProviderChips: document.getElementById("model-provider-chips"),
     themeBtn: document.getElementById("theme-btn"),
     themeOverlay: document.getElementById("theme-overlay"),
     themeList: document.getElementById("theme-list"),
@@ -331,6 +332,12 @@
         break;
       case "model_changed":
         state.currentModel = msg.model;
+        updateModelBadge();
+        break;
+      case "provider_changed":
+        state.currentProvider = msg.provider;
+        state.currentModel = msg.model;
+        state.modelCache = null;
         updateModelBadge();
         break;
       case "settings_saved":
@@ -1240,31 +1247,99 @@
 
   // ---------- Model picker ----------
 
+  const PROVIDER_LABELS = {
+    pollinations: "Pollinations",
+    groq: "Groq",
+    openrouter: "OpenRouter",
+    gemini: "Google Gemini",
+    cerebras: "Cerebras",
+    mistral: "Mistral",
+  };
+
+  // Which provider's models the picker is currently browsing — starts on the active one each time it opens, but
+  // browsing a different provider (to preview/switch to it) shouldn't touch state.currentProvider until confirmed.
+  let pickerProvider = "";
+  let pickerKeyStatus = {};
+
   async function openModelModal() {
     el.modelOverlay.hidden = false;
     el.modelSearch.value = "";
     el.modelSearch.focus();
-    el.modelProviderNote.textContent = `Provider: ${state.currentProvider}`;
+    pickerProvider = state.currentProvider;
 
-    if (state.modelCache && state.modelCache.provider === state.currentProvider) {
+    try {
+      const res = await fetch("/api/api-keys");
+      pickerKeyStatus = await res.json();
+    } catch {
+      pickerKeyStatus = {};
+    }
+    renderProviderChips();
+    await loadModelsForPicker();
+  }
+
+  function renderProviderChips() {
+    el.modelProviderChips.innerHTML = "";
+    for (const provider of ["pollinations", ...API_KEY_PROVIDERS]) {
+      const hasKey = provider === "pollinations" || !!pickerKeyStatus[provider]?.set;
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = `provider-chip${provider === pickerProvider ? " active" : ""}${hasKey ? "" : " disabled"}`;
+      chip.textContent = PROVIDER_LABELS[provider] || provider;
+      chip.disabled = !hasKey;
+      chip.title = hasKey ? "" : "Add an API key in Settings > API Keys first";
+      chip.addEventListener("click", () => {
+        if (pickerProvider === provider) return;
+        pickerProvider = provider;
+        renderProviderChips();
+        loadModelsForPicker();
+      });
+      el.modelProviderChips.appendChild(chip);
+    }
+  }
+
+  async function loadModelsForPicker() {
+    el.modelProviderNote.textContent = `Provider: ${PROVIDER_LABELS[pickerProvider] || pickerProvider}`;
+
+    if (state.modelCache && state.modelCache.provider === pickerProvider) {
       renderModelList(state.modelCache.models);
       return;
     }
 
     el.modelList.innerHTML = `<div class="model-list-loading">Loading models…</div>`;
     try {
-      const res = await fetch("/api/models");
+      const res = await fetch(`/api/models?provider=${encodeURIComponent(pickerProvider)}`);
       const data = await res.json();
       const models = data.models || [];
-      state.modelCache = { provider: state.currentProvider, models };
-      if (!models.length) {
-        el.modelList.innerHTML = `<div class="model-list-empty">${escapeHtml(data.note || "No selectable models for this provider.")}</div>`;
-        return;
-      }
+      state.modelCache = { provider: pickerProvider, models };
+      if (!models.length) return renderNoModels(data.note);
       renderModelList(models);
     } catch (err) {
       el.modelList.innerHTML = `<div class="model-list-empty">Failed to load models: ${escapeHtml(String(err.message || err))}</div>`;
     }
+  }
+
+  // Pollinations has no model list (no tool-calling model choice) — if that's also the already-active provider
+  // there's nothing to do here, but if the user is browsing it as a *switch target* they still need a way to
+  // confirm the switch, so give them one explicit row instead of a dead end.
+  function renderNoModels(note) {
+    if (pickerProvider === state.currentProvider) {
+      el.modelList.innerHTML = `<div class="model-list-empty">${escapeHtml(note || "No selectable models for this provider.")}</div>`;
+      return;
+    }
+    el.modelList.innerHTML = "";
+    const row = document.createElement("div");
+    row.className = "model-item";
+    row.innerHTML = `
+      <div>
+        <div class="model-item-name">Switch to ${escapeHtml(PROVIDER_LABELS[pickerProvider] || pickerProvider)}</div>
+        <div class="model-item-id">${escapeHtml(note || "No model list for this provider.")}</div>
+      </div>
+    `;
+    row.addEventListener("click", () => {
+      send({ type: "switch_provider", provider: pickerProvider });
+      el.modelOverlay.hidden = true;
+    });
+    el.modelList.appendChild(row);
   }
 
   function renderModelList(models) {
@@ -1280,8 +1355,9 @@
     }
 
     for (const model of filtered) {
+      const isActive = pickerProvider === state.currentProvider && model.id === state.currentModel;
       const row = document.createElement("div");
-      row.className = `model-item${model.id === state.currentModel ? " active" : ""}`;
+      row.className = `model-item${isActive ? " active" : ""}`;
       row.innerHTML = `
         <div>
           <div class="model-item-name">${escapeHtml(model.name)}</div>
@@ -1290,7 +1366,11 @@
         ${model.free ? '<span class="model-item-free">FREE</span>' : ""}
       `;
       row.addEventListener("click", () => {
-        send({ type: "switch_model", model: model.id });
+        if (pickerProvider === state.currentProvider) {
+          send({ type: "switch_model", model: model.id });
+        } else {
+          send({ type: "switch_provider", provider: pickerProvider, model: model.id });
+        }
         el.modelOverlay.hidden = true;
       });
       el.modelList.appendChild(row);

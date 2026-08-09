@@ -48,7 +48,7 @@
 
     <div id="gate-setup" hidden>
       <h1 class="gate-title">// SET UP YOUR PROVIDER</h1>
-      <p class="gate-desc">Pollinations is selected by default — free and anonymous, no key needed, just hit start. Or pick another provider and paste in your own API key; it's saved only in this browser's local storage and sent directly from your browser to that provider — never to us, because there's no "us" here to send it to.</p>
+      <p class="gate-desc">Pick a provider and paste in your own free API key — Groq takes about a minute, no credit card. It's saved only in this browser's local storage and sent directly from your browser to that provider — never to us, because there's no "us" here to send it to.</p>
 
       <label class="field-label" for="provider-select">Provider</label>
       <select id="provider-select"></select>
@@ -59,6 +59,9 @@
 
       <div class="error-text" id="setup-error"></div>
       <button class="btn btn-primary btn-full" id="start-btn">Start chatting</button>
+
+      <div class="gate-divider">or</div>
+      <button class="btn btn-full" id="quickstart-btn">Try instantly, no signup — Pollinations (free, occasionally unavailable)</button>
     </div>
 
   </div>

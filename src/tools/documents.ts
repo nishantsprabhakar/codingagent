@@ -570,9 +570,13 @@ export const createPptxTool: ToolSpec = {
       if (mode === "image") {
         const loaded = loadImageFile(ctx.root, String(spec.image.path ?? ""), MAX_IMAGE_BYTES);
         if ("error" in loaded) return { ok: false, output: loaded.error };
-        const { widthIn, heightIn } = fitImageBox(loaded.intrinsic, 8, spec.image.width, spec.image.height);
-        const x = Math.max(0.5, (10 - widthIn) / 2);
         const y = 1.55;
+        // Slide is 5.625in tall; a portrait screenshot sized only by width would otherwise derive a height that
+        // runs off the bottom edge — cap it to whatever room is actually left below the title, minus space for
+        // the caption (if any) plus a bottom margin.
+        const maxHeightIn = 5.625 - y - (spec.image.caption ? 0.7 : 0.3);
+        const { widthIn, heightIn } = fitImageBox(loaded.intrinsic, 8, spec.image.width, spec.image.height, maxHeightIn);
+        const x = Math.max(0.5, (10 - widthIn) / 2);
         slide.addImage({ data: `data:image/${loaded.type};base64,${loaded.buffer.toString("base64")}`, x, y, w: widthIn, h: heightIn });
         if (spec.image.caption) {
           slide.addText(pptxRuns(String(spec.image.caption), { fontFace: BODY_FONT, fontSize: 13, color: "6B7280" }), {
@@ -617,12 +621,14 @@ export const createPptxTool: ToolSpec = {
         const columns = Array.isArray(spec.columns) ? spec.columns : [[], []];
         const left = (columns[0] ?? []).map(normalizeListItem);
         const right = (columns[1] ?? []).map(normalizeListItem);
-        if (left.length) slide.addText(pptxBulletRuns(left, bodyBase), { x: 0.5, y: 1.55, w: 4.3, h: 5, valign: "top" });
-        if (right.length) slide.addText(pptxBulletRuns(right, bodyBase), { x: 5.2, y: 1.55, w: 4.3, h: 5, valign: "top" });
+        if (left.length) slide.addText(pptxBulletRuns(left, bodyBase), { x: 0.5, y: 1.55, w: 4.3, h: 3.9, valign: "top" });
+        if (right.length) slide.addText(pptxBulletRuns(right, bodyBase), { x: 5.2, y: 1.55, w: 4.3, h: 3.9, valign: "top" });
       } else {
         const items = (spec.bullets ?? []).map(normalizeListItem);
         if (items.length) {
-          slide.addText(pptxBulletRuns(items, bodyBase), { x: 0.5, y: 1.55, w: 9, h: 5, valign: "top" });
+          // Slide is 5.625in tall; a box taller than that (the old h:5 constant) is harmless only by luck —
+          // it silently invites real overflow the day a slide has enough bullets to actually fill it.
+          slide.addText(pptxBulletRuns(items, bodyBase), { x: 0.5, y: 1.55, w: 9, h: 3.9, valign: "top" });
         }
       }
 
