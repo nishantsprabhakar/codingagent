@@ -29,13 +29,16 @@
 
 html, body {
   margin: 0;
-  height: 100%;
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
 }
 
 body {
+  /* body's own box used to be pinned to exactly one viewport tall (height: 100%, inherited from html's own
+     100%-of-viewport box) — its background, including this grid, only paints within that box, so scrolling past
+     one screenful of content showed plain var(--bg) with no grid at all. Dropping the fixed height lets body's
+     box (and its background) grow with actual content; min-height still guarantees a full screen on short pages. */
   background-image:
     linear-gradient(rgba(var(--grid-rgb), 0.12) 1px, transparent 1px),
     linear-gradient(90deg, rgba(var(--grid-rgb), 0.12) 1px, transparent 1px);
@@ -43,9 +46,29 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  position: relative;
 }
 
 a { color: var(--accent); }
+
+/* Fixed to the viewport (not body), so it's immune to the same scroll-clipping bug the grid background just had
+   — it always covers whatever's currently on screen. Sits first in the DOM at z-index 0 so the sticky topbar
+   (z-index 10) and normal in-flow content painted after it in document order both layer on top. */
+.bg-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    480px circle at var(--mx, 50vw) var(--my, 35vh),
+    rgba(0, 240, 255, 0.10),
+    rgba(var(--grid-rgb), 0.06) 40%,
+    transparent 70%
+  );
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bg-glow { transition: background-position 0.05s linear; }
+}
 
 /* ---------- Top bar ---------- */
 

@@ -18,6 +18,26 @@
 
   const STORAGE_KEY = "wrexlyn_web_setup";
 
+  // ---------- Interactive background glow ----------
+  // Purely decorative — skipped entirely under prefers-reduced-motion rather than just slowed down, since a
+  // cursor-chasing glow is motion, not just a transition.
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const root = document.documentElement;
+    let pending = null;
+    window.addEventListener(
+      "pointermove",
+      (e) => {
+        if (pending) return;
+        pending = requestAnimationFrame(() => {
+          root.style.setProperty("--mx", `${e.clientX}px`);
+          root.style.setProperty("--my", `${e.clientY}px`);
+          pending = null;
+        });
+      },
+      { passive: true }
+    );
+  }
+
   const el = {
     gate: document.getElementById("gate"),
     gateSignedOut: document.getElementById("gate-signed-out"),
