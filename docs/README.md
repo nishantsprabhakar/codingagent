@@ -3,6 +3,19 @@
 A static, browser-only chat demo of Wrexlyn, meant to be served by GitHub
 Pages. It has **no backend** — no server, no database — which means:
 
+## One-time setup: enable GitHub Pages
+
+This repo doesn't have Pages enabled yet — I don't have a token to flip
+that setting via the API, so it needs one manual step from you:
+
+1. Go to **github.com/nishantsprabhakar/codingagent → Settings → Pages**.
+2. Under "Build and deployment" → "Source", choose **"Deploy from a
+   branch"**.
+3. Branch: **main**, folder: **/docs**. Save.
+4. GitHub builds and publishes it within a minute or two, at
+   **https://nishantsprabhakar.github.io/codingagent/**.
+
+
 - It cannot read/write files or run shell commands. That's the real agent,
   which only exists as the local desktop app in the rest of this repo.
 - Google Sign-In runs entirely client-side (Google Identity Services). It
