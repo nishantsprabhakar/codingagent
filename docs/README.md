@@ -85,6 +85,16 @@ an actual browser `fetch()` before trusting curl alone, or before assuming
 this note is still accurate — free anonymous tiers change behavior
 without notice.
 
+## Cache-busting style.css/app.js/providers.js
+
+GitHub Pages serves these with `Cache-Control: max-age=600` and no other
+versioning, so a browser that loaded the page before a CSS/JS change can
+keep serving the stale file for up to 10 minutes — or longer, on a soft
+reload that doesn't revalidate. `index.html` links to them with a
+`?v=YYYYMMDD` query string for exactly this reason: bump that date on any
+change to `style.css`, `app.js`, or `providers.js`, or visitors won't see
+the fix until their own cache happens to expire.
+
 ## Local preview
 
 Any static file server works, e.g. from the repo root:
