@@ -27,7 +27,7 @@ import PptxGenJS from "pptxgenjs";
 import ExcelJS from "exceljs";
 import type { ToolSpec } from "../types";
 import { resolveInRoot } from "./paths";
-import { parseInlineMarkup } from "./richText";
+import { parseInlineMarkup, stripInlineMarkup } from "./richText";
 import { loadImageFile, fitImageBox } from "./imageUtils";
 
 const HEADING_LEVELS = [
@@ -105,6 +105,13 @@ interface CellSpec {
   text: string;
   align?: string;
   bold?: boolean;
+}
+
+/** See the pptx table-cell comment at its call site — cells can't mix formatting within one string, so this
+ *  strips markup delimiters to plain text and reports whether any span was meant to be bold. */
+function flattenCellMarkup(text: string): { text: string; anyBold: boolean } {
+  const spans = parseInlineMarkup(text);
+  return { text: spans.map((s) => s.text).join(""), anyBold: spans.some((s) => s.bold) };
 }
 
 function normalizeCell(raw: any): CellSpec {
@@ -616,20 +623,29 @@ export const createPptxTool: ToolSpec = {
         const tableRows: PptxGenJS.TableRow[] = [];
         if (headers.length) {
           tableRows.push(
-            headers.map((h) => ({
-              text: normalizeCell(h).text,
-              options: { bold: true, color: "FFFFFF", fill: { color: accent }, align: (normalizeCell(h).align as any) ?? "left" },
-            }))
+            headers.map((h) => {
+              // Unlike addText, pptxgenjs table cells take a plain string with one set of options for the
+              // whole cell — there's no per-run styling within a cell. Strip markup delimiters so a model's
+              // "**Total**" doesn't show as literal asterisks; the header row is already bold regardless.
+              const flat = flattenCellMarkup(normalizeCell(h).text);
+              return {
+                text: flat.text,
+                options: { bold: true, color: "FFFFFF", fill: { color: accent }, align: (normalizeCell(h).align as any) ?? "left" },
+              };
+            })
           );
         }
         rows.forEach((row, i) => {
           tableRows.push(
             row.map((cellVal) => {
               const cell = normalizeCell(cellVal);
+              const flat = flattenCellMarkup(cell.text);
               return {
-                text: cell.text,
+                text: flat.text,
                 options: {
-                  bold: cell.bold || undefined,
+                  // A cell can't be partially bold here, so a bold span anywhere in the text promotes the
+                  // whole cell — closer to what the model intended than showing raw "**" characters.
+                  bold: cell.bold || flat.anyBold || undefined,
                   fill: i % 2 === 1 ? { color: "F3F4F6" } : undefined,
                   align: (cell.align as any) ?? "left",
                 },
@@ -686,10 +702,18 @@ function checkPptxHasContent(slides: any[] | undefined): string | null {
 
 // ---------- Excel (.xlsx) ----------
 
-/** A cell value of "=SOME_FORMULA" becomes a live Excel formula instead of a literal string. */
+/**
+ * A cell value of "=SOME_FORMULA" becomes a live Excel formula instead of a literal string. Any other string
+ * has markup delimiters stripped — Excel cells have no concept of an inline bold run within a value (unlike
+ * docx/pptx), so a model reusing the **bold** convention it was taught for those would otherwise show the
+ * literal asterisks in the spreadsheet instead of anything resembling emphasis.
+ */
 function toFormulaAwareCellValue(v: any): any {
   if (typeof v === "string" && v.startsWith("=") && v.length > 1) {
     return { formula: v.slice(1) };
+  }
+  if (typeof v === "string" && v.length > 0) {
+    return stripInlineMarkup(v);
   }
   return v;
 }
@@ -789,7 +813,7 @@ export const createXlsxTool: ToolSpec = {
       const cellBorder = { top: THIN, bottom: THIN, left: THIN, right: THIN };
 
       if (headers.length) {
-        const headerRow = sheet.addRow(headers.map((h) => h.name));
+        const headerRow = sheet.addRow(headers.map((h) => stripInlineMarkup(h.name)));
         headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
         headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${accent}` } };
         headerRow.eachCell((cell, colNumber) => {
@@ -808,6 +832,12 @@ export const createXlsxTool: ToolSpec = {
           cell.border = cellBorder;
           const align = headers[colNumber - 1]?.align;
           if (align === "center" || align === "right" || align === "left") cell.alignment = { horizontal: align as any };
+          // A cell can't be partially bold, so **markup** anywhere in the raw (pre-strip) value promotes the
+          // whole cell — same reasoning as the pptx table-cell fallback above.
+          const raw = row[colNumber - 1];
+          if (typeof raw === "string" && !raw.startsWith("=") && parseInlineMarkup(raw).some((s) => s.bold)) {
+            cell.font = { bold: true };
+          }
         });
       });
 
