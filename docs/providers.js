@@ -208,7 +208,7 @@ const PROVIDER_META = {
   },
   gemini: {
     label: "Google Gemini",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     needsKey: true,
     note: 'Free key (no credit card) at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.',
     stream: (messages, apiKey, onDelta) =>
