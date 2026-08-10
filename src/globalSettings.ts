@@ -4,8 +4,9 @@
  * See LICENSE for details.
  *
  * User-authored instructions that apply to every project, not just one —
- * the equivalent of a global CLAUDE.md. Stored once per machine, separate
- * from any single project's files.
+ * a global set of standing instructions layered on top of any single
+ * project's own. Stored once per machine, separate from any single
+ * project's files.
  */
 import * as fs from "fs";
 import * as os from "os";

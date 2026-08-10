@@ -11,8 +11,8 @@ export type ConfirmFn = (toolName: string, label: string, risk: RiskLevel, previ
 
 /**
  * Gates mutating tools (write_file, edit_file, run_shell_command) behind an
- * explicit allow/always/deny decision, mirroring Claude Code's permission
- * model. Read-only tools never hit this. "always" is remembered per tool
+ * explicit allow/always/deny decision. Read-only tools never hit this.
+ * "always" is remembered per tool
  * name for the rest of the process; --yolo skips prompting entirely.
  *
  * High-risk actions (rm -rf, force push, DROP TABLE, ...) can never become

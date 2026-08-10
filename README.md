@@ -2,7 +2,7 @@
 
 &copy; 2026 Nishant Prabhakar. All rights reserved. See [LICENSE](LICENSE).
 
-A minimal coding agent in the spirit of Claude Code / Codex — it takes a
+A minimal coding agent — it takes a
 natural-language prompt, decides which tools to call, and edits files or runs
 commands in a working directory with your permission. It uses a pluggable
 model backend: [Pollinations AI](https://pollinations.ai) is free and keyless
@@ -234,8 +234,9 @@ REPL commands:
   whichever chat was active. Projects using the older single-session format
   are migrated automatically the first time they're opened.
 - **MCP support / app connectors**: drop an `mcp.json` in your project root
-  (see `mcp.json.example` — same format as Claude Desktop/VS Code:
-  `{"mcpServers": {"name": {"command", "args", "env"}}}`) and the agent
+  (see `mcp.json.example` — the standard MCP config shape most editors and AI
+  tool clients use: `{"mcpServers": {"name": {"command", "args", "env"}}}`)
+  and the agent
   connects to those servers on startup, merging their tools in as
   `mcp__<server>__<tool>`, gated behind the same permission prompts as
   everything else. A server that fails to start is skipped with a logged
@@ -243,10 +244,9 @@ REPL commands:
   to add/edit/remove servers without hand-editing JSON — saving reconnects
   live, no restart needed.
 - **Global instructions**: the settings modal's "Global Instructions" tab
-  holds free-text instructions applied to every project on this machine (the
-  same idea as a global CLAUDE.md) — stored once at
-  `~/.coding-agent/global-instructions.txt`, applied to the system prompt
-  immediately on save.
+  holds free-text instructions applied to every project on this machine —
+  stored once at `~/.coding-agent/global-instructions.txt`, applied to the
+  system prompt immediately on save.
 - **Switch project folder / create a new project**: the folder icon in the
   web UI's header opens a modal with an in-app folder browser (drives on
   Windows, home directory on Linux/macOS — click a folder to descend, the up

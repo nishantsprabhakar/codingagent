@@ -67,10 +67,11 @@ interface ConnectedServer {
 }
 
 /**
- * Connects to MCP servers configured in <root>/mcp.json (same shape as Claude
- * Desktop / VS Code's config: {"mcpServers": {"name": {"command", "args"}}}),
- * merges their tools into the agent's tool list, and routes calls back to the
- * right server. A server that fails to start is skipped, not fatal.
+ * Connects to MCP servers configured in <root>/mcp.json (the standard MCP
+ * config shape most editors and AI tool clients use:
+ * {"mcpServers": {"name": {"command", "args"}}}), merges their tools into
+ * the agent's tool list, and routes calls back to the right server. A
+ * server that fails to start is skipped, not fatal.
  */
 export class McpManager {
   private servers: ConnectedServer[] = [];
