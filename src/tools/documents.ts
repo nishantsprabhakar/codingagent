@@ -81,6 +81,26 @@ function normalizeListItem(raw: any): { text: string; level: number } {
   return { text: String(raw ?? ""), level: 0 };
 }
 
+/**
+ * Repairs a common model mistake: writing a bold "label" and its ": description" as two separate list items
+ * instead of one — e.g. `["**Accelerated Drug Discovery**", ": explores molecular spaces..."]` instead of
+ * `["**Accelerated Drug Discovery**: explores molecular spaces..."]` — which renders as two disconnected
+ * bullets (the second starting with a bare colon) instead of the intended single "**Label**: description"
+ * line. Merges any item whose text starts with a bare colon into the previous item instead of giving it its
+ * own bullet.
+ */
+function mergeColonContinuations(items: Array<{ text: string; level: number }>): Array<{ text: string; level: number }> {
+  const result: Array<{ text: string; level: number }> = [];
+  for (const item of items) {
+    if (item.text.trimStart().startsWith(":") && result.length > 0) {
+      result[result.length - 1] = { ...result[result.length - 1], text: result[result.length - 1].text + item.text.trimStart() };
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 interface CellSpec {
   text: string;
   align?: string;
@@ -234,7 +254,7 @@ export const createDocxTool: ToolSpec = {
           })
         );
       } else if (block.type === "bullets") {
-        const items = (block.items ?? []).map(normalizeListItem);
+        const items = mergeColonContinuations((block.items ?? []).map(normalizeListItem));
         const ordered = !!block.ordered;
         for (const item of items) {
           children.push(
@@ -438,7 +458,10 @@ function pptxBulletRuns(items: Array<{ text: string; level: number }>, base: Ppt
           italic: s.italic || undefined,
           strike: s.strike || undefined,
           underline: s.underline ? { style: "sng" } : undefined,
-          bullet: { characterCode: "2022" },
+          // Only the item's first run gets a bullet marker — pptxgenjs starts a new bullet paragraph at any
+          // run carrying one, so an item with mixed markup (e.g. "**Label**: description") would otherwise
+          // render as two separate bullets, one per inline-markup span, regardless of breakLine.
+          ...(i === 0 ? { bullet: { characterCode: "2022" } } : {}),
           indentLevel: item.level,
           breakLine: i === list.length - 1,
         },
@@ -619,12 +642,12 @@ export const createPptxTool: ToolSpec = {
         }
       } else if (mode === "two_column") {
         const columns = Array.isArray(spec.columns) ? spec.columns : [[], []];
-        const left = (columns[0] ?? []).map(normalizeListItem);
-        const right = (columns[1] ?? []).map(normalizeListItem);
+        const left = mergeColonContinuations((columns[0] ?? []).map(normalizeListItem));
+        const right = mergeColonContinuations((columns[1] ?? []).map(normalizeListItem));
         if (left.length) slide.addText(pptxBulletRuns(left, bodyBase), { x: 0.5, y: 1.55, w: 4.3, h: 3.9, valign: "top" });
         if (right.length) slide.addText(pptxBulletRuns(right, bodyBase), { x: 5.2, y: 1.55, w: 4.3, h: 3.9, valign: "top" });
       } else {
-        const items = (spec.bullets ?? []).map(normalizeListItem);
+        const items = mergeColonContinuations((spec.bullets ?? []).map(normalizeListItem));
         if (items.length) {
           // Slide is 5.625in tall; a box taller than that (the old h:5 constant) is harmless only by luck —
           // it silently invites real overflow the day a slide has enough bullets to actually fill it.
