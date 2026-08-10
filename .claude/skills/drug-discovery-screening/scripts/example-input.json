@@ -1,0 +1,29 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — a Phase 2 targeted small-molecule oncology asset. Run `node score.js example-input.json` to reproduce the PAVS exactly.",
+  "clinical": {
+    "developmentStage": "phase2",
+    "modalityPrecedent": "well_precedented"
+  },
+  "efficacy": {
+    "effectSizeRelativePctVsSoc": 35,
+    "statisticallySignificant": true,
+    "controlledRandomizedDesign": true
+  },
+  "safety": {
+    "candidateGrade3PlusAEsPct": 28,
+    "socGrade3PlusAEsPct": 35
+  },
+  "mechanism": {
+    "targetValidationRubric": 4
+  },
+  "competitive": {
+    "phase2PlusCompetitorCount": 4,
+    "addressablePatientPopulation": 45000,
+    "pricingPowerRubric": 4
+  },
+  "regulatory": {
+    "designationsHeld": ["breakthrough_therapy", "fast_track"],
+    "patentRunwayYearsPostLaunch": 9,
+    "unresolvedIpDisputeOrFtoConcern": false
+  }
+}

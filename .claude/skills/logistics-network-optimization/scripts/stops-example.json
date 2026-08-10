@@ -1,0 +1,17 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 8 — run node consolidate.js stops-example.json to reproduce these numbers exactly. Coordinates are in km on a simple planar grid, chosen to give clean Euclidean distances.",
+  "depot": { "x": 0, "y": 0 },
+  "vehicle": {
+    "capacity": 10,
+    "maxRouteDurationMinutes": 480,
+    "avgSpeedKmh": 40,
+    "serviceTimeMinutesPerStop": 10
+  },
+  "stops": [
+    { "id": "A", "x": 3, "y": 4, "demand": 3, "tier": "standard", "slaHours": 24, "carbonIntensityKgCo2ePerKm": 0.15 },
+    { "id": "B", "x": 4, "y": 3, "demand": 2, "tier": "premium", "slaHours": 4, "carbonIntensityKgCo2ePerKm": 0.15 },
+    { "id": "C", "x": 6, "y": 8, "demand": 4, "tier": "standard", "slaHours": 72, "carbonIntensityKgCo2ePerKm": 0.15 },
+    { "id": "D", "x": 8, "y": 6, "demand": 3, "tier": "standard", "slaHours": 24, "carbonIntensityKgCo2ePerKm": 0.5 },
+    { "id": "E", "x": -5, "y": 0, "demand": 2, "tier": "budget", "slaHours": 168, "carbonIntensityKgCo2ePerKm": 0.05 }
+  ]
+}

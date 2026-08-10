@@ -1,0 +1,50 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7. Fictional mid-cap industrial-products company, screened against a sector peer universe of ~25 listed comps. Peer percentiles below are assumed already computed by the analyst against that universe, per algorithm.md section 4/6 — this script does not derive them from a raw peer list.",
+  "valuation": {
+    "blendedMultiplePercentile": 35
+  },
+  "quality": {
+    "roicPercentile": 72,
+    "marginStabilityPercentile": 68,
+    "altmanZInputs": {
+      "workingCapital": 150,
+      "totalAssets": 1000,
+      "retainedEarnings": 300,
+      "ebit": 120,
+      "marketValueEquity": 900,
+      "totalLiabilities": 600,
+      "sales": 950
+    }
+  },
+  "growth": {
+    "revenueGrowthPercentile": 78,
+    "epsGrowthPercentile": 82,
+    "growthQualityFlag": false
+  },
+  "momentum": {
+    "priceMomentumPercentile": 55,
+    "estimateRevisionPercentile": 60
+  },
+  "ownership": {
+    "insiderTrendRubric": 4,
+    "institutionalOwnershipTrend": "increasing",
+    "shortInterestPctFloat": 3.5
+  },
+  "risk": {
+    "netDebtToEbitda": 2.8,
+    "sectorMedianLeverage": 2.0,
+    "beta": 1.15,
+    "sectorMedianBeta": 1.0,
+    "materialPendingLitigation": false,
+    "beneishInputs": {
+      "dsri": 1.05,
+      "gmi": 1.02,
+      "aqi": 1.01,
+      "sgi": 1.10,
+      "depi": 1.0,
+      "sgai": 1.0,
+      "tata": 0.02,
+      "lvgi": 1.0
+    }
+  }
+}

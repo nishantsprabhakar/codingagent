@@ -1,0 +1,33 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7. Run node score.js example-input.json to reproduce the numbers exactly.",
+  "borrower": "Mid-market industrial components manufacturer, secured term loan (senior secured, first-lien on fixed assets)",
+  "leverage": {
+    "netDebtToEbitda": 3.8,
+    "sectorMedianLeverage": 3.0,
+    "debtToEquity": 1.4
+  },
+  "coverage": {
+    "ebitdaToInterestExpense": 3.2,
+    "fcfToTotalDebtService": 1.4
+  },
+  "liquidity": {
+    "currentRatio": 1.3,
+    "quickRatio": 0.9,
+    "isCashFlowNegative": false,
+    "cashRunwayMonths": null
+  },
+  "profitability": {
+    "ebitdaMargin": 14,
+    "sectorMedianEbitdaMargin": 12,
+    "marginCoefficientOfVariation3to5yr": 0.18
+  },
+  "industry": {
+    "cyclicalityRubric": 3
+  },
+  "qualitative": {
+    "managementQualityRubric": 4,
+    "isSecuredLending": true,
+    "collateralQualityRubric": 4,
+    "governanceRedFlags": ["covenant_breach_history"]
+  }
+}

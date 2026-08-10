@@ -1,0 +1,36 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — Class A single-tenant industrial/logistics acquisition. Run node score.js example-input.json to reproduce the exact PREIS and tier.",
+  "income": {
+    "dealCapRatePct": 6.25,
+    "submarketMedianCapRatePct": 5.75,
+    "occupancyPct": 96,
+    "waleYears": 6.5,
+    "tenantCreditQualityRubric": 4
+  },
+  "growth": {
+    "noiGrowthTrendPctPerYear": 4.2,
+    "inPlaceRentPsf": 5.1,
+    "marketRentPsf": 6.25
+  },
+  "location": {
+    "vacancyTrendPtsPerYear": -0.8,
+    "populationJobGrowthPct": 2.1,
+    "newSupplyPipelinePctOfStock": 4.5
+  },
+  "physical": {
+    "buildingClassRubric": 4,
+    "deferredCapexPctOfPrice": 1.2,
+    "esgRating": "certified"
+  },
+  "structure": {
+    "ltvPct": 62,
+    "noiUSD": 3750000,
+    "loanAmountUSD": 40000000,
+    "goingInCapRatePct": 6.25,
+    "costOfDebtPct": 5.1
+  },
+  "exit": {
+    "assetClassLiquidityRubric": 4,
+    "exitCapRateDeltaBps": 25
+  }
+}

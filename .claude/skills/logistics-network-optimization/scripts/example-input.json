@@ -1,0 +1,24 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — run node score.js example-input.json to reproduce these numbers exactly.",
+  "capacity": {
+    "avgFillRatePct": 78
+  },
+  "cost": {
+    "costPerTonKm": 0.092,
+    "benchmarkCostPerTonKm": 0.085
+  },
+  "service": {
+    "onTimeDeliveryPct": 94,
+    "orderCycleTimeCv": 0.22
+  },
+  "deadhead": {
+    "emptyMilePct": 22
+  },
+  "network": {
+    "unrealizedConsolidationPct": 18
+  },
+  "sustainability": {
+    "co2ePerTonKm": 0.071,
+    "modalMixAdjustedBenchmarkCo2ePerTonKm": 0.078
+  }
+}

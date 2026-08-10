@@ -1,0 +1,33 @@
+{
+  "_comment": "Hypothetical quarter, illustrative only (not an actual RBI/MOSPI release). Matches the worked example in reference/algorithm.md section 7 — expected PIMRI ~84.4, Expansion/Goldilocks regime.",
+  "growth": {
+    "realGdpYoyPct": 7.2,
+    "iipYoyPct": 5.8,
+    "manufacturingPmi": 57.5,
+    "servicesPmi": 60.3
+  },
+  "inflation": {
+    "cpiYoyPct": 3.6,
+    "repoRatePct": 6.0
+  },
+  "externalSector": {
+    "cadPctOfGdp": 1.1,
+    "fxReserveMonthsImportCover": 10.5,
+    "inrRealizedVolPct": 4.8
+  },
+  "fiscal": {
+    "fiscalDeficitPctGdp": 4.4,
+    "fiscalDeficitTargetPctGdp": 4.5,
+    "capexShareRisingYoy": true
+  },
+  "credit": {
+    "nonFoodCreditGrowthYoyPct": 12.8,
+    "liquidityStance": "comfortable_surplus"
+  },
+  "capitalFlows": {
+    "netFpiTrailing3moUsdBn": 6.2,
+    "netFdiTrailingQuarterUsdBn": 8.5,
+    "sovereignRiskPremiumBps": 65,
+    "geopoliticalPolicyRiskRubric": null
+  }
+}

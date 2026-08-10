@@ -1,0 +1,49 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — expected DQI ~73.2, Attractive tier.",
+  "financials": {
+    "revenueCagr3yr": 22,
+    "yearsOfHistoricalData": 3,
+    "ebitdaMargin": 18,
+    "sectorMedianEbitdaMargin": 15,
+    "marginTrendPtsPerYear": 1.5,
+    "recurringRevenuePct": 78,
+    "avgContractLengthYears": 2.3,
+    "fcfToEbitda": 0.65,
+    "ebitdaPositive": true
+  },
+  "valuation": {
+    "entryMultiple": 11.5,
+    "sectorMedianMultiple": 10.2,
+    "netDebtToEbitda": 3.5,
+    "sectorMedianLeverage": 3.0,
+    "structuralProtectionsRubric": 3
+  },
+  "market": {
+    "tamGrowthRatePct": 12,
+    "marketShareTrend": "gaining_slightly",
+    "competitiveMoat": {
+      "switchingCosts": 3,
+      "ip": 2,
+      "networkEffects": 2,
+      "brandOrRegulatory": 4
+    }
+  },
+  "management": {
+    "priorSuccessfulExits": 1,
+    "tenureYears": 6,
+    "insiderOwnershipPctPostDeal": 22,
+    "governanceRedFlags": ["no_succession_plan_founder_ceo"]
+  },
+  "growth": {
+    "evidencedExpansionLevers": ["new_geography_eu", "active_m&a_pipeline"],
+    "exitPathClarityRubric": 4
+  },
+  "risk": {
+    "top1CustomerPctOfRevenue": 8,
+    "top3CustomerPctOfRevenue": 18,
+    "materialUnresolvedRegulatoryOrLitigation": false,
+    "keyPersonDependencyNoSuccession": false,
+    "highCyclicality": false,
+    "fxOrGeographicConcentration": false
+  }
+}

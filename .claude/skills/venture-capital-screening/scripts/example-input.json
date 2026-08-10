@@ -1,0 +1,32 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — expected PSTS ~75.3, Strong tier. Series A-stage B2B SaaS startup.",
+  "team": {
+    "domainExpertiseRubric": 4,
+    "priorStartupExperienceRubric": 4,
+    "teamCompletenessRubric": 4
+  },
+  "market": {
+    "tamUsdMillions": 2500,
+    "whyNowTimingRubric": 4
+  },
+  "traction": {
+    "momGrowthRatePct": 9,
+    "primaryMetric": "revenue",
+    "retentionCohortQualityRubric": 4
+  },
+  "product": {
+    "differentiationRubric": 3
+  },
+  "unitEconomics": {
+    "dataAvailable": true,
+    "ltvCacRatio": 3.2,
+    "burnMultiple": 1.4
+  },
+  "roundTerms": {
+    "askValuationToTractionMultiple": 18,
+    "stageBenchmarkMultiple": 15,
+    "capTableCleanlinessRubric": 4,
+    "optionPoolPct": 12,
+    "recommendedOptionPoolPctForStage": 10
+  }
+}
