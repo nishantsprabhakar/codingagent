@@ -207,6 +207,7 @@
       <a class="navlink" href="#security"><span class="num">08</span>Security &amp; privacy</a>
       <a class="navlink" href="#roadmap"><span class="num">09</span>Roadmap</a>
       <a class="navlink" href="#skills-library"><span class="num">10</span>Skills library</a>
+      <a class="navlink" href="#differentiation"><span class="num">11</span>Why it&#8217;s differentiated</a>
     </nav>
   </aside>
 
@@ -392,19 +393,43 @@
       </div>
       <div class="table-wrap">
         <table>
-          <tr><th>Algorithm</th><th>Domain</th><th>Verified score</th><th>Whitepaper</th></tr>
-          <tr><td class="strong">PDQI</td><td>Private equity</td><td>74.1 &mdash; Attractive</td><td><a href="assets/whitepapers/PDQI-Whitepaper.docx" download>Download &darr;</a></td></tr>
-          <tr><td class="strong">PSTS</td><td>Venture capital</td><td>75.3 &mdash; Strong</td><td><a href="assets/whitepapers/PSTS-Whitepaper.docx" download>Download &darr;</a></td></tr>
-          <tr><td class="strong">PESS</td><td>Public equities</td><td>72.3 &mdash; Attractive</td><td><a href="assets/whitepapers/PESS-Whitepaper.docx" download>Download &darr;</a></td></tr>
-          <tr><td class="strong">PCRS</td><td>Corporate credit</td><td>70.0 &mdash; BB/B High Yield</td><td><a href="assets/whitepapers/PCRS-Whitepaper.docx" download>Download &darr;</a></td></tr>
-          <tr><td class="strong">PREIS</td><td>Real estate</td><td>77.4 &mdash; Core-plus</td><td><a href="assets/whitepapers/PREIS-Whitepaper.docx" download>Download &darr;</a></td></tr>
-          <tr><td class="strong">PAVS</td><td>Drug discovery</td><td>64.2 &mdash; Monitor</td><td><a href="assets/whitepapers/PAVS-Whitepaper.docx" download>Download &darr;</a></td></tr>
-          <tr><td class="strong">PIMRI</td><td>India macro</td><td>84.4 &mdash; Expansion</td><td><a href="assets/whitepapers/PIMRI-Whitepaper.docx" download>Download &darr;</a></td></tr>
-          <tr><td class="strong">PLNES / PCH</td><td>Logistics</td><td>64.8 &mdash; Adequate</td><td><a href="assets/whitepapers/PLNES-Whitepaper.docx" download>PLNES &darr;</a> &middot; <a href="assets/whitepapers/PCH-Whitepaper.docx" download>PCH &darr;</a></td></tr>
+          <tr><th>Algorithm</th><th>Domain</th><th>Verified score</th></tr>
+          <tr><td class="strong">PDQI</td><td>Private equity</td><td>74.1 &mdash; Attractive</td></tr>
+          <tr><td class="strong">PSTS</td><td>Venture capital</td><td>75.3 &mdash; Strong</td></tr>
+          <tr><td class="strong">PESS</td><td>Public equities</td><td>72.3 &mdash; Attractive</td></tr>
+          <tr><td class="strong">PCRS</td><td>Corporate credit</td><td>70.0 &mdash; BB/B High Yield</td></tr>
+          <tr><td class="strong">PREIS</td><td>Real estate</td><td>77.4 &mdash; Core-plus</td></tr>
+          <tr><td class="strong">PAVS</td><td>Drug discovery</td><td>64.2 &mdash; Monitor</td></tr>
+          <tr><td class="strong">PIMRI</td><td>India macro</td><td>84.4 &mdash; Expansion</td></tr>
+          <tr><td class="strong">PLNES / PCH</td><td>Logistics</td><td>64.8 &mdash; Adequate</td></tr>
         </table>
       </div>
       <div class="prose">
-        <p class="dim">Each algorithm ships with a full methodology doc and a runnable reference implementation &mdash; the same convention this document holds itself to: check the arithmetic, do not take the number on faith. Documented as a trade secret today; patent-eligibility for the scoring models themselves is a separate, harder question under the US <em>Alice/Mayo</em> framework, addressed honestly in the library&rsquo;s own README rather than oversold here. The <strong>Whitepaper</strong> column above links to the full detailed methodology document per algorithm &mdash; formulas, worked example, comparative positioning, and an honest IP-defensibility read, not a summary.</p>
+        <p class="dim">Each algorithm ships with a full methodology doc and a runnable reference implementation &mdash; the same convention this document holds itself to: check the arithmetic, do not take the number on faith. Documented as a trade secret today; patent-eligibility for the scoring models themselves is a separate, harder question under the US <em>Alice/Mayo</em> framework, addressed honestly in the library&rsquo;s own README rather than oversold here.</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="differentiation">
+      <div class="chapter-head"><span class="chapter-num">11</span><h2>Why this is differentiated</h2></div>
+      <div class="prose">
+        <p class="lede">Most quantitative screening in these sectors runs on an analyst&rsquo;s gut-check translated into a number that means something different depending on who&rsquo;s asking and when. These eight algorithms replace that with named, versioned frameworks built to one shared design discipline &mdash; not eight unrelated one-off scoring hacks.</p>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <h3><span class="tick">&check;</span>Named &amp; versioned</h3>
+          <p>&ldquo;PDQI 74&rdquo; means the same thing regardless of who is asking or answering, this year or next &mdash; in the tradition of other analyst-attributed models like the Altman Z-Score.</p>
+        </div>
+        <div class="card">
+          <h3><span class="tick">&check;</span>Deliberate, not arbitrary</h3>
+          <p>Every pillar&rsquo;s weight reflects a stated view of what actually drives outcomes in that domain &mdash; entry price and trajectory dominate PE screening; clinical-stage probability of success dominates drug-pipeline triage.</p>
+        </div>
+        <div class="card">
+          <h3><span class="tick">&check;</span>Auditable, not a black box</h3>
+          <p>Missing data degrades a confidence rating instead of being silently guessed, and every score ships with a runnable reference implementation &mdash; the claim is checkable, not just quotable.</p>
+        </div>
+      </div>
+      <div class="prose">
+        <p class="dim">The full methodology &mdash; formulas, worked examples, and an honest IP-defensibility read &mdash; is documented as a trade secret and kept private; it&rsquo;s available for review under NDA, not published here.</p>
       </div>
     </section>
 
