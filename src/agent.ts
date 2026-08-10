@@ -509,6 +509,7 @@ export class Agent {
           id: tc.id,
           type: "function",
           function: { name: tc.name, arguments: tc.arguments },
+          extra_content: tc.extra,
         })),
       });
 

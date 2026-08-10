@@ -9,6 +9,13 @@ export interface ToolCallRequest {
   id: string;
   name: string;
   arguments: string;
+  /**
+   * Opaque per-call vendor metadata some providers attach to a tool call and require echoed back verbatim on the
+   * next turn — e.g. Gemini's `thought_signature` (an encrypted reasoning-continuity token for its "thinking"
+   * models), sent as `tool_calls[i].extra_content` on the OpenAI-compatible endpoint. Never inspect or modify
+   * this; just carry it through unchanged, or the provider rejects the follow-up request with a 400.
+   */
+  extra?: Record<string, unknown>;
 }
 
 export interface ChatCompletionResult {
@@ -44,6 +51,8 @@ export interface ChatMessage {
     id: string;
     type: "function";
     function: { name: string; arguments: string };
+    /** Round-tripped verbatim from `ToolCallRequest.extra` — see that field's comment. */
+    extra_content?: Record<string, unknown>;
   }>;
 }
 
