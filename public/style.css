@@ -255,7 +255,11 @@
 
 .hud-diagnostic { display: none; }
 [data-theme="tactical"] .hud-diagnostic {
-  display: inline-flex;
+  /* inline-block, not inline-flex: text-overflow:ellipsis only reliably renders the "…" glyph in a
+     block/inline formatting context. A flex container lays out its children as separate boxes
+     instead, so the nested <span class="hud-diag-*"> status word made the ellipsis silently not
+     appear — content just hard-clipped with no visual cue that it had been truncated. */
+  display: inline-block;
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -937,6 +941,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* Floor spacing between the three sections — justify-content:space-between only adds space when
+     there's slack; once long content forces all three to shrink, they'd otherwise butt up against
+     each other with zero gap, which reads as one run-together, garbled line. */
+  gap: 14px;
   padding: 0 18px;
   /* Standalone home-screen mode (viewport-fit=cover) lets the status bar/Dynamic
      Island overlay content — grow into that space rather than getting covered. */
@@ -952,6 +960,14 @@ body {
    when a long cwd path claims space in .topbar-center, and without clipping here that overflow
    visually bleeds into — and garbles — the center label instead of just being cropped. */
 .topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+
+/* Without min-width:0 + overflow:hidden here too, this flex item's auto min-width falls back to
+   .cwd-label's min-content size (its full, unwrapped path text, since white-space:nowrap prevents
+   wrapping) — a floor the browser refuses to shrink below. That forced the *entire* shrink deficit
+   for a long path onto .topbar-left instead, crushing the hud-diagnostic down to a few characters
+   while the path stayed fully unclipped. This lets both sides share the squeeze, so .cwd-label's
+   own ellipsis (below) actually gets used instead of the diagnostic disappearing first. */
+.topbar-center { min-width: 0; overflow: hidden; }
 
 .status-dot {
   width: 8px;
@@ -975,13 +991,23 @@ body {
 .status-text { font-size: 14px; color: var(--text-dim); }
 
 .cwd-label {
+  /* inline-block, not the default inline: overflow/text-overflow/max-width are all no-ops on a
+     plain non-replaced inline box (its scrollWidth/clientWidth report 0 — there's no scrollable
+     overflow area to speak of), so none of the properties below were doing anything and a long
+     path just hard-clipped with no ellipsis instead of truncating visibly. */
+  display: inline-block;
   font-family: var(--mono);
   font-size: 14px;
   color: var(--text-faint);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 46vw;
+  /* 100%, not a separate 46vw: .topbar-center (this element's actual containing block) is already
+     correctly bounded by flexbox shrinking. A fixed viewport-relative cap here could exceed what
+     the parent actually allocates once .topbar-left also needs room, and .topbar-center's own
+     overflow:hidden would then hard-clip this box before its own ellipsis point was ever reached. */
+  max-width: 100%;
+  vertical-align: middle;
 }
 
 .topbar-right { display: flex; align-items: center; gap: 8px; }
