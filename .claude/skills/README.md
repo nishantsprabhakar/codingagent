@@ -14,14 +14,14 @@ seen it before.
 
 | Skill | Niche | Algorithm | What it does |
 |---|---|---|---|
-| [`private-equity-analysis`](private-equity-analysis/SKILL.md) | Private equity / growth investments | **Prabhakar Deal Quality Index (PDQI)** | Six-pillar weighted score covering financial trajectory, valuation/terms, market position, management/governance, growth/exit potential, and risk. |
-| [`venture-capital-screening`](venture-capital-screening/SKILL.md) | Early-stage / VC | **Prabhakar Startup Traction Score (PSTS)** | The pre-revenue sibling of PDQI — team, market, traction/PMF signals, product differentiation, unit-economics trajectory, round terms. |
-| [`public-markets-equity-analysis`](public-markets-equity-analysis/SKILL.md) | Public equities | **Prabhakar Equity Signal Score (PESS)** | Cross-sectional factor score (valuation, quality, growth, momentum, ownership/sentiment, risk) for narrowing a stock universe. |
-| [`credit-risk-analysis`](credit-risk-analysis/SKILL.md) | Corporate credit / lending | **Prabhakar Credit Risk Score (PCRS)** | Leverage/coverage/liquidity/profitability/industry/governance score mapped to an agency-style rating band and indicative spread. |
-| [`real-estate-investment-analysis`](real-estate-investment-analysis/SKILL.md) | Commercial real estate | **Prabhakar Real Estate Investment Score (PREIS)** | Income quality, growth potential, location/market, physical asset quality, deal structure/leverage, exit/liquidity risk. |
-| [`drug-discovery-screening`](drug-discovery-screening/SKILL.md) | Pharma / biotech pipeline | **Prabhakar Asset Viability Score (PAVS)** | Clinical-stage-adjusted probability of success, efficacy signal strength, safety, target validation, competitive/commercial position, regulatory/IP risk. |
-| [`india-macro-regime`](india-macro-regime/SKILL.md) | India macroeconomics | **Prabhakar India Macro Regime Index (PIMRI)** | Classifies India's macro cycle into a named regime (growth, inflation/policy, external sector, fiscal, credit, capital flows) with an asset-allocation tilt, not just a number. |
-| [`logistics-network-optimization`](logistics-network-optimization/SKILL.md) | Logistics / supply chain | **Prabhakar Logistics Network Efficiency Score (PLNES)** + **Prabhakar Consolidation Heuristic (PCH)** | A network-health diagnostic score, plus an actual route-consolidation heuristic (Clarke-Wright savings backbone + a proprietary priority-weighting overlay for tier/urgency/carbon). |
+| [`private-equity-analysis`](private-equity-analysis/SKILL.md) | Private equity / growth investments | **Nishant Deal Quality Index (NDQI)** | Six-pillar weighted score covering financial trajectory, valuation/terms, market position, management/governance, growth/exit potential, and risk. |
+| [`venture-capital-screening`](venture-capital-screening/SKILL.md) | Early-stage / VC | **Nishant Startup Traction Score (NSTS)** | The pre-revenue sibling of NDQI — team, market, traction/PMF signals, product differentiation, unit-economics trajectory, round terms. |
+| [`public-markets-equity-analysis`](public-markets-equity-analysis/SKILL.md) | Public equities | **Nishant Equity Signal Score (NESS)** | Cross-sectional factor score (valuation, quality, growth, momentum, ownership/sentiment, risk) for narrowing a stock universe. |
+| [`credit-risk-analysis`](credit-risk-analysis/SKILL.md) | Corporate credit / lending | **Nishant Credit Risk Score (NCRS)** | Leverage/coverage/liquidity/profitability/industry/governance score mapped to an agency-style rating band and indicative spread. |
+| [`real-estate-investment-analysis`](real-estate-investment-analysis/SKILL.md) | Commercial real estate | **Nishant Real Estate Investment Score (NREIS)** | Income quality, growth potential, location/market, physical asset quality, deal structure/leverage, exit/liquidity risk. |
+| [`drug-discovery-screening`](drug-discovery-screening/SKILL.md) | Pharma / biotech pipeline | **Nishant Asset Viability Score (NAVS)** | Clinical-stage-adjusted probability of success, efficacy signal strength, safety, target validation, competitive/commercial position, regulatory/IP risk. |
+| [`india-macro-regime`](india-macro-regime/SKILL.md) | India macroeconomics | **Nishant India Macro Regime Index (NIMRI)** | Classifies India's macro cycle into a named regime (growth, inflation/policy, external sector, fiscal, credit, capital flows) with an asset-allocation tilt, not just a number. |
+| [`logistics-network-optimization`](logistics-network-optimization/SKILL.md) | Logistics / supply chain | **Nishant Logistics Network Efficiency Score (NLNES)** + **Nishant Consolidation Heuristic (NCH)** | A network-health diagnostic score, plus an actual route-consolidation heuristic (Clarke-Wright savings backbone + a proprietary priority-weighting overlay for tier/urgency/carbon). |
 
 Each skill's `reference/algorithm.md` is the authoritative spec; `scripts/score.js`
 (and, for logistics, `scripts/consolidate.js`) is a literal, runnable
@@ -42,12 +42,12 @@ product. Be accurate about what that does and doesn't mean:
   review (the *Alice*/*Mayo* framework) unless the claim ties the scoring
   method to a specific technical improvement — e.g. a particular system
   architecture, a measurable efficiency gain in how the computation runs, not
-  just "a new way to weight financial ratios." The PCH routing heuristic
+  just "a new way to weight financial ratios." The NCH routing heuristic
   (logistics skill) is the strongest patent-eligibility candidate in this set
   for that reason — it's a concrete computational method with a measurable
   output (route assignment, distance saved), closer to the kind of
   technical process that has cleared this bar before. The pure scoring
-  models (PDQI, PESS, PCRS, PAVS, PREIS, PSTS, PIMRI) are more naturally
+  models (NDQI, NESS, NCRS, NAVS, NREIS, NSTS, NIMRI) are more naturally
   trade secrets than patent candidates as currently written.
 - **"Patentable" in any of these documents means "specified with enough
   novelty and precision to be a serious patent-counsel conversation,"** not
@@ -99,7 +99,7 @@ time it's quoted, to anyone in the firm, a year from now.
 - **Auditable, not black-box.** Every sub-score traces to a named formula
   against a named input. Anyone should be able to check the arithmetic.
 - **Versioned.** Changing a weight or formula is a version bump with a
-  changelog entry, not a silent tweak — otherwise "PDQI 73" stops meaning
+  changelog entry, not a silent tweak — otherwise "NDQI 73" stops meaning
   anything comparable across time.
 - **Script and doc never drift.** The reference script is a literal
   implementation of the methodology doc. If you change one, change the other

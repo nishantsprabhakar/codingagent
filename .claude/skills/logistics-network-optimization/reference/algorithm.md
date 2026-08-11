@@ -1,10 +1,10 @@
-# Prabhakar Logistics Network Efficiency Score (PLNES) & Prabhakar Consolidation Heuristic (PCH) — v1.0
+# Nishant Logistics Network Efficiency Score (NLNES) & Nishant Consolidation Heuristic (NCH) — v1.0
 
 **Proprietary logistics-network diagnostic and consolidation methodology,
 developed by Nishant Prabhakar.**
 
 Status: v1.0 (2026-08-10). Author/owner: Nishant Prabhakar. This document is
-the authoritative specification for both PLNES (`scripts/score.js`) and PCH
+the authoritative specification for both NLNES (`scripts/score.js`) and NCH
 (`scripts/consolidate.js`) — both scripts are direct, literal implementations
 of the formulas below. If a script and this document ever disagree, this
 document is correct and the script has a bug.
@@ -13,31 +13,31 @@ Named in the tradition of other analyst-attributed scoring models (the Altman
 Z-Score, the Piotroski F-Score) and classic named OR heuristics (the
 Clarke-Wright savings algorithm itself is one) — the point of putting a name
 on a model is that the name becomes shorthand for a specific, checkable
-methodology, not a vibe. "PLNES 68" or "a PCH run" should mean the same thing
+methodology, not a vibe. "NLNES 68" or "a NCH run" should mean the same thing
 regardless of who's asking or who's answering.
 
 This skill bundles **two distinct tools that answer two different
 questions**:
 
-- **PLNES** is a *diagnostic score* — it tells you how healthy an existing
-  logistics network is right now, pillar by pillar, the same way PDQI scores
+- **NLNES** is a *diagnostic score* — it tells you how healthy an existing
+  logistics network is right now, pillar by pillar, the same way NDQI scores
   a deal.
-- **PCH** is an *operational heuristic* — it actually re-plans a set of
+- **NCH** is an *operational heuristic* — it actually re-plans a set of
   shipments into consolidated routes and tells you how much distance you'd
   save by running them together.
 
-They're complementary, not interchangeable: PLNES's Network Density pillar
-(§4, P5) previews whether PCH-style consolidation would find much to work
-with, but computing P5 does not require running PCH itself, and running PCH
-does not require having computed a PLNES score first.
+They're complementary, not interchangeable: NLNES's Network Density pillar
+(§4, P5) previews whether NCH-style consolidation would find much to work
+with, but computing P5 does not require running NCH itself, and running NCH
+does not require having computed a NLNES score first.
 
 ---
 
 ## 1. Purpose and positioning
 
-### 1.1 PLNES
+### 1.1 NLNES
 
-PLNES is a **screening and triage tool**, not a routing engine. It exists to
+NLNES is a **screening and triage tool**, not a routing engine. It exists to
 do three things quickly and consistently across a logistics network, lane, or
 portfolio of distribution centers:
 
@@ -50,15 +50,15 @@ portfolio of distribution centers:
    against an 18% benchmark" instead of "trucks feel emptier than they should."
 
 It is deliberately **not** a black box: every sub-score is a named, auditable
-formula against a named input. **What PLNES is not**: a routing engine, a
+formula against a named input. **What NLNES is not**: a routing engine, a
 network-design tool, or a replacement for a real transportation-management
 system (TMS). It scores the network's *current operating health*, not what
-the optimal network would look like. Run PCH (§8) in parallel — PLNES tells
-you whether consolidation is worth pursuing; PCH is what actually pursues it.
+the optimal network would look like. Run NCH (§8) in parallel — NLNES tells
+you whether consolidation is worth pursuing; NCH is what actually pursues it.
 
-### 1.2 PCH
+### 1.2 NCH
 
-PCH is a **fast, good-enough greedy heuristic for shipment consolidation**,
+NCH is a **fast, good-enough greedy heuristic for shipment consolidation**,
 not a promise of a globally optimal route plan. Its backbone — computing
 pairwise merge "savings" between stops and greedily combining routes — is the
 **Clarke-Wright savings algorithm**, a well-established vehicle-routing
@@ -70,7 +70,7 @@ Prabhakar.
 including this one, guarantees the mathematically optimal set of routes for
 anything but small toy instances. Savings-algorithm heuristics are well known
 to land in a "good enough, fast enough" zone — see §9 for the honest gap
-versus true optimal. What *is* proprietary here, and what "Prabhakar
+versus true optimal. What *is* proprietary here, and what "Nishant
 Consolidation Heuristic" actually names, is the **priority-weighting overlay**
 described in §8(b): a business-priority layer (customer tier, SLA urgency,
 carbon-impact-per-unit-saved) that decides which merges to act on first when
@@ -80,7 +80,7 @@ Prabhakar's contribution.
 
 ---
 
-## 2. PLNES structure at a glance
+## 2. NLNES structure at a glance
 
 Six weighted pillars, each scored 0–100, rolled into one composite:
 
@@ -94,7 +94,7 @@ Six weighted pillars, each scored 0–100, rolled into one composite:
 | P6. Sustainability | 10% | Is carbon intensity in line with a modal-mix-adjusted benchmark? |
 
 ```
-PLNES = 0.25*P1 + 0.20*P2 + 0.20*P3 + 0.15*P4 + 0.10*P5 + 0.10*P6
+NLNES = 0.25*P1 + 0.20*P2 + 0.20*P3 + 0.15*P4 + 0.10*P5 + 0.10*P6
 ```
 
 **Weighting rationale**: P1 and P2 together are 45% of the score by design —
@@ -111,14 +111,14 @@ intensity from being treated as afterthoughts.
 
 ---
 
-## 3. PLNES score bands
+## 3. NLNES score bands
 
-| PLNES | Tier | Action |
+| NLNES | Tier | Action |
 |---|---|---|
 | 85–100 | **Excellent** | Maintain; use as the internal benchmark for other lanes/DCs |
 | 70–84 | **Efficient** | Healthy network; look for incremental gains pillar by pillar |
 | 50–69 | **Adequate** | Functional but leaving real money/service on the table — prioritize the lowest pillar |
-| 30–49 | **Underperforming** | Material structural issues; commission a lane-level review, likely including a PCH consolidation pass |
+| 30–49 | **Underperforming** | Material structural issues; commission a lane-level review, likely including a NCH consolidation pass |
 | 0–29 | **Critical — intervention needed** | Network is not operating viably as designed; escalate before the next planning cycle |
 
 These bands assume **high confidence** inputs (see §6). Under low confidence,
@@ -127,7 +127,7 @@ head before acting on it.
 
 ---
 
-## 4. PLNES pillar formulas
+## 4. NLNES pillar formulas
 
 All sub-scores are clamped to `[0, 100]` after computation unless stated
 otherwise. `clamp(x, lo, hi)` = min(max(x, lo), hi). `lerp` = piecewise-linear
@@ -163,7 +163,7 @@ P2 = clamp(60 - (costPerTonKm/benchmarkCostPerTonKm - 1) * 150, 0, 100)
 *adequate*, not *good* — matching a benchmark isn't an achievement, it's
 table stakes. Every 10% below benchmark earns 15 points; every 10% above
 benchmark costs 15 points. This is the steepest lever in the model, same
-reasoning as PDQI's entry-multiple sub-score: cost-per-unit is the single most
+reasoning as NDQI's entry-multiple sub-score: cost-per-unit is the single most
 controllable driver of network-level margin.
 
 ### P3. Service Reliability
@@ -214,11 +214,11 @@ P5 = lerp(unrealizedConsolidationPct, [[0,100],[10,80],[25,55],[40,30],[60,5]])
 of current fragmentation, not a reward for future upside. A network sitting
 on 40% unrealized consolidation potential is not "40% ahead" — it's
 inefficient *today*, and the score should say so plainly. This is
-deliberately the pillar most directly related to what a PCH run would find
-(§8) — a low P5 score is a strong signal that running PCH on the current
+deliberately the pillar most directly related to what a NCH run would find
+(§8) — a low P5 score is a strong signal that running NCH on the current
 shipment list will find real merge opportunities. Computing this pillar does
-not require running PCH; a rough estimate (e.g., from lane/OD overlap
-analysis) is sufficient for the diagnostic, and PCH is the follow-up action
+not require running NCH; a rough estimate (e.g., from lane/OD overlap
+analysis) is sufficient for the diagnostic, and NCH is the follow-up action
 once the diagnostic flags the opportunity.
 
 ### P6. Sustainability
@@ -241,15 +241,15 @@ adjustment will unfairly tank this pillar; see §9.
 
 ## 5. Qualitative rubrics
 
-PLNES's six pillars are currently built entirely from measurable operational
+NLNES's six pillars are currently built entirely from measurable operational
 data (fill rate, cost, OTD, cycle-time variance, empty-mile ratio, unrealized
 consolidation estimate, carbon intensity) rather than Likert-style qualitative
-judgment calls. There is no PLNES-equivalent of PDQI's moat/governance
+judgment calls. There is no NLNES-equivalent of NDQI's moat/governance
 rubrics in v1.0.
 
 If a future version needs a qualitative input (e.g., "carrier relationship
 quality" or "network resilience to single-point failures"), use the same 1–5
-Likert anchor convention as PDQI for consistency across the skills library:
+Likert anchor convention as NDQI for consistency across the skills library:
 
 | Value | Score | Anchor description |
 |---|---|---|
@@ -263,7 +263,7 @@ Any such addition is a version bump (§10), not a silent extension.
 
 ---
 
-## 6. Confidence and missing data (PLNES)
+## 6. Confidence and missing data (NLNES)
 
 Every pillar has a **required input list** (see `scripts/score.js`'s
 `REQUIRED_FIELDS`). Before computing, count how many required fields are
@@ -290,7 +290,7 @@ lower-confidence real answer beats a confident wrong one.
 
 ---
 
-## 7. PLNES worked example
+## 7. NLNES worked example
 
 Regional mid-size distribution network, single-region road fleet. Full input
 is `scripts/example-input.json` — run
@@ -324,11 +324,11 @@ P5 = lerp(18, [[0,100],[10,80],[25,55],[40,30],[60,5]])
 P6: ratio = 0.071/0.078 = 0.9103
    P6 = 60 - (0.9103-1)*150 = 60 + 13.46 = 73.5
 
-PLNES = 0.25(70.0) + 0.20(47.6) + 0.20(73.75) + 0.15(60.0) + 0.10(66.7) + 0.10(73.5)
+NLNES = 0.25(70.0) + 0.20(47.6) + 0.20(73.75) + 0.15(60.0) + 0.10(66.7) + 0.10(73.5)
       = 17.5 + 9.53 + 14.75 + 9.0 + 6.67 + 7.35 = 64.8
 ```
 
-**Result: PLNES 64.8 — Adequate tier** (confidence: High, 100% complete, per
+**Result: NLNES 64.8 — Adequate tier** (confidence: High, 100% complete, per
 the script's real output). The network is functional but leaving real money
 on the table: **P2 (cost efficiency, 47.6)** is the weakest pillar by a wide
 margin — the network is running about 8% above benchmark cost-per-ton-km,
@@ -336,13 +336,13 @@ which alone costs roughly 2.5 composite points versus running at benchmark.
 **P4 (empty miles, 60.0)** is the second-largest drag; 22% deadhead is above
 the 15–20% "common/acceptable" band. Both P2 and P4 point toward the same fix
 — **P5 (consolidation potential, 66.7)** shows there's a real, if moderate,
-amount of unrealized consolidation (18%) that a PCH run (§8) against the
+amount of unrealized consolidation (18%) that a NCH run (§8) against the
 current shipment list would likely convert into both lower empty miles and
 lower cost-per-ton-km.
 
 ---
 
-## 8. THE PCH ALGORITHM
+## 8. THE NCH ALGORITHM
 
 ### 8(a). Pairwise savings — the Clarke-Wright backbone (not proprietary)
 
@@ -373,7 +373,7 @@ Raw savings alone treats every merge opportunity as equally worth pursuing if
 the distance math is similar. In practice, a business rarely wants that: a
 large merge opportunity between two low-priority, slack-SLA shipments isn't
 necessarily more valuable to act on first than a smaller merge that happens
-to protect a premium customer's delivery window. The **Prabhakar
+to protect a premium customer's delivery window. The **Nishant
 Consolidation Heuristic** re-ranks merge candidates by a priority-weighting
 overlay before the greedy loop runs:
 
@@ -486,12 +486,12 @@ adjusted savings gives `C-D(17.17) > A-C(10.00) = B-D(10.00) > B-C(9.61) =
 A-D(9.61) > A-B(8.59) > ... `. Every pair touching **B** — the premium,
 4-hour-SLA customer — sits in the middle of that raw ordering, tied or behind
 `A-C`, which involves no premium/urgent/high-carbon stop at all. Under the
-priority-weighted PCH ordering, `B-D` and `B-C` jump to solidly 2nd and 3rd
+priority-weighted NCH ordering, `B-D` and `B-C` jump to solidly 2nd and 3rd
 place (`B-D`'s weight of 1.75 comes from averaging B's premium+urgent
 multipliers with D's high-carbon multiplier — three separate priority signals
 compounding on one pair), while `A-C` — which gets no boost from either
 stop — drops to 6th. In practice this means B's shipment is pulled into the
-first consolidation pass PCH considers, instead of being left to whichever
+first consolidation pass NCH considers, instead of being left to whichever
 merges the raw distance math happens to get to once its geometrically bigger
 neighbors are already spoken for.
 
@@ -517,7 +517,7 @@ R1: [depot] -> A -> E -> [depot]      demand 5/10,  18.94 km
 R2: [depot] -> B -> D -> C -> [depot] demand 9/10,  22.83 km
 ```
 
-**Result**: baseline (no consolidation) = 70.00 km. Consolidated (PCH) =
+**Result**: baseline (no consolidation) = 70.00 km. Consolidated (NCH) =
 41.77 km. **Total distance saved: 28.23 km (40.32%).** Note that B's
 shipment — the one merge chain the priority overlay pulled forward — ends up
 in a fully-loaded 9/10-capacity route (`R2`) built from the two
@@ -528,7 +528,7 @@ smaller, lower-priority `A-E` route that only fills to 5/10.
 
 ## 9. Known limitations
 
-- **PLNES benchmarks must be real, lane-level data, or the score is
+- **NLNES benchmarks must be real, lane-level data, or the score is
   meaningless.** "Benchmark cost-per-ton-km" and "modal-mix-adjusted carbon
   benchmark" are only as good as the comp set behind them. A generic
   industry-average benchmark applied to a specialized lane (e.g.,
@@ -537,27 +537,27 @@ smaller, lower-priority `A-E` route that only fills to 5/10.
 - **Savings-algorithm heuristics are not optimal.** Clarke-Wright-style
   greedy savings heuristics are well documented in the OR literature to land
   roughly 5–15% above the true optimal total distance for realistic
-  instances, not at it. PCH inherits that gap. For networks where the last
+  instances, not at it. NCH inherits that gap. For networks where the last
   few percent of routing efficiency matters enough to justify the cost, a
   full VRP solver (exact or metaheuristic — branch-and-cut, simulated
-  annealing, genetic algorithms) should be run instead; PCH is the fast,
+  annealing, genetic algorithms) should be run instead; NCH is the fast,
   explainable first pass, not the final word.
-- **PCH does not model real-time traffic or dynamic re-routing.** Distances
+- **NCH does not model real-time traffic or dynamic re-routing.** Distances
   and durations are static inputs (or straight-line/Euclidean estimates). A
   route that looks efficient on the savings matrix can still run long because
-  of live congestion, road closures, or a driver going off-plan — PCH plans
+  of live congestion, road closures, or a driver going off-plan — NCH plans
   the network, it doesn't operate it in real time.
 - **Capacity and duration constraints are simplified.** The `maxRouteDurationMinutes`
   check is a flat cap computed from average speed and per-stop service time;
   it does not model real driver hours-of-service regulations (mandatory
   breaks, daily/weekly driving limits, rest periods), time-window
   constraints at individual stops, or multi-depot/multi-vehicle-type fleets.
-  Treat PCH's output as a planning input to a real TMS/dispatch process, not
+  Treat NCH's output as a planning input to a real TMS/dispatch process, not
   a compliance-ready dispatch order.
-- **PLNES's P5 estimate and PCH's actual findings can disagree.** P5 is a
-  rough, often analyst-estimated proxy for consolidation opportunity; PCH
+- **NLNES's P5 estimate and NCH's actual findings can disagree.** P5 is a
+  rough, often analyst-estimated proxy for consolidation opportunity; NCH
   works off the actual shipment list and real constraints. Treat a large gap
-  between "P5 said there was room" and "PCH found little to merge" as a
+  between "P5 said there was room" and "NCH found little to merge" as a
   signal that P5's input estimate needs to be revisited, not that either tool
   is wrong.
 
@@ -565,10 +565,10 @@ smaller, lower-priority `A-E` route that only fills to 5/10.
 
 | Version | Date | Change |
 |---|---|---|
-| 1.0 | 2026-08-10 | Initial specification and reference implementation for both PLNES and PCH |
+| 1.0 | 2026-08-10 | Initial specification and reference implementation for both NLNES and NCH |
 
 Any change to a weight, formula, anchor value, or priority-weighting
 multiplier is a version bump with an entry here — the whole point of a
-proprietary, named algorithm (and a named heuristic overlay) is that "PLNES
-68" or "a PCH v1.0 run" means the same thing every time it's quoted. Silent
+proprietary, named algorithm (and a named heuristic overlay) is that "NLNES
+68" or "a NCH v1.0 run" means the same thing every time it's quoted. Silent
 tuning defeats that.

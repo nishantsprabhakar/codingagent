@@ -1,11 +1,11 @@
 ---
 name: venture-capital-screening
-description: Screen and score early-stage venture capital / startup deals (pre-seed through Series B) using the proprietary Prabhakar Startup Traction Score (PSTS) — a six-pillar, weighted algorithm covering founder/team quality, market opportunity, traction/PMF signals, product differentiation, unit economics trajectory, and round terms/dilution. Use whenever the user asks to score a startup, run the PSTS, screen a seed-stage or Series A/B company, evaluate a pitch deck for investment, write an early-stage investment memo, or decide whether a startup is worth funding — including "score this startup", "PSTS", "startup traction score", "evaluate this pitch deck for investment", "screen this seed-stage company", "is this startup worth funding", "VC deal screening", "early-stage investment memo", "run the startup algorithm", "rate this founder/team". Also use for comparing multiple early-stage deals or explaining why a startup scored the way it did.
+description: Screen and score early-stage venture capital / startup deals (pre-seed through Series B) using the proprietary Nishant Startup Traction Score (NSTS) — a six-pillar, weighted algorithm covering founder/team quality, market opportunity, traction/PMF signals, product differentiation, unit economics trajectory, and round terms/dilution. Use whenever the user asks to score a startup, run the NSTS, screen a seed-stage or Series A/B company, evaluate a pitch deck for investment, write an early-stage investment memo, or decide whether a startup is worth funding — including "score this startup", "NSTS", "startup traction score", "evaluate this pitch deck for investment", "screen this seed-stage company", "is this startup worth funding", "VC deal screening", "early-stage investment memo", "run the startup algorithm", "rate this founder/team". Also use for comparing multiple early-stage deals or explaining why a startup scored the way it did.
 ---
 
-# Early-Stage Venture Screening — PSTS
+# Early-Stage Venture Screening — NSTS
 
-This skill applies the **Prabhakar Startup Traction Score (PSTS)**, a
+This skill applies the **Nishant Startup Traction Score (NSTS)**, a
 proprietary six-pillar scoring algorithm developed by Nishant Prabhakar, to
 screen early-stage venture opportunities (pre-seed through Series B, before a
 company has an established financial trajectory). Full methodology:
@@ -70,7 +70,7 @@ you'd normally build a real financial model), use the
    that produces the silent one-point drift the whole point of a named
    algorithm is meant to prevent.
 
-3. **Report the result.** Lead with the PSTS, tier, and confidence level,
+3. **Report the result.** Lead with the NSTS, tier, and confidence level,
    then walk through the two or three pillars that moved the score most
    (both up and down) — that's more useful to the reader than restating
    every sub-score. If confidence is Medium or Low, say plainly what's
@@ -81,7 +81,7 @@ you'd normally build a real financial model), use the
 4. **Be honest about base rates.** This is a triage/funnel tool, not a
    prediction of success — most startups that score well will still fail;
    that's the nature of venture, not a flaw in the model. Never present a
-   high PSTS as a guarantee, and never present it as a valuation. If a
+   high NSTS as a guarantee, and never present it as a valuation. If a
    pillar (especially P2 market size, or P6 round terms) is the main drag,
    it's often worth noting what would move the deal into the next tier —
    re-run `score.js` with the adjusted input rather than estimating by hand.
@@ -91,7 +91,7 @@ you'd normally build a real financial model), use the
 Unless the user asks for something else, structure the report as:
 
 ```
-## [Company name] — PSTS: <score> (<Tier>, <confidence> confidence)
+## [Company name] — NSTS: <score> (<Tier>, <confidence> confidence)
 
 **One-line take:** <what's driving this — the single biggest factor>
 
@@ -117,18 +117,18 @@ This is the early-stage sibling to `private-equity-analysis`
 models exist because one set of anchors can't honestly serve both ends of a
 company's life:
 
-- **Use this skill (PSTS)** for pre-revenue or early-traction companies —
+- **Use this skill (NSTS)** for pre-revenue or early-traction companies —
   pre-seed through roughly Series B — where the investment case rests mostly
   on team and market, and financial history is thin or nonexistent.
-- **Use `private-equity-analysis` (PDQI)** once a company has an established,
+- **Use `private-equity-analysis` (NDQI)** once a company has an established,
   multi-year financial trajectory — realized revenue CAGR, margins, cash
   conversion — that can actually be underwritten directly, and the deal
   involves buyout/growth-equity economics (leverage, entry multiples vs.
   sector comps) rather than primary dilution and option pools.
 
-If you're asked to adapt PSTS for a still-different niche (e.g. a
+If you're asked to adapt NSTS for a still-different niche (e.g. a
 deep-tech/biotech-specific variant — see `reference/algorithm.md` §8's known
 limitations — or a growth-stage bridge model), don't overwrite this one:
 copy the folder, rename it, and re-derive the pillar weights/anchors for that
-niche's actual risk/return drivers rather than reusing PSTS anchors that
+niche's actual risk/return drivers rather than reusing NSTS anchors that
 don't fit.

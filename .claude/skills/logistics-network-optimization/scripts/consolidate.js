@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prabhakar Consolidation Heuristic (PCH) — reference implementation, v1.0.
+ * Nishant Consolidation Heuristic (NCH) — reference implementation, v1.0.
  * Developed by Nishant Prabhakar.
  *
  * IMPORTANT — attribution: the *backbone* of this heuristic is the
@@ -8,7 +8,7 @@
  * operations-research technique for vehicle-routing consolidation (Clarke &
  * Wright, 1964). That backbone is NOT proprietary and is not claimed as an
  * original contribution here. What IS proprietary, and is the actual
- * "Prabhakar Consolidation Heuristic," is the priority-weighting overlay in
+ * "Nishant Consolidation Heuristic," is the priority-weighting overlay in
  * computePriorityWeight() / adjustedSavings() below, which re-ranks merge
  * opportunities by business priority (customer tier, SLA urgency,
  * carbon-impact-per-unit-saved) instead of raw distance savings alone. See
@@ -30,7 +30,7 @@
 
 const fs = require("fs");
 
-const HEURISTIC_NAME = "Prabhakar Consolidation Heuristic (PCH)";
+const HEURISTIC_NAME = "Nishant Consolidation Heuristic (NCH)";
 const HEURISTIC_VERSION = "1.0";
 const BACKBONE_ATTRIBUTION =
   "Savings-matrix backbone: Clarke-Wright savings algorithm (Clarke & Wright, 1964) — a well-established OR method, not proprietary.";
@@ -104,14 +104,14 @@ function computePriorityWeight(stopA, stopB) {
 }
 
 /**
- * Runs the full PCH pipeline: savings matrix -> priority-weighted overlay ->
+ * Runs the full NCH pipeline: savings matrix -> priority-weighted overlay ->
  * greedy capacity/duration-constrained merge loop.
  *
  * input.depot: {x, y}
  * input.stops: [{id, x, y, demand, tier, slaHours, carbonIntensityKgCo2ePerKm}]
  * input.vehicle: {capacity, maxRouteDurationMinutes, avgSpeedKmh, serviceTimeMinutesPerStop}
  */
-function runPCH(input) {
+function runNCH(input) {
   const depot = input.depot;
   const stops = input.stops;
   const vehicle = {
@@ -279,7 +279,7 @@ function printHumanReadable(result) {
   }
   lines.push("");
   lines.push(`Baseline (no consolidation): ${result.baselineDistanceKm} km`);
-  lines.push(`Consolidated (PCH):          ${result.consolidatedDistanceKm} km`);
+  lines.push(`Consolidated (NCH):          ${result.consolidatedDistanceKm} km`);
   lines.push(`Total distance saved:        ${result.totalDistanceSavedKm} km (${result.pctDistanceSaved}%)`);
   return lines.join("\n");
 }
@@ -292,7 +292,7 @@ function main() {
   }
   const raw = arg === "-" ? fs.readFileSync(0, "utf-8") : fs.readFileSync(arg, "utf-8");
   const input = JSON.parse(raw);
-  const result = runPCH(input);
+  const result = runNCH(input);
 
   console.log(printHumanReadable(result));
   console.log("");
@@ -304,4 +304,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { runPCH, HEURISTIC_NAME, HEURISTIC_VERSION, computePriorityWeight, tierMultiplier, urgencyMultiplier, carbonMultiplier };
+module.exports = { runNCH, HEURISTIC_NAME, HEURISTIC_VERSION, computePriorityWeight, tierMultiplier, urgencyMultiplier, carbonMultiplier };

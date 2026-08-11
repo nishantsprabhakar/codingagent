@@ -1,5 +1,5 @@
 {
-  "_comment": "Matches the worked example in reference/algorithm.md section 7 — expected DQI ~73.2, Attractive tier.",
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — expected NDQI ~73.2, Attractive tier.",
   "financials": {
     "revenueCagr3yr": 22,
     "yearsOfHistoricalData": 3,

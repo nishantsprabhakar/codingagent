@@ -1,11 +1,11 @@
 ---
 name: real-estate-investment-analysis
-description: Screen and score commercial real estate acquisition targets using the proprietary Prabhakar Real Estate Investment Score (PREIS) — a six-pillar, weighted algorithm covering income quality, growth potential, location/market dynamics, physical asset quality, deal structure/leverage, and exit/liquidity risk. Use whenever the user asks to evaluate, score, screen, or underwrite a commercial property, acquisition target, or deal pipeline entry — including from an offering memorandum (OM), rent roll, comp set, or property condition report. Also use for comparing multiple properties, sensitivity-testing purchase price/leverage, or explaining why a deal scored the way it did. Trigger phrases include "score this property", "PREIS", "real estate investment score", "evaluate this acquisition", "should we buy this building", "CRE deal screening", "underwrite this property", "run the real estate algorithm".
+description: Screen and score commercial real estate acquisition targets using the proprietary Nishant Real Estate Investment Score (NREIS) — a six-pillar, weighted algorithm covering income quality, growth potential, location/market dynamics, physical asset quality, deal structure/leverage, and exit/liquidity risk. Use whenever the user asks to evaluate, score, screen, or underwrite a commercial property, acquisition target, or deal pipeline entry — including from an offering memorandum (OM), rent roll, comp set, or property condition report. Also use for comparing multiple properties, sensitivity-testing purchase price/leverage, or explaining why a deal scored the way it did. Trigger phrases include "score this property", "NREIS", "real estate investment score", "evaluate this acquisition", "should we buy this building", "CRE deal screening", "underwrite this property", "run the real estate algorithm".
 ---
 
-# Commercial Real Estate Investment Screening — PREIS
+# Commercial Real Estate Investment Screening — NREIS
 
-This skill applies the **Prabhakar Real Estate Investment Score (PREIS)**, a
+This skill applies the **Nishant Real Estate Investment Score (NREIS)**, a
 proprietary six-pillar scoring algorithm developed by Nishant Prabhakar, to
 screen commercial real estate acquisition opportunities. Full methodology:
 `reference/algorithm.md`. Reference implementation: `scripts/score.js`. Read
@@ -61,7 +61,7 @@ deal terms typed into chat.
    produces the silent one-point drift the whole point of a named algorithm is
    meant to prevent.
 
-3. **Report the result.** Lead with the PREIS, tier, and confidence level, then
+3. **Report the result.** Lead with the NREIS, tier, and confidence level, then
    walk through the two or three pillars that moved the score most (both up
    and down) — that's more useful to the reader than restating every
    sub-score. If confidence is Medium or Low, say plainly what's missing and
@@ -79,7 +79,7 @@ deal terms typed into chat.
 Unless the user asks for something else, structure the report as:
 
 ```
-## [Property name/address] — PREIS: <score> (<Tier>, <confidence> confidence)
+## [Property name/address] — NREIS: <score> (<Tier>, <confidence> confidence)
 
 **One-line take:** <what's driving this — the single biggest factor>
 
@@ -102,7 +102,7 @@ Unless the user asks for something else, structure the report as:
 
 This is one entry in a growing library of niche-specific skills
 (`.claude/skills/README.md` is the index, alongside `private-equity-analysis`).
-If you're asked to adapt the PREIS for a different real estate strategy (e.g.
+If you're asked to adapt the NREIS for a different real estate strategy (e.g.
 residential single-family rental, land development, hospitality/hotels), don't
 overwrite this one — copy the folder, rename it, and re-derive the pillar
 weights/anchors for that niche's actual risk/return drivers rather than reusing

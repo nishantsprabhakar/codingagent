@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prabhakar Logistics Network Efficiency Score (PLNES) — reference
+ * Nishant Logistics Network Efficiency Score (NLNES) — reference
  * implementation, v1.0.
  * Developed by Nishant Prabhakar.
  *
@@ -16,8 +16,8 @@
  * reference/algorithm.md §4 and §6 for what each field means and how
  * missing/"unknown" values are handled.
  *
- * PLNES is the diagnostic scorecard in this skill. The companion
- * optimization heuristic — the Prabhakar Consolidation Heuristic (PCH) — is
+ * NLNES is the diagnostic scorecard in this skill. The companion
+ * optimization heuristic — the Nishant Consolidation Heuristic (NCH) — is
  * implemented separately in consolidate.js; the two are related but answer
  * different questions (see algorithm.md §1).
  */
@@ -26,7 +26,7 @@
 
 const fs = require("fs");
 
-const ALGORITHM_NAME = "Prabhakar Logistics Network Efficiency Score (PLNES)";
+const ALGORITHM_NAME = "Nishant Logistics Network Efficiency Score (NLNES)";
 const ALGORITHM_VERSION = "1.0";
 
 function clamp(x, lo, hi) {
@@ -177,10 +177,10 @@ function scoreP4(input, missing) {
 // ---------------------------------------------------------------------------
 function scoreP5(input, missing) {
   const read = makeReader(input, missing, "P5");
-  // unrealizedConsolidationPct: analyst/PCH-derived estimate of the share of
+  // unrealizedConsolidationPct: analyst/NCH-derived estimate of the share of
   // current shipment volume that sits on overlapping O-D corridors and could
-  // plausibly be merged into fewer routes. This pillar previews what PCH
-  // would find (see algorithm.md §1) — it does not run PCH itself.
+  // plausibly be merged into fewer routes. This pillar previews what NCH
+  // would find (see algorithm.md §1) — it does not run NCH itself.
   const unrealizedPct = read("network.unrealizedConsolidationPct", 0);
 
   // Inverse: lots of easy unrealized savings sitting on the table means the
@@ -236,11 +236,11 @@ function getByPath(obj, path) {
   return path.split(".").reduce((v, p) => (v == null ? undefined : v[p]), obj);
 }
 
-function tierFor(plnes) {
-  if (plnes >= 85) return "Excellent";
-  if (plnes >= 70) return "Efficient";
-  if (plnes >= 50) return "Adequate";
-  if (plnes >= 30) return "Underperforming";
+function tierFor(nlnes) {
+  if (nlnes >= 85) return "Excellent";
+  if (nlnes >= 70) return "Efficient";
+  if (nlnes >= 50) return "Adequate";
+  if (nlnes >= 30) return "Underperforming";
   return "Critical — intervention needed";
 }
 
@@ -259,7 +259,7 @@ function computeScore(input) {
   const p5 = scoreP5(input, missing);
   const p6 = scoreP6(input, missing);
 
-  const plnes =
+  const nlnes =
     PILLAR_WEIGHTS.p1 * p1.score +
     PILLAR_WEIGHTS.p2 * p2.score +
     PILLAR_WEIGHTS.p3 * p3.score +
@@ -273,8 +273,8 @@ function computeScore(input) {
   return {
     algorithm: ALGORITHM_NAME,
     version: ALGORITHM_VERSION,
-    plnes: Math.round(plnes * 10) / 10,
-    tier: tierFor(plnes),
+    nlnes: Math.round(nlnes * 10) / 10,
+    tier: tierFor(nlnes),
     confidence: confidenceFor(completeness),
     completeness: Math.round(completeness * 100) / 100,
     pillars: {
@@ -293,7 +293,7 @@ function printHumanReadable(result) {
   const lines = [];
   lines.push(`${result.algorithm} v${result.version}`);
   lines.push(
-    `PLNES: ${result.plnes} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`
+    `NLNES: ${result.nlnes} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`
   );
   lines.push("");
   for (const [key, pillar] of Object.entries(result.pillars)) {

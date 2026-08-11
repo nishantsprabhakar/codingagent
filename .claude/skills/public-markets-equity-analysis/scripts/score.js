@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prabhakar Equity Signal Score (PESS) — reference implementation, v1.0.
+ * Nishant Equity Signal Score (NESS) — reference implementation, v1.0.
  * Developed by Nishant Prabhakar.
  *
  * This is a literal implementation of reference/algorithm.md. If you change a
@@ -27,7 +27,7 @@
 
 const fs = require("fs");
 
-const ALGORITHM_NAME = "Prabhakar Equity Signal Score (PESS)";
+const ALGORITHM_NAME = "Nishant Equity Signal Score (NESS)";
 const ALGORITHM_VERSION = "1.0";
 
 function clamp(x, lo, hi) {
@@ -81,7 +81,7 @@ function makeReader(input, missingList, pillarLabel) {
 
 /**
  * Altman Z-Score — the real, established 1968 balance-sheet-strength formula
- * (Edward Altman), not a Prabhakar invention. Used here as one input into
+ * (Edward Altman), not a Nishant invention. Used here as one input into
  * P2 Quality: Z = 1.2A + 1.4B + 3.3C + 0.6D + 1.0E, where
  *   A = Working Capital / Total Assets
  *   B = Retained Earnings / Total Assets
@@ -101,7 +101,7 @@ function altmanZScore(v) {
 
 /**
  * Beneish M-Score — the real, established 1999 earnings-manipulation
- * forensic-accounting formula (Messod Beneish), not a Prabhakar invention.
+ * forensic-accounting formula (Messod Beneish), not a Nishant invention.
  * Takes the eight pre-computed ratio inputs (DSRI, GMI, AQI, SGI, DEPI,
  * SGAI, TATA, LVGI) — deriving those from two years of financial statements
  * is the analyst's job, same as sourcing a peer percentile. Standard
@@ -319,11 +319,11 @@ function getByPath(obj, path) {
   return path.split(".").reduce((v, p) => (v == null ? undefined : v[p]), obj);
 }
 
-function tierFor(pess) {
-  if (pess >= 80) return "Top decile / High conviction";
-  if (pess >= 65) return "Attractive";
-  if (pess >= 50) return "Neutral / Hold";
-  if (pess >= 35) return "Weak / Avoid new positions";
+function tierFor(ness) {
+  if (ness >= 80) return "Top decile / High conviction";
+  if (ness >= 65) return "Attractive";
+  if (ness >= 50) return "Neutral / Hold";
+  if (ness >= 35) return "Weak / Avoid new positions";
   return "Red flag / Exit review";
 }
 
@@ -342,7 +342,7 @@ function computeScore(input) {
   const p5 = scoreP5(input, missing);
   const p6 = scoreP6(input, missing);
 
-  const pess =
+  const ness =
     PILLAR_WEIGHTS.p1 * p1.score +
     PILLAR_WEIGHTS.p2 * p2.score +
     PILLAR_WEIGHTS.p3 * p3.score +
@@ -356,8 +356,8 @@ function computeScore(input) {
   return {
     algorithm: ALGORITHM_NAME,
     version: ALGORITHM_VERSION,
-    pess: Math.round(pess * 10) / 10,
-    tier: tierFor(pess),
+    ness: Math.round(ness * 10) / 10,
+    tier: tierFor(ness),
     confidence: confidenceFor(completeness),
     completeness: Math.round(completeness * 100) / 100,
     pillars: {
@@ -375,7 +375,7 @@ function computeScore(input) {
 function printHumanReadable(result) {
   const lines = [];
   lines.push(`${result.algorithm} v${result.version}`);
-  lines.push(`PESS: ${result.pess} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`);
+  lines.push(`NESS: ${result.ness} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`);
   lines.push("");
   for (const [key, pillar] of Object.entries(result.pillars)) {
     lines.push(`${key}  weight=${pillar.weight}  score=${Math.round(pillar.score * 10) / 10}`);

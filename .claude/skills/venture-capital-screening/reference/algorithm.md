@@ -1,4 +1,4 @@
-# Prabhakar Startup Traction Score (PSTS) — v1.0
+# Nishant Startup Traction Score (NSTS) — v1.0
 
 **Proprietary scoring methodology for early-stage venture capital / startup
 screening (pre-seed through Series B), developed by Nishant Prabhakar.**
@@ -13,15 +13,15 @@ Z-Score, the Piotroski F-Score) — the point of putting a name on a model is
 that the name becomes shorthand for a specific, checkable methodology, not a
 vibe. It's also formalizing something VCs already do informally: every
 partner meeting eventually asks "how's the team, how big is the market, is
-there real traction" — PSTS just forces those judgments into named, weighted,
-auditable sub-scores instead of a gut-feel average. "PSTS 71" should mean the
+there real traction" — NSTS just forces those judgments into named, weighted,
+auditable sub-scores instead of a gut-feel average. "NSTS 71" should mean the
 same thing regardless of who's asking or who's answering.
 
 ---
 
 ## 1. Purpose and positioning
 
-The PSTS is a **deal-flow triage tool**, not a substitute for diligence and
+The NSTS is a **deal-flow triage tool**, not a substitute for diligence and
 absolutely not a valuation model. It exists to do one job well: take a firm
 that sees hundreds of inbound pitches and get to a fast, consistent,
 comparable pass/fail-ish read on each one, so partner time goes to the
@@ -42,20 +42,20 @@ It exists to do three things quickly and consistently across a funnel:
    founder (if there is one) is targeted — "come back with 3 more months of
    retention data" instead of a form-letter pass.
 
-**What the PSTS is explicitly not:**
+**What the NSTS is explicitly not:**
 
 - **Not a valuation model.** It says nothing about what the company is worth;
   §4's P6 pillar checks whether the *ask* is reasonably priced against the
   company's own traction stage, which is a sanity check, not a valuation.
 - **Not an IRR or ownership-return forecaster.** Run real portfolio-construction
-  math separately — PSTS tells you whether a deal is worth spending diligence
+  math separately — NSTS tells you whether a deal is worth spending diligence
   time on, not what it will return.
 - **Not a guarantee of outcome, and it should never be presented as one.**
   This needs to be said plainly: most startups that score well on this model
   will still fail. That is not a flaw in the model — it is the base-rate
   reality of early-stage venture, where the large majority of funded companies
   return less than invested capital even when the team, market, and product
-  looked strong at the time of the check. PSTS improves *consistency and speed
+  looked strong at the time of the check. NSTS improves *consistency and speed
   of triage*; it does not — cannot — repeal the power-law economics of the
   asset class. Treat a high score as "worth the partner's time," never as
   "safe."
@@ -83,16 +83,16 @@ Six weighted pillars, each scored 0–100, rolled into one composite:
 | P6. Round Terms & Dilution | 10% | Are we paying a sane price for this stage, and is the cap table clean? |
 
 ```
-PSTS = 0.25·P1 + 0.20·P2 + 0.20·P3 + 0.15·P4 + 0.10·P5 + 0.10·P6
+NSTS = 0.25·P1 + 0.20·P2 + 0.20·P3 + 0.15·P4 + 0.10·P5 + 0.10·P6
 ```
 
 **Weighting rationale**: P1 and P2 together are 45% of the score by design —
 at pre-seed through Series B, the business itself is still mostly a bet on
 *who* is building and *how big the room is*, because the financial evidence
 that would let you underwrite the business directly usually doesn't exist
-yet. That's the single biggest structural difference from the PDQI (the PE/
-growth sibling of this model): PDQI weights realized financial trajectory at
-25% because it's measurable and dominant; PSTS can't do that honestly this
+yet. That's the single biggest structural difference from the NDQI (the PE/
+growth sibling of this model): NDQI weights realized financial trajectory at
+25% because it's measurable and dominant; NSTS can't do that honestly this
 early, so it shifts that weight onto team and market, the two things that
 *do* have signal before revenue does. P3 (traction) is weighted 20% because
 early metrics — while noisy (see §8) — are still the closest thing to
@@ -106,7 +106,7 @@ and the most forgiving confidence treatment (§6).
 
 ## 3. Score bands
 
-| PSTS | Tier | Action |
+| NSTS | Tier | Action |
 |---|---|---|
 | 80–100 | **Fast-track to partner meeting** | Prioritize; get this in front of a decision-maker this week |
 | 65–79 | **Strong — proceed to diligence** | Open a data room, start reference calls |
@@ -199,10 +199,10 @@ stage-specific.** Sustained >15% MoM is exceptional and 5–10% is solid *for
 an early-stage company* — a mature, $50M-revenue business growing 10% a
 *month* would be one of the fastest-growing companies in the world and
 something has probably gone wrong with the input data. That mismatch is
-exactly why this is a separate model from the PDQI rather than a re-skin of
-it: PDQI's P1a anchors a 15% *annual* CAGR at a similar score-band position.
-Never port PSTS's growth anchors onto a company with an established,
-multi-year financial history — use the PDQI for that company instead (see
+exactly why this is a separate model from the NDQI rather than a re-skin of
+it: NDQI's P1a anchors a 15% *annual* CAGR at a similar score-band position.
+Never port NSTS's growth anchors onto a company with an established,
+multi-year financial history — use the NDQI for that company instead (see
 `private-equity-analysis/reference/algorithm.md` §8).
 
 **Retention/cohort quality (b)** is arguably the single highest-signal number
@@ -223,7 +223,7 @@ P4 = likertToScore(differentiationRubric)
 ```
 
 This is framed specifically for **pre-revenue technical differentiation** —
-unlike the PDQI's competitive-moat rubric (P3c there), which averages four
+unlike the NDQI's competitive-moat rubric (P3c there), which averages four
 sub-ratings (switching costs, IP, network effects, brand/regulatory) because
 an established business has all four to evaluate, an early-stage company
 usually only has one or two of those yet. Rate what actually exists today —
@@ -279,8 +279,8 @@ company's stage (e.g. valuation ÷ ARR for revenue-stage companies, or
 whatever multiple convention is normal for the round type) and
 **`stageBenchmarkMultiple`** is the going market rate for that stage/sector —
 this needs to be sourced (recent comparable rounds), same caveat as the
-PDQI's sector-comp inputs in §8. The formula's baseline-at-70-for-fair-price
-logic is deliberately identical to the PDQI's P2a entry-multiple formula:
+NDQI's sector-comp inputs in §8. The formula's baseline-at-70-for-fair-price
+logic is deliberately identical to the NDQI's P2a entry-multiple formula:
 pricing exactly at the going rate is fair, not exceptional, and every 10%
 paid above benchmark costs 10 points.
 
@@ -411,7 +411,7 @@ completeness = 1 − (missingCount / totalRequiredFields)
 completeness than PE/growth deals — this is expected and is not a flaw in the
 target company.** A pre-seed company simply hasn't existed long enough to
 generate the documented history a Series C company has. Don't read a Medium
-or Low confidence PSTS score as "this founder is hiding something" by
+or Low confidence NSTS score as "this founder is hiding something" by
 default — it usually just means "this company is early," which is the entire
 premise of investing at this stage. Only treat missing data as a real
 yellow flag when the specific missing item is something a company at *that*
@@ -477,11 +477,11 @@ P6: premiumPct = (18-15)/15 = 0.20 → a = clamp(70-20,0,100) = 50.0
     ratio = 12/10 = 1.2 → c = lerp(1.2, [1.0,85]→[1.25,100]) = 85 + (1.2-1.0)/(1.25-1.0)×15 = 97.0
 P6 = 0.40(50.0) + 0.35(80.0) + 0.25(97.0) = 20.0 + 28.0 + 24.25 = 72.25
 
-PSTS = 0.25(80.0) + 0.20(83.4) + 0.20(71.75) + 0.15(60.0) + 0.10(80.5) + 0.10(72.25)
+NSTS = 0.25(80.0) + 0.20(83.4) + 0.20(71.75) + 0.15(60.0) + 0.10(80.5) + 0.10(72.25)
      = 20.0 + 16.69 + 14.35 + 9.0 + 8.05 + 7.23 = 75.3
 ```
 
-**Result: PSTS 75.3 — Strong, proceed to diligence.**
+**Result: NSTS 75.3 — Strong, proceed to diligence.**
 
 > Verification note: these numbers were checked against
 > `node scripts/score.js scripts/example-input.json` and match the script's
@@ -505,7 +505,7 @@ the deal from "Strong" toward "Fast-track" at a slightly better price.
 - **This model cannot detect founder fraud or misrepresentation.** It scores
   what's presented — a founder who fabricates traction numbers or overstates
   domain expertise will score well on exactly the metrics they lied about.
-  PSTS is not a diligence substitute for reference calls, data-room
+  NSTS is not a diligence substitute for reference calls, data-room
   verification, or checking retention numbers against raw underlying data.
 - **Traction metrics for a very young company are extremely noisy.** A
   6-month-old company's MoM growth rate can legitimately swing 20+ points
@@ -528,9 +528,9 @@ the deal from "Strong" toward "Fast-track" at a slightly better price.
   and burn profile. Don't force those companies through this model's anchors
   — build a separate deep-tech-specific variant with its own milestone-based
   P3/P5 anchors, the same way this model itself was built as a separate
-  sibling to the PDQI rather than a re-skin of it.
+  sibling to the NDQI rather than a re-skin of it.
 - **Sector/stage benchmarks (P2's TAM read, P6's ask multiple and option-pool
-  benchmarks) must be sourced and dated**, same caveat as the PDQI's sector
+  benchmarks) must be sourced and dated**, same caveat as the NDQI's sector
   comps — a stale benchmark set will silently bias P2 and P6 in either
   direction.
 - **The model rewards clean, well-documented pitches**, and early-stage
@@ -546,5 +546,5 @@ the deal from "Strong" toward "Fast-track" at a slightly better price.
 
 Any change to a weight, formula, or anchor value is a version bump with an
 entry here — the whole point of a proprietary, named algorithm is that
-"PSTS 75" means the same thing every time it's quoted. Silent tuning defeats
+"NSTS 75" means the same thing every time it's quoted. Silent tuning defeats
 that.

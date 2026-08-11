@@ -1,4 +1,4 @@
-# Prabhakar Deal Quality Index (PDQI) — v1.0
+# Nishant Deal Quality Index (NDQI) — v1.0
 
 **Proprietary scoring methodology for private equity and growth-investment
 screening, developed by Nishant Prabhakar.**
@@ -11,14 +11,14 @@ is correct and the script has a bug.
 Named in the tradition of other analyst-attributed scoring models (the Altman
 Z-Score, the Piotroski F-Score) — the point of putting a name on a model is
 that the name becomes shorthand for a specific, checkable methodology, not a
-vibe. "PDQI 74" should mean the same thing regardless of who's asking or who's
+vibe. "NDQI 74" should mean the same thing regardless of who's asking or who's
 answering.
 
 ---
 
 ## 1. Purpose and positioning
 
-The PDQI is a **screening and triage tool**, not a substitute for full diligence. It
+The NDQI is a **screening and triage tool**, not a substitute for full diligence. It
 exists to do three things quickly and consistently across a deal pipeline:
 
 1. Convert a messy pile of deck claims, a financial model, and diligence notes into
@@ -33,9 +33,9 @@ It is deliberately **not** a black box: every sub-score is a named, auditable
 formula against a named input. If an input is unknown, the algorithm says so and
 degrades its confidence rating rather than guessing silently.
 
-**What the PDQI is not**: a valuation model, an IRR/MOIC forecaster, or a legal risk
+**What the NDQI is not**: a valuation model, an IRR/MOIC forecaster, or a legal risk
 assessment. It scores the *investment case*, not the deal's cash flows. Run a real
-LBO/DCF model in parallel — the PDQI tells you whether it's worth building one.
+LBO/DCF model in parallel — the NDQI tells you whether it's worth building one.
 
 ---
 
@@ -53,7 +53,7 @@ Six weighted pillars, each scored 0–100, rolled into one composite:
 | P6. Risk Factors | 10% | What's the one thing that blows this up? |
 
 ```
-PDQI = 0.25·P1 + 0.20·P2 + 0.20·P3 + 0.15·P4 + 0.10·P5 + 0.10·P6
+NDQI = 0.25·P1 + 0.20·P2 + 0.20·P3 + 0.15·P4 + 0.10·P5 + 0.10·P6
 ```
 
 **Weighting rationale**: P1 and P2 together are 45% of the score by design — a
@@ -70,7 +70,7 @@ into a great outcome five years out.
 
 ## 3. Score bands
 
-| PDQI | Tier | Action |
+| NDQI | Tier | Action |
 |---|---|---|
 | 80–100 | **Strong** | Pursue aggressively; fast-track to IC |
 | 65–79 | **Attractive** | Proceed to deep diligence |
@@ -284,16 +284,16 @@ P5 = 0.60(70) + 0.40(80) = 74.0
 
 P6 = 100 (no risk flags triggered)
 
-PDQI = 0.25(73.0) + 0.20(68.4) + 0.20(67.7) + 0.15(75.0) + 0.10(74.0) + 0.10(100)
+NDQI = 0.25(73.0) + 0.20(68.4) + 0.20(67.7) + 0.15(75.0) + 0.10(74.0) + 0.10(100)
     = 18.2 + 13.7 + 13.5 + 11.3 + 7.4 + 10.0 = 74.1
 ```
 
-**Result: PDQI 74.1 — Attractive tier.** Proceed to deep diligence, with particular
+**Result: NDQI 74.1 — Attractive tier.** Proceed to deep diligence, with particular
 attention to succession planning (the one governance flag) and to whether the
 11.5x entry multiple has room to move — P2 (68.4) and P3 (67.7) are the two
 pillars with the most room to improve the score further; re-underwriting at a
 10.5x entry, for instance, would lift P2's entry-multiple sub-score from 57.3 to
-roughly 67 and the overall PDQI by about a point and a half.
+roughly 67 and the overall NDQI by about a point and a half.
 
 ---
 
@@ -321,5 +321,5 @@ roughly 67 and the overall PDQI by about a point and a half.
 | 1.0 | 2026-08-10 | Initial specification and reference implementation |
 
 Any change to a weight, formula, or anchor value is a version bump with an entry
-here — the whole point of a proprietary, named algorithm is that "PDQI 73" means
+here — the whole point of a proprietary, named algorithm is that "NDQI 73" means
 the same thing every time it's quoted. Silent tuning defeats that.

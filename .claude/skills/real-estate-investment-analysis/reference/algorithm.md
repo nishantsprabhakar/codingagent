@@ -1,4 +1,4 @@
-# Prabhakar Real Estate Investment Score (PREIS) — v1.0
+# Nishant Real Estate Investment Score (NREIS) — v1.0
 
 **Proprietary scoring methodology for commercial real estate acquisition
 screening, developed by Nishant Prabhakar.**
@@ -11,14 +11,14 @@ is correct and the script has a bug.
 Named in the tradition of other analyst-attributed scoring models (the Altman
 Z-Score, the Piotroski F-Score) — the point of putting a name on a model is
 that the name becomes shorthand for a specific, checkable methodology, not a
-vibe. "PREIS 77" should mean the same thing regardless of who's asking or who's
+vibe. "NREIS 77" should mean the same thing regardless of who's asking or who's
 answering.
 
 ---
 
 ## 1. Purpose and positioning
 
-The PREIS is a **screening and triage tool**, not an appraisal. It exists to do
+The NREIS is a **screening and triage tool**, not an appraisal. It exists to do
 three things quickly and consistently across a deal pipeline:
 
 1. Convert an offering memorandum, rent roll, comp set, and diligence notes into
@@ -34,11 +34,11 @@ It is deliberately **not** a black box: every sub-score is a named, auditable
 formula against a named input. If an input is unknown, the algorithm says so and
 degrades its confidence rating rather than guessing silently.
 
-**What the PREIS is not**: an appraisal, a substitute for a real third-party
+**What the NREIS is not**: an appraisal, a substitute for a real third-party
 valuation, or a substitute for a physical property condition inspection. It
 scores the *acquisition case* relative to comps and submarket data, not the
 building's true fair value or its actual structural condition. Commission a real
-appraisal and a property condition report in parallel — the PREIS tells you
+appraisal and a property condition report in parallel — the NREIS tells you
 whether it's worth commissioning them.
 
 ---
@@ -57,7 +57,7 @@ Six weighted pillars, each scored 0–100, rolled into one composite:
 | P6. Exit / Liquidity Risk | 10% | Can we actually sell this later, and did we underwrite the exit honestly? |
 
 ```
-PREIS = 0.25·P1 + 0.20·P2 + 0.20·P3 + 0.15·P4 + 0.10·P5 + 0.10·P6
+NREIS = 0.25·P1 + 0.20·P2 + 0.20·P3 + 0.15·P4 + 0.10·P5 + 0.10·P6
 ```
 
 **Weighting rationale**: P1 and P2 together are 45% of the score by design — a
@@ -77,7 +77,7 @@ good submarket actually converts into a good realized return.
 
 ## 3. Score bands / tiers
 
-| PREIS | Tier | Action |
+| NREIS | Tier | Action |
 |---|---|---|
 | 80–100 | **Core** | Pursue aggressively |
 | 65–79 | **Core-plus** | Attractive |
@@ -343,11 +343,11 @@ P6: a = likert(4) = 80
     b = lerp(25, [0→65, 50→85]) = 65 + (25/50)×20 = 75.0
 P6 = 0.55(80) + 0.45(75.0) = 44.0 + 33.75 = 77.8
 
-PREIS = 0.25(85.2) + 0.20(72.0) + 0.20(72.1) + 0.15(85.9) + 0.10(65.9) + 0.10(77.8)
+NREIS = 0.25(85.2) + 0.20(72.0) + 0.20(72.1) + 0.15(85.9) + 0.10(65.9) + 0.10(77.8)
      = 21.3 + 14.4 + 14.4 + 12.9 + 6.6 + 7.8 = 77.4
 ```
 
-**Result: PREIS 77.4 — Core-plus tier.** Attractive; proceed toward deep
+**Result: NREIS 77.4 — Core-plus tier.** Attractive; proceed toward deep
 diligence. The two pillars doing the most work here are P4 (physical asset
 quality, 85.9 — a well-maintained Class A box with light deferred capex and an
 efficiency certification) and P1 (income quality, 85.2 — a wide cap-rate spread
@@ -403,5 +403,5 @@ re-running through `score.js` before going to committee.
 | 1.0 | 2026-08-10 | Initial specification and reference implementation |
 
 Any change to a weight, formula, or anchor value is a version bump with an entry
-here — the whole point of a proprietary, named algorithm is that "PREIS 77" means
+here — the whole point of a proprietary, named algorithm is that "NREIS 77" means
 the same thing every time it's quoted. Silent tuning defeats that.

@@ -1,11 +1,11 @@
 ---
 name: private-equity-analysis
-description: Screen and score private equity / growth-investment deals using the proprietary Prabhakar Deal Quality Index (PDQI) — a six-pillar, weighted algorithm covering financial trajectory, valuation/deal terms, market position, management/governance, growth/exit potential, and risk factors. Use whenever the user asks to evaluate, score, screen, or write an investment memo for a PE/VC/growth-equity deal, portfolio company, or target company — including from a pitch deck, financial model, CIM, or data-room documents. Also use for comparing multiple deals, sensitivity-testing entry price/terms, or explaining why a deal scored the way it did. Trigger phrases include "score this deal", "evaluate this investment", "is this a good deal", "PDQI", "deal quality index", "run the PE algorithm", "investment memo", "screen this company".
+description: Screen and score private equity / growth-investment deals using the proprietary Nishant Deal Quality Index (NDQI) — a six-pillar, weighted algorithm covering financial trajectory, valuation/deal terms, market position, management/governance, growth/exit potential, and risk factors. Use whenever the user asks to evaluate, score, screen, or write an investment memo for a PE/VC/growth-equity deal, portfolio company, or target company — including from a pitch deck, financial model, CIM, or data-room documents. Also use for comparing multiple deals, sensitivity-testing entry price/terms, or explaining why a deal scored the way it did. Trigger phrases include "score this deal", "evaluate this investment", "is this a good deal", "NDQI", "deal quality index", "run the PE algorithm", "investment memo", "screen this company".
 ---
 
-# Private Equity Deal Screening — PDQI
+# Private Equity Deal Screening — NDQI
 
-This skill applies the **Prabhakar Deal Quality Index (PDQI)**, a proprietary
+This skill applies the **Nishant Deal Quality Index (NDQI)**, a proprietary
 six-pillar scoring algorithm developed by Nishant Prabhakar, to screen private
 equity / growth-investment opportunities. Full methodology:
 `reference/algorithm.md`. Reference
@@ -63,7 +63,7 @@ description of the company and deal terms typed into chat.
    produces the silent one-point drift the whole point of a named algorithm is
    meant to prevent.
 
-3. **Report the result.** Lead with the PDQI, tier, and confidence level, then
+3. **Report the result.** Lead with the NDQI, tier, and confidence level, then
    walk through the two or three pillars that moved the score most (both up
    and down) — that's more useful to the reader than restating every
    sub-score. If confidence is Medium or Low, say plainly what's missing and
@@ -79,7 +79,7 @@ description of the company and deal terms typed into chat.
 Unless the user asks for something else, structure the report as:
 
 ```
-## [Company name] — PDQI: <score> (<Tier>, <confidence> confidence)
+## [Company name] — NDQI: <score> (<Tier>, <confidence> confidence)
 
 **One-line take:** <what's driving this — the single biggest factor>
 
@@ -102,7 +102,7 @@ Unless the user asks for something else, structure the report as:
 
 This is the first entry in what's meant to become a library of niche-specific
 skills (`.claude/skills/README.md` is the index). If you're asked to adapt the
-PDQI for a different investment style (e.g. early-stage VC, real estate, credit),
+NDQI for a different investment style (e.g. early-stage VC, real estate, credit),
 don't overwrite this one — copy the folder, rename it, and re-derive the
 pillar weights/anchors for that niche's actual risk/return drivers rather than
 reusing PE anchors that don't fit (pre-revenue VC deals in particular will

@@ -1,5 +1,5 @@
 {
-  "_comment": "Matches the worked example in reference/algorithm.md section 7 — a Phase 2 targeted small-molecule oncology asset. Run `node score.js example-input.json` to reproduce the PAVS exactly.",
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — a Phase 2 targeted small-molecule oncology asset. Run `node score.js example-input.json` to reproduce the NAVS exactly.",
   "clinical": {
     "developmentStage": "phase2",
     "modalityPrecedent": "well_precedented"

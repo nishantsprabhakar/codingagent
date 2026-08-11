@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prabhakar India Macro Regime Index (PIMRI) — reference implementation, v1.0.
+ * Nishant India Macro Regime Index (NIMRI) — reference implementation, v1.0.
  * Developed by Nishant Prabhakar.
  *
  * This is a literal implementation of reference/algorithm.md. If you change a
@@ -20,7 +20,7 @@
 
 const fs = require("fs");
 
-const ALGORITHM_NAME = "Prabhakar India Macro Regime Index (PIMRI)";
+const ALGORITHM_NAME = "Nishant India Macro Regime Index (NIMRI)";
 const ALGORITHM_VERSION = "1.0";
 
 function clamp(x, lo, hi) {
@@ -321,11 +321,11 @@ const REGIME_TILTS = {
     "Capital preservation: maximum defensive posture — gold, cash, and sovereign duration overweight; minimal equity exposure; consider INR hedges on residual foreign-asset exposure.",
 };
 
-function regimeFor(pimri) {
-  if (pimri >= 80) return "Expansion / Goldilocks";
-  if (pimri >= 65) return "Moderate Growth / Balanced Expansion";
-  if (pimri >= 50) return "Slowdown / Caution";
-  if (pimri >= 30) return "Stress / Contraction";
+function regimeFor(nimri) {
+  if (nimri >= 80) return "Expansion / Goldilocks";
+  if (nimri >= 65) return "Moderate Growth / Balanced Expansion";
+  if (nimri >= 50) return "Slowdown / Caution";
+  if (nimri >= 30) return "Stress / Contraction";
   return "Crisis / Deep Contraction";
 }
 
@@ -344,7 +344,7 @@ function computeScore(input) {
   const p5 = scoreP5(input, missing);
   const p6 = scoreP6(input, missing);
 
-  const pimri =
+  const nimri =
     PILLAR_WEIGHTS.p1 * p1.score +
     PILLAR_WEIGHTS.p2 * p2.score +
     PILLAR_WEIGHTS.p3 * p3.score +
@@ -355,12 +355,12 @@ function computeScore(input) {
   const explicitlyMissing = REQUIRED_FIELDS.filter((f) => MISSING.has(getByPath(input, f)));
   const completeness = 1 - explicitlyMissing.length / REQUIRED_FIELDS.length;
 
-  const regime = regimeFor(pimri);
+  const regime = regimeFor(nimri);
 
   return {
     algorithm: ALGORITHM_NAME,
     version: ALGORITHM_VERSION,
-    pimri: Math.round(pimri * 10) / 10,
+    nimri: Math.round(nimri * 10) / 10,
     regime,
     assetAllocationTilt: REGIME_TILTS[regime],
     confidence: confidenceFor(completeness),
@@ -381,7 +381,7 @@ function printHumanReadable(result) {
   const lines = [];
   lines.push(`${result.algorithm} v${result.version}`);
   lines.push(
-    `PIMRI: ${result.pimri} — ${result.regime} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`
+    `NIMRI: ${result.nimri} — ${result.regime} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`
   );
   lines.push(`Tilt: ${result.assetAllocationTilt}`);
   lines.push("");

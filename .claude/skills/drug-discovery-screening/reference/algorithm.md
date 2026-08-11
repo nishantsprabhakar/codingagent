@@ -1,4 +1,4 @@
-# Prabhakar Asset Viability Score (PAVS) — v1.0
+# Nishant Asset Viability Score (NAVS) — v1.0
 
 **Proprietary scoring methodology for drug discovery / pharma pipeline asset
 screening, developed by Nishant Prabhakar.**
@@ -11,14 +11,14 @@ is correct and the script has a bug.
 Named in the tradition of other analyst-attributed scoring models (the Altman
 Z-Score, the Piotroski F-Score) — the point of putting a name on a model is
 that the name becomes shorthand for a specific, checkable methodology, not a
-vibe. "PAVS 64" should mean the same thing regardless of who's asking or who's
+vibe. "NAVS 64" should mean the same thing regardless of who's asking or who's
 answering.
 
 ---
 
 ## 1. Purpose and positioning
 
-The PAVS is a **screening and prioritization tool**, not a substitute for full
+The NAVS is a **screening and prioritization tool**, not a substitute for full
 clinical or regulatory diligence. It exists to do three things quickly and
 consistently across a pipeline:
 
@@ -36,14 +36,14 @@ It is deliberately **not** a black box: every sub-score is a named, auditable
 formula against a named input. If an input is unknown, the algorithm says so
 and degrades its confidence rating rather than guessing silently.
 
-**What the PAVS is not**: it is not a substitute for full clinical or
+**What the NAVS is not**: it is not a substitute for full clinical or
 regulatory diligence, not a clinical trial design tool, and not a
 probability-of-technical-and-regulatory-success (PTRS) model calibrated to a
 specific therapeutic area's real transition data — it uses aggregate
 cross-industry base rates (§4, P1) as a starting anchor, not a bespoke
 forecast. It scores the *asset's current evidence package*, not the trial
 that should be run next. Run real biostatistics, a formal PTRS model, and
-outside medical/regulatory review in parallel — the PAVS tells you which
+outside medical/regulatory review in parallel — the NAVS tells you which
 assets are worth spending that review budget on first.
 
 ---
@@ -62,7 +62,7 @@ Six weighted pillars, each scored 0–100, rolled into one composite:
 | P6. Regulatory & IP Risk | 10% | What could take the exclusivity or the pathway away? |
 
 ```
-PAVS = 0.25·P1 + 0.20·P2 + 0.15·P3 + 0.15·P4 + 0.15·P5 + 0.10·P6
+NAVS = 0.25·P1 + 0.20·P2 + 0.15·P3 + 0.15·P4 + 0.15·P5 + 0.10·P6
 ```
 
 **Weighting rationale**: P1 and P2 together are 45% of the score by design —
@@ -84,7 +84,7 @@ weight.
 
 ## 3. Score bands
 
-| PAVS | Tier | Action |
+| NAVS | Tier | Action |
 |---|---|---|
 | 80–100 | **Fast-track** | Prioritize resourcing; accelerate to next milestone |
 | 65–79 | **Advance** | Continue on current development plan |
@@ -351,11 +351,11 @@ P6: designationBonus = min(30, 2×10) = 20
     ipPenalty = 0
     P6 = clamp(60 + 20 + 0 − 0, 0, 100) = 80.0
 
-PAVS = 0.25(39.0) + 0.20(70.0) + 0.15(67.0) + 0.15(80.0) + 0.15(69.3) + 0.10(80.0)
+NAVS = 0.25(39.0) + 0.20(70.0) + 0.15(67.0) + 0.15(80.0) + 0.15(69.3) + 0.10(80.0)
      = 9.75 + 14.0 + 10.05 + 12.0 + 10.4 + 8.0 = 64.2
 ```
 
-**Result: PAVS 64.2 — Monitor tier**, High confidence (100% complete). The
+**Result: NAVS 64.2 — Monitor tier**, High confidence (100% complete). The
 asset is one pillar away from Advance (65): P1 (39.0) is the clear drag,
 driven almost entirely by the Phase 2 base rate itself rather than anything
 asset-specific — that is the pillar to watch closely at the next readout, and
@@ -413,5 +413,5 @@ Phase 3.
 | 1.0 | 2026-08-10 | Initial specification and reference implementation |
 
 Any change to a weight, formula, or anchor value is a version bump with an
-entry here — the whole point of a proprietary, named algorithm is that "PAVS
+entry here — the whole point of a proprietary, named algorithm is that "NAVS
 64" means the same thing every time it's quoted. Silent tuning defeats that.

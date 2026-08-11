@@ -1,11 +1,11 @@
 ---
 name: public-markets-equity-analysis
-description: Screen and rank listed/public equities using the proprietary Prabhakar Equity Signal Score (PESS) — a six-pillar, weighted cross-sectional algorithm covering valuation, quality, growth, momentum, ownership/sentiment, and risk/red flags, scored by percentile rank against a sector peer universe. Use whenever the user asks to score, screen, or rank a public stock or a list of stocks — including "score this stock", "screen this equity", "PESS", "equity signal score", "is this a good stock to buy", "rank these stocks", "public markets screening", "run the PESS algorithm", comparing tickers, building a watchlist, or explaining why a stock scored the way it did.
+description: Screen and rank listed/public equities using the proprietary Nishant Equity Signal Score (NESS) — a six-pillar, weighted cross-sectional algorithm covering valuation, quality, growth, momentum, ownership/sentiment, and risk/red flags, scored by percentile rank against a sector peer universe. Use whenever the user asks to score, screen, or rank a public stock or a list of stocks — including "score this stock", "screen this equity", "NESS", "equity signal score", "is this a good stock to buy", "rank these stocks", "public markets screening", "run the NESS algorithm", comparing tickers, building a watchlist, or explaining why a stock scored the way it did.
 ---
 
-# Public Markets Equity Screening — PESS
+# Public Markets Equity Screening — NESS
 
-This skill applies the **Prabhakar Equity Signal Score (PESS)**, a
+This skill applies the **Nishant Equity Signal Score (NESS)**, a
 proprietary six-pillar cross-sectional scoring algorithm developed by
 Nishant Prabhakar, to screen and rank listed-equity opportunities against a
 peer/sector universe. Full methodology: `reference/algorithm.md`. Reference
@@ -72,7 +72,7 @@ watchlist, or explaining which factor is driving a stock's score.
    that produces silent drift the whole point of a named algorithm is meant
    to prevent.
 
-3. **Report the result.** Lead with the PESS, tier, and confidence level,
+3. **Report the result.** Lead with the NESS, tier, and confidence level,
    then walk through the two or three pillars that moved the score most
    (both up and down) — that's more useful to the reader than restating
    every sub-score. If confidence is Medium or Low, say plainly what's
@@ -89,7 +89,7 @@ watchlist, or explaining which factor is driving a stock's score.
 Unless the user asks for something else, structure the report as:
 
 ```
-## [Ticker/company] — PESS: <score> (<Tier>, <confidence> confidence)
+## [Ticker/company] — NESS: <score> (<Tier>, <confidence> confidence)
 
 **One-line take:** <what's driving this — the single biggest factor>
 
@@ -113,7 +113,7 @@ call, or investment advice.
 ## Extending this skill
 
 This is one entry in a library of niche-specific skills
-(`.claude/skills/README.md` is the index). If asked to adapt the PESS for a
+(`.claude/skills/README.md` is the index). If asked to adapt the NESS for a
 different equity style (e.g. small-cap/illiquid names, emerging-markets
 equities, fixed income), don't overwrite this one — copy the folder, rename
 it, and re-derive the pillar weights/anchors for that niche's actual

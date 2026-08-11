@@ -1,5 +1,5 @@
 {
-  "_comment": "Matches the worked example in reference/algorithm.md section 7 — Class A single-tenant industrial/logistics acquisition. Run node score.js example-input.json to reproduce the exact PREIS and tier.",
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — Class A single-tenant industrial/logistics acquisition. Run node score.js example-input.json to reproduce the exact NREIS and tier.",
   "income": {
     "dealCapRatePct": 6.25,
     "submarketMedianCapRatePct": 5.75,

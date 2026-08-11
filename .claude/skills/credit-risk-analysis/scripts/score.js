@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prabhakar Credit Risk Score (PCRS) — reference implementation, v1.0.
+ * Nishant Credit Risk Score (NCRS) — reference implementation, v1.0.
  * Developed by Nishant Prabhakar.
  *
  * This is a literal implementation of reference/algorithm.md. If you change a
@@ -20,7 +20,7 @@
 
 const fs = require("fs");
 
-const ALGORITHM_NAME = "Prabhakar Credit Risk Score (PCRS)";
+const ALGORITHM_NAME = "Nishant Credit Risk Score (NCRS)";
 const ALGORITHM_VERSION = "1.0";
 
 function clamp(x, lo, hi) {
@@ -272,7 +272,7 @@ function computeScore(input) {
   const p5 = scoreP5(input, missing);
   const p6 = scoreP6(input, missing);
 
-  const pcrs =
+  const ncrs =
     PILLAR_WEIGHTS.p1 * p1.score +
     PILLAR_WEIGHTS.p2 * p2.score +
     PILLAR_WEIGHTS.p3 * p3.score +
@@ -298,12 +298,12 @@ function computeScore(input) {
   }
 
   const completeness = 1 - explicitlyMissing.length / totalRequiredFields;
-  const rating = ratingBandFor(pcrs);
+  const rating = ratingBandFor(ncrs);
 
   return {
     algorithm: ALGORITHM_NAME,
     version: ALGORITHM_VERSION,
-    pcrs: Math.round(pcrs * 10) / 10,
+    ncrs: Math.round(ncrs * 10) / 10,
     ratingBand: rating.band,
     indicativeSpreadBpsOverRiskFree: rating.indicativeSpreadBpsOverRiskFree,
     confidence: confidenceFor(completeness),
@@ -324,7 +324,7 @@ function printHumanReadable(result) {
   const lines = [];
   lines.push(`${result.algorithm} v${result.version}`);
   lines.push(
-    `PCRS: ${result.pcrs} — ${result.ratingBand} (indicative spread: +${result.indicativeSpreadBpsOverRiskFree} bps over risk-free benchmark; confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`
+    `NCRS: ${result.ncrs} — ${result.ratingBand} (indicative spread: +${result.indicativeSpreadBpsOverRiskFree} bps over risk-free benchmark; confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`
   );
   lines.push("");
   for (const [key, pillar] of Object.entries(result.pillars)) {

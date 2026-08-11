@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prabhakar Startup Traction Score (PSTS) — reference implementation, v1.0.
+ * Nishant Startup Traction Score (NSTS) — reference implementation, v1.0.
  * Developed by Nishant Prabhakar.
  *
  * This is a literal implementation of reference/algorithm.md. If you change a
@@ -20,7 +20,7 @@
 
 const fs = require("fs");
 
-const ALGORITHM_NAME = "Prabhakar Startup Traction Score (PSTS)";
+const ALGORITHM_NAME = "Nishant Startup Traction Score (NSTS)";
 const ALGORITHM_VERSION = "1.0";
 
 function clamp(x, lo, hi) {
@@ -235,11 +235,11 @@ function getByPath(obj, path) {
   return path.split(".").reduce((v, p) => (v == null ? undefined : v[p]), obj);
 }
 
-function tierFor(psts) {
-  if (psts >= 80) return "Fast-track to partner meeting";
-  if (psts >= 65) return "Strong — proceed to diligence";
-  if (psts >= 50) return "Promising — needs one more data point";
-  if (psts >= 35) return "Pass for now — revisit at next milestone";
+function tierFor(nsts) {
+  if (nsts >= 80) return "Fast-track to partner meeting";
+  if (nsts >= 65) return "Strong — proceed to diligence";
+  if (nsts >= 50) return "Promising — needs one more data point";
+  if (nsts >= 35) return "Pass for now — revisit at next milestone";
   return "Pass";
 }
 
@@ -260,7 +260,7 @@ function computeScore(input) {
   const p5 = scoreP5(input, missing, unitEconDataAvailable);
   const p6 = scoreP6(input, missing);
 
-  const psts =
+  const nsts =
     PILLAR_WEIGHTS.p1 * p1.score +
     PILLAR_WEIGHTS.p2 * p2.score +
     PILLAR_WEIGHTS.p3 * p3.score +
@@ -278,8 +278,8 @@ function computeScore(input) {
   return {
     algorithm: ALGORITHM_NAME,
     version: ALGORITHM_VERSION,
-    psts: Math.round(psts * 10) / 10,
-    tier: tierFor(psts),
+    nsts: Math.round(nsts * 10) / 10,
+    tier: tierFor(nsts),
     confidence: confidenceFor(completeness),
     completeness: Math.round(completeness * 100) / 100,
     unitEconomicsDataAvailable: unitEconDataAvailable,
@@ -299,7 +299,7 @@ function printHumanReadable(result) {
   const lines = [];
   lines.push(`${result.algorithm} v${result.version}`);
   lines.push(
-    `PSTS: ${result.psts} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`
+    `NSTS: ${result.nsts} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`
   );
   if (!result.unitEconomicsDataAvailable) {
     lines.push("Note: unit economics marked not-yet-applicable (pre-revenue) — P5 scored neutral, excluded from completeness denominator.");

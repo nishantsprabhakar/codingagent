@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prabhakar Asset Viability Score (PAVS) — reference implementation, v1.0.
+ * Nishant Asset Viability Score (NAVS) — reference implementation, v1.0.
  * Developed by Nishant Prabhakar.
  *
  * This is a literal implementation of reference/algorithm.md. If you change a
@@ -20,7 +20,7 @@
 
 const fs = require("fs");
 
-const ALGORITHM_NAME = "Prabhakar Asset Viability Score (PAVS)";
+const ALGORITHM_NAME = "Nishant Asset Viability Score (NAVS)";
 const ALGORITHM_VERSION = "1.0";
 
 function clamp(x, lo, hi) {
@@ -246,11 +246,11 @@ function getByPath(obj, path) {
   return path.split(".").reduce((v, p) => (v == null ? undefined : v[p]), obj);
 }
 
-function tierFor(pavs) {
-  if (pavs >= 80) return "Fast-track";
-  if (pavs >= 65) return "Advance";
-  if (pavs >= 50) return "Monitor";
-  if (pavs >= 35) return "Deprioritize";
+function tierFor(navs) {
+  if (navs >= 80) return "Fast-track";
+  if (navs >= 65) return "Advance";
+  if (navs >= 50) return "Monitor";
+  if (navs >= 35) return "Deprioritize";
   return "Discontinue";
 }
 
@@ -269,7 +269,7 @@ function computeScore(input) {
   const p5 = scoreP5(input, missing);
   const p6 = scoreP6(input, missing);
 
-  const pavs =
+  const navs =
     PILLAR_WEIGHTS.p1 * p1.score +
     PILLAR_WEIGHTS.p2 * p2.score +
     PILLAR_WEIGHTS.p3 * p3.score +
@@ -283,8 +283,8 @@ function computeScore(input) {
   return {
     algorithm: ALGORITHM_NAME,
     version: ALGORITHM_VERSION,
-    pavs: Math.round(pavs * 10) / 10,
-    tier: tierFor(pavs),
+    navs: Math.round(navs * 10) / 10,
+    tier: tierFor(navs),
     confidence: confidenceFor(completeness),
     completeness: Math.round(completeness * 100) / 100,
     pillars: {
@@ -302,7 +302,7 @@ function computeScore(input) {
 function printHumanReadable(result) {
   const lines = [];
   lines.push(`${result.algorithm} v${result.version}`);
-  lines.push(`PAVS: ${result.pavs} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`);
+  lines.push(`NAVS: ${result.navs} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`);
   lines.push("");
   for (const [key, pillar] of Object.entries(result.pillars)) {
     lines.push(`${key}  weight=${pillar.weight}  score=${Math.round(pillar.score * 10) / 10}`);

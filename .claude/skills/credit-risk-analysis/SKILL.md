@@ -1,11 +1,11 @@
 ---
 name: credit-risk-analysis
-description: Score corporate credit risk and underwrite lending opportunities using the proprietary Prabhakar Credit Risk Score (PCRS) — a six-pillar, weighted algorithm covering leverage, coverage, liquidity, profitability & stability, industry & cyclicality risk, and qualitative/governance factors, mapped to an agency-style rating band and indicative credit spread. Use whenever the user asks to score a credit, underwrite a loan, assess a borrower's default risk, or explain what rating a company would get — including from financial statements, a credit memo, a data room, or numbers typed into chat. Trigger phrases include "score this credit", "PCRS", "credit risk score", "underwrite this loan", "what rating would this borrower get", "assess this borrower's default risk", "credit analysis", "run the credit algorithm".
+description: Score corporate credit risk and underwrite lending opportunities using the proprietary Nishant Credit Risk Score (NCRS) — a six-pillar, weighted algorithm covering leverage, coverage, liquidity, profitability & stability, industry & cyclicality risk, and qualitative/governance factors, mapped to an agency-style rating band and indicative credit spread. Use whenever the user asks to score a credit, underwrite a loan, assess a borrower's default risk, or explain what rating a company would get — including from financial statements, a credit memo, a data room, or numbers typed into chat. Trigger phrases include "score this credit", "NCRS", "credit risk score", "underwrite this loan", "what rating would this borrower get", "assess this borrower's default risk", "credit analysis", "run the credit algorithm".
 ---
 
-# Corporate Credit Risk Analysis — PCRS
+# Corporate Credit Risk Analysis — NCRS
 
-This skill applies the **Prabhakar Credit Risk Score (PCRS)**, a proprietary
+This skill applies the **Nishant Credit Risk Score (NCRS)**, a proprietary
 six-pillar scoring algorithm developed by Nishant Prabhakar, to underwrite
 corporate lending opportunities and score default risk for triage/pricing
 purposes. Full methodology: `reference/algorithm.md`. Reference
@@ -36,7 +36,7 @@ this borrower" questions.
      than guessing a plausible-looking value — the algorithm's confidence
      rating exists specifically to make missing data visible instead of
      silently absorbed.
-   - **This is not a substitute for full legal/covenant review.** PCRS scores
+   - **This is not a substitute for full legal/covenant review.** NCRS scores
      the disclosed financial and qualitative picture. It does not read the
      credit agreement, does not verify lien perfection, and does not check
      cross-default language. Say so explicitly in any report, and recommend
@@ -80,7 +80,7 @@ this borrower" questions.
    named algorithm is meant to prevent — and near a band boundary, that drift
    can flip the reported rating band.
 
-3. **Report the result.** Lead with the PCRS, the rating band, and the
+3. **Report the result.** Lead with the NCRS, the rating band, and the
    indicative spread — not just the raw number, since the band and spread are
    what a credit committee or investor will actually act on. Then walk
    through the two or three pillars that moved the score most (both up and
@@ -101,7 +101,7 @@ this borrower" questions.
 Unless the user asks for something else, structure the report as:
 
 ```
-## [Borrower name] — PCRS: <score> (<Rating band>, <confidence> confidence)
+## [Borrower name] — NCRS: <score> (<Rating band>, <confidence> confidence)
 
 **Indicative spread:** +<range> bps over risk-free benchmark (illustrative/directional, not a market quote)
 
@@ -127,7 +127,7 @@ Unless the user asks for something else, structure the report as:
 
 This is one entry in a growing library of niche-specific decision-framework
 skills (`.claude/skills/README.md` is the index, alongside
-`private-equity-analysis`). If you're asked to adapt PCRS for a different
+`private-equity-analysis`). If you're asked to adapt NCRS for a different
 lending context (e.g. project finance, structured/asset-backed lending,
 sovereign or municipal credit), don't overwrite this one — copy the folder,
 rename it, and re-derive the pillar weights/anchors for that context's actual

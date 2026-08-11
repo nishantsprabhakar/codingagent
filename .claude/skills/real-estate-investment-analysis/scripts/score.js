@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prabhakar Real Estate Investment Score (PREIS) — reference implementation, v1.0.
+ * Nishant Real Estate Investment Score (NREIS) — reference implementation, v1.0.
  * Developed by Nishant Prabhakar.
  *
  * This is a literal implementation of reference/algorithm.md. If you change a
@@ -20,7 +20,7 @@
 
 const fs = require("fs");
 
-const ALGORITHM_NAME = "Prabhakar Real Estate Investment Score (PREIS)";
+const ALGORITHM_NAME = "Nishant Real Estate Investment Score (NREIS)";
 const ALGORITHM_VERSION = "1.0";
 
 function clamp(x, lo, hi) {
@@ -287,11 +287,11 @@ function getByPath(obj, path) {
   return path.split(".").reduce((v, p) => (v == null ? undefined : v[p]), obj);
 }
 
-function tierFor(preis) {
-  if (preis >= 80) return "Core — pursue aggressively";
-  if (preis >= 65) return "Core-plus — attractive";
-  if (preis >= 50) return "Value-add — proceed with plan";
-  if (preis >= 35) return "Opportunistic/high-risk — proceed only with strong mitigants";
+function tierFor(nreis) {
+  if (nreis >= 80) return "Core — pursue aggressively";
+  if (nreis >= 65) return "Core-plus — attractive";
+  if (nreis >= 50) return "Value-add — proceed with plan";
+  if (nreis >= 35) return "Opportunistic/high-risk — proceed only with strong mitigants";
   return "Pass";
 }
 
@@ -310,7 +310,7 @@ function computeScore(input) {
   const p5 = scoreP5(input, missing);
   const p6 = scoreP6(input, missing);
 
-  const preis =
+  const nreis =
     PILLAR_WEIGHTS.p1 * p1.score +
     PILLAR_WEIGHTS.p2 * p2.score +
     PILLAR_WEIGHTS.p3 * p3.score +
@@ -324,8 +324,8 @@ function computeScore(input) {
   return {
     algorithm: ALGORITHM_NAME,
     version: ALGORITHM_VERSION,
-    preis: Math.round(preis * 10) / 10,
-    tier: tierFor(preis),
+    nreis: Math.round(nreis * 10) / 10,
+    tier: tierFor(nreis),
     confidence: confidenceFor(completeness),
     completeness: Math.round(completeness * 100) / 100,
     pillars: {
@@ -343,7 +343,7 @@ function computeScore(input) {
 function printHumanReadable(result) {
   const lines = [];
   lines.push(`${result.algorithm} v${result.version}`);
-  lines.push(`PREIS: ${result.preis} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`);
+  lines.push(`NREIS: ${result.nreis} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`);
   lines.push("");
   for (const [key, pillar] of Object.entries(result.pillars)) {
     lines.push(`${key}  weight=${pillar.weight}  score=${Math.round(pillar.score * 10) / 10}`);

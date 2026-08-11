@@ -1,11 +1,11 @@
 ---
 name: drug-discovery-screening
-description: Screen and score drug discovery / pharma pipeline assets using the proprietary Prabhakar Asset Viability Score (PAVS) — a six-pillar, weighted algorithm covering clinical stage & historical probability of success, efficacy signal strength, safety/tolerability, target/mechanism validation, competitive & commercial position, and regulatory/IP risk. Use whenever the user asks to evaluate, score, screen, or prioritize a drug candidate, pipeline asset, clinical program, or biotech/pharma R&D program — including from trial readouts, IND/NDA filings, competitive-intelligence summaries, or a description typed into chat. Also use for comparing multiple pipeline assets, sensitivity-testing what data would move the tier, or explaining why an asset scored the way it did. Trigger phrases include "score this drug candidate", "evaluate this pipeline asset", "PAVS", "asset viability score", "screen this pharma program", "is this drug worth advancing", "pipeline prioritization", "run the PAVS algorithm".
+description: Screen and score drug discovery / pharma pipeline assets using the proprietary Nishant Asset Viability Score (NAVS) — a six-pillar, weighted algorithm covering clinical stage & historical probability of success, efficacy signal strength, safety/tolerability, target/mechanism validation, competitive & commercial position, and regulatory/IP risk. Use whenever the user asks to evaluate, score, screen, or prioritize a drug candidate, pipeline asset, clinical program, or biotech/pharma R&D program — including from trial readouts, IND/NDA filings, competitive-intelligence summaries, or a description typed into chat. Also use for comparing multiple pipeline assets, sensitivity-testing what data would move the tier, or explaining why an asset scored the way it did. Trigger phrases include "score this drug candidate", "evaluate this pipeline asset", "NAVS", "asset viability score", "screen this pharma program", "is this drug worth advancing", "pipeline prioritization", "run the NAVS algorithm".
 ---
 
-# Drug Discovery / Pharma Pipeline Screening — PAVS
+# Drug Discovery / Pharma Pipeline Screening — NAVS
 
-This skill applies the **Prabhakar Asset Viability Score (PAVS)**, a
+This skill applies the **Nishant Asset Viability Score (NAVS)**, a
 proprietary six-pillar scoring algorithm developed by Nishant Prabhakar, to
 screen drug discovery and pharma pipeline assets. Full methodology:
 `reference/algorithm.md`. Reference implementation: `scripts/score.js`. Read
@@ -66,7 +66,7 @@ into chat.
    produces the silent one-point drift the whole point of a named algorithm is
    meant to prevent.
 
-3. **Report the result.** Lead with the PAVS, tier, and confidence level, then
+3. **Report the result.** Lead with the NAVS, tier, and confidence level, then
    walk through the two or three pillars that moved the score most (both up
    and down) — that's more useful to the reader than restating every
    sub-score. If confidence is Medium or Low, say plainly what's missing and
@@ -83,7 +83,7 @@ into chat.
 Unless the user asks for something else, structure the report as:
 
 ```
-## [Asset/program name] — PAVS: <score> (<Tier>, <confidence> confidence)
+## [Asset/program name] — NAVS: <score> (<Tier>, <confidence> confidence)
 
 **One-line take:** <what's driving this — the single biggest factor>
 
@@ -105,7 +105,7 @@ Unless the user asks for something else, structure the report as:
 ## Extending this skill
 
 This is one entry in a growing library of niche-specific skills
-(`.claude/skills/README.md` is the index). If you're asked to adapt the PAVS
+(`.claude/skills/README.md` is the index). If you're asked to adapt the NAVS
 for a different screening context (e.g. medical-device pipeline, diagnostics,
 agtech biologics), don't overwrite this one — copy the folder, rename it, and
 re-derive the pillar weights/anchors for that niche's actual risk/return

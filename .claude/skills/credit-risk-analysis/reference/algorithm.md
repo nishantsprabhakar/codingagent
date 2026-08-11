@@ -1,4 +1,4 @@
-# Prabhakar Credit Risk Score (PCRS) — v1.0
+# Nishant Credit Risk Score (NCRS) — v1.0
 
 **Proprietary scoring methodology for corporate credit risk analysis and
 lending underwriting, developed by Nishant Prabhakar.**
@@ -11,11 +11,11 @@ is correct and the script has a bug.
 Named credit-scoring models have real precedent: the **Altman Z-Score** (1968)
 distilled five financial ratios into a single bankruptcy-prediction number
 that's still quoted by name fifty-plus years later, precisely because "Z-Score
-2.1" means the same specific, checkable thing every time it's cited. PCRS
+2.1" means the same specific, checkable thing every time it's cited. NCRS
 borrows that same discipline — six named, auditable pillars instead of one
 composite ratio — and borrows its output convention from **rating-agency
 scales** (AAA...D), which solved the adjacent problem of collapsing a dense
-credit file into a single comparable symbol decades ago. PCRS's leverage and
+credit file into a single comparable symbol decades ago. NCRS's leverage and
 coverage pillars (P1/P2) are philosophically the closest thing here to
 Altman's original leverage/liquidity ratios; the rest of the model extends
 that lineage to the qualitative and industry factors a five-ratio model from
@@ -25,7 +25,7 @@ that lineage to the qualitative and industry factors a five-ratio model from
 
 ## 1. Purpose and positioning
 
-The PCRS is a **triage and relative-ranking tool for underwriting and
+The NCRS is a **triage and relative-ranking tool for underwriting and
 pricing**, not a regulatory capital model and not a substitute for full
 covenant or legal review. It exists to do three things quickly and
 consistently across a lending pipeline:
@@ -42,17 +42,17 @@ It is deliberately **not** a black box: every sub-score is a named, auditable
 formula against a named input. If an input is unknown, the algorithm says so
 and degrades its confidence rating rather than guessing silently.
 
-**What the PCRS explicitly is not**:
+**What the NCRS explicitly is not**:
 
 - **Not a regulatory capital model.** It does not produce a Basel-compliant
   Probability of Default (PD) or Loss Given Default (LGD) estimate, is not
   calibrated against a regulatory default database, and should never be
   represented as such to a regulator, auditor, or rating agency.
-- **Not a substitute for full covenant or legal review.** PCRS scores what is
+- **Not a substitute for full covenant or legal review.** NCRS scores what is
   disclosed in the financials and diligence notes. It does not read credit
   agreements, does not verify collateral perfection, and does not check
   cross-default or MAC clause language. Run real legal/covenant diligence in
-  parallel — PCRS tells you whether the credit is worth that effort and at
+  parallel — NCRS tells you whether the credit is worth that effort and at
   roughly what price.
 - **Not a cash-flow or amortization forecaster.** It scores the *current
   credit profile*, not a projected repayment schedule. Build a real debt
@@ -75,7 +75,7 @@ Six weighted pillars, each scored 0–100, rolled into one composite:
 | P6. Qualitative & Governance | 15% | Is management credible, is the collateral real, and is anything being hidden? |
 
 ```
-PCRS = 0.25·P1 + 0.20·P2 + 0.15·P3 + 0.15·P4 + 0.10·P5 + 0.15·P6
+NCRS = 0.25·P1 + 0.20·P2 + 0.15·P3 + 0.15·P4 + 0.10·P5 + 0.15·P6
 ```
 
 **Weighting rationale**: Leverage and coverage together are 45% of the score
@@ -86,7 +86,7 @@ profitability/stability are real but slower-moving signals, weighted lower
 individually. Industry risk is weighted lowest of the quantitative-adjacent
 pillars because it is a base-rate adjustment, not a borrower-specific signal —
 but it still matters enough (10%) that a single-B commodity shipping company
-and a single-B regulated utility should not land at the same PCRS if
+and a single-B regulated utility should not land at the same NCRS if
 everything else about them looks identical. Qualitative & governance sits at
 15% because a governance red flag (undisclosed related-party dealing, a prior
 covenant breach) can invalidate the trustworthiness of every other pillar's
@@ -96,15 +96,15 @@ inputs, which is worth real weight even though it is the softest pillar.
 
 ## 3. Score bands — rating-agency-style mapping
 
-PCRS bands are mapped to a rating-agency-style scale for ease of
+NCRS bands are mapped to a rating-agency-style scale for ease of
 communication with credit committees and investors already fluent in that
 convention. **The basis-point spread ranges are illustrative and directional
 only — they are not a market quote, not a pricing commitment, and not
 calibrated to any specific benchmark curve, index, or day.** Always price
 off an actual market quote sheet; use these only to communicate roughly what
-tier of pricing a PCRS implies.
+tier of pricing a NCRS implies.
 
-| PCRS | Rating-agency-equivalent band | Indicative spread over risk-free benchmark* | Action |
+| NCRS | Rating-agency-equivalent band | Indicative spread over risk-free benchmark* | Action |
 |---|---|---|---|
 | 85–100 | **AAA/AA-equivalent** | +50 to +100 bps | Approve; price at the tight end of the book |
 | 70–84 | **A/BBB-equivalent (Investment Grade)** | +100 to +250 bps | Approve; standard IG covenant package |
@@ -145,7 +145,7 @@ P1 = 0.60a + 0.40b
 means something very different for a capital-light software business than for
 a capital-intensive industrial roll-up where 4.0x is the sector norm. Scoring
 leverage *relative to sector median* (rather than against one fixed universal
-threshold) is the same design choice PDQI makes for its valuation-multiple
+threshold) is the same design choice NDQI makes for its valuation-multiple
 pillar, for the same reason: an absolute threshold silently penalizes
 capital-intensive sectors and silently rewards capital-light ones. Each turn
 of leverage above the sector median costs 12 points — steep enough that
@@ -415,12 +415,12 @@ P6: a = likertToScore(4) = 80.0
     c = clamp(100 - 1×15, 0, 100) = 85.0  (one governance flag: covenant breach history)
 P6 = 0.40(80.0) + 0.30(80.0) + 0.30(85.0) = 81.5
 
-PCRS = 0.25(81.44) + 0.20(56.55) + 0.15(71.3) + 0.15(62.5) + 0.10(60.0) + 0.15(81.5)
+NCRS = 0.25(81.44) + 0.20(56.55) + 0.15(71.3) + 0.15(62.5) + 0.10(60.0) + 0.15(81.5)
      = 20.36 + 11.31 + 10.695 + 9.375 + 6.0 + 12.225
      = 69.97 → rounds to 70.0
 ```
 
-**Result: PCRS 70.0 — BB/B-equivalent (High Yield), indicative spread +250 to
+**Result: NCRS 70.0 — BB/B-equivalent (High Yield), indicative spread +250 to
 +600 bps, High confidence (100% complete).**
 
 This example lands right on top of the Investment-Grade cutoff, which is a
@@ -456,21 +456,21 @@ restructured or EBITDA grew.
   (e.g. "all industrials" instead of the borrower's actual sub-sector), or
   mis-sourced comp set will silently bias the leverage score in either
   direction. Always record the comp set's source, scope, and as-of date
-  alongside the score, same discipline as PDQI requires for its valuation
+  alongside the score, same discipline as NDQI requires for its valuation
   comps.
 - **The model does not independently verify covenant language or collateral
-  perfection.** PCRS scores what is disclosed in financials and diligence
+  perfection.** NCRS scores what is disclosed in financials and diligence
   notes — it has no mechanism to catch a cross-default clause, an
   unperfected lien, a subordination trap, or covenant-definition games (e.g.
   "EBITDA" adjusted well beyond a standard definition). Full legal/covenant
   review by counsel remains mandatory before closing; see §1.
 - **Sudden macro or liquidity shocks can move a credit faster than
-  quarterly-frequency scoring can capture.** PCRS is built on trailing
+  quarterly-frequency scoring can capture.** NCRS is built on trailing
   financials and ratios that are, at best, refreshed quarterly. A credit that
   scored a clean Investment-Grade-equivalent 78 in Q1 can be genuinely
   distressed by Q3 following a demand shock, a supply-chain disruption, or a
   sudden funding-market freeze — none of which shows up in a backward-looking
-  ratio until the next reporting cycle. Treat PCRS as a point-in-time
+  ratio until the next reporting cycle. Treat NCRS as a point-in-time
   snapshot that decays in reliability the longer it goes unrefreshed, and
   supplement it with real-time signals (payment behavior, covenant-compliance
   certificates, market-implied credit spreads on comparable issuers) between
@@ -494,5 +494,5 @@ restructured or EBITDA grew.
 | 1.0 | 2026-08-10 | Initial specification and reference implementation |
 
 Any change to a weight, formula, or anchor value is a version bump with an
-entry here — the whole point of a proprietary, named algorithm is that "PCRS
+entry here — the whole point of a proprietary, named algorithm is that "NCRS
 70" means the same thing every time it's quoted. Silent tuning defeats that.

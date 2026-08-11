@@ -1,4 +1,4 @@
-# Prabhakar Equity Signal Score (PESS) — v1.0
+# Nishant Equity Signal Score (NESS) — v1.0
 
 **Proprietary cross-sectional screening methodology for listed-equity
 universes, developed by Nishant Prabhakar.**
@@ -12,14 +12,14 @@ Named in the tradition of established quant-factor scoring conventions —
 Fama-French style factor investing, and the older analyst-attributed models
 (Altman Z-Score, Piotroski F-Score) that this document borrows real inputs
 from directly. The point of putting a name on a model is that the name
-becomes shorthand for a specific, checkable methodology, not a vibe. "PESS 72"
+becomes shorthand for a specific, checkable methodology, not a vibe. "NESS 72"
 should mean the same thing regardless of who's asking or who's answering.
 
 ---
 
 ## 1. Purpose and positioning
 
-The PESS is a **cross-sectional screening and ranking tool**, not a price
+The NESS is a **cross-sectional screening and ranking tool**, not a price
 model. It exists to do three things quickly and consistently across a stock
 universe:
 
@@ -37,12 +37,12 @@ It is deliberately **not** a black box: every sub-score is a named, auditable
 formula against a named input. If an input is unknown, the algorithm says so
 and degrades its confidence rating rather than guessing silently.
 
-**What the PESS is not**: a price-target model, a market-timing signal, or
+**What the NESS is not**: a price-target model, a market-timing signal, or
 investment advice. It does not forecast returns, does not tell you when to
 buy or sell, and produces a *screening rank within a universe*, not a
-standalone verdict on any one stock in isolation — a PESS of 80 means "near
+standalone verdict on any one stock in isolation — a NESS of 80 means "near
 the top of the peer set you compared it against," not "will go up." Run real
-valuation work and your own judgment in parallel; the PESS tells you which
+valuation work and your own judgment in parallel; the NESS tells you which
 names in a universe are worth spending that time on.
 
 ---
@@ -64,7 +64,7 @@ comparable companies right now is the actual signal.
 | P6. Risk & Red Flags | 15% | What could blow this up — leverage, manipulation risk, volatility, litigation? |
 
 ```
-PESS = 0.20·P1 + 0.20·P2 + 0.20·P3 + 0.15·P4 + 0.10·P5 + 0.15·P6
+NESS = 0.20·P1 + 0.20·P2 + 0.20·P3 + 0.15·P4 + 0.10·P5 + 0.15·P6
 ```
 
 **Weighting rationale**: valuation, quality, and growth are weighted equally
@@ -84,7 +84,7 @@ diligence conversation.
 
 ## 3. Score bands / tiers
 
-| PESS | Tier | Action |
+| NESS | Tier | Action |
 |---|---|---|
 | 80–100 | **Top decile / High conviction** | Priority shortlist; deepest research first |
 | 65–79 | **Attractive** | Add to watchlist; underwrite further |
@@ -111,7 +111,7 @@ section (e.g. `valuation.blendedMultiplePercentile`) are **not** computed by
 building an actual, dated, well-scoped peer/sector universe and ranking the
 company within it — that is real analytical work and it is the analyst's job
 to do it *before* calling the script, the same way sourcing a sector comp set
-is the analyst's job in the PDQI (private-equity) skill. The script scores
+is the analyst's job in the NDQI (private-equity) skill. The script scores
 the already-computed percentile; it does not infer one from a raw peer list,
 and it cannot detect a badly-scoped peer set — see §8.
 
@@ -148,7 +148,7 @@ P2 = 0.35a + 0.30b + 0.35c
 
 **Altman Z-Score** is Edward Altman's real, established 1968
 balance-sheet-strength formula — cited here as a genuine external input, not
-a Prabhakar invention:
+a Nishant invention:
 
 ```
 Z = 1.2·(WorkingCapital/TotalAssets) + 1.4·(RetainedEarnings/TotalAssets)
@@ -201,7 +201,7 @@ literature (Jegadeesh & Titman, and standard in most commercial factor
 models) — the most recent month is excluded specifically because short-term
 reversal effects tend to work against 1-month-old momentum, muddying the
 signal if included raw. This convention is cited here as an established
-practice, not a Prabhakar invention; only the weighting of it within PESS is.
+practice, not a Nishant invention; only the weighting of it within NESS is.
 
 ### P5. Ownership & Sentiment
 
@@ -238,7 +238,7 @@ P6 = clamp(100 − sum(triggered deductions), 0, 100)
 
 **Beneish M-Score** is Messod Beneish's real, established 1999
 earnings-manipulation forensic-accounting formula — cited here as a genuine
-external input, not a Prabhakar invention:
+external input, not a Nishant invention:
 
 ```
 M = −4.84 + 0.920·DSRI + 0.528·GMI + 0.404·AQI + 0.892·SGI
@@ -359,11 +359,11 @@ P6: Beneish M = −4.84 + 0.92(1.05) + 0.528(1.02) + 0.404(1.01) + 0.892(1.10)
     beta deduction = clamp((1.15−1.00)×20, 0, 15) = 3.0
 P6 = 100 − 8.0 − 3.0 = 89.0
 
-PESS = 0.20(65.0) + 0.20(68.82) + 0.20(80.0) + 0.15(57.0) + 0.10(75.95) + 0.15(89.0)
+NESS = 0.20(65.0) + 0.20(68.82) + 0.20(80.0) + 0.15(57.0) + 0.10(75.95) + 0.15(89.0)
      = 13.0 + 13.76 + 16.0 + 8.55 + 7.60 + 13.35 = 72.3
 ```
 
-**Result: PESS 72.3 — Attractive tier, High confidence (100% complete).**
+**Result: NESS 72.3 — Attractive tier, High confidence (100% complete).**
 Momentum (57.0) is the softest pillar here — the stock isn't unloved, but it
 isn't attracting price or estimate momentum either, which fits a name that's
 cheap and high-quality but not yet catalyzed. Valuation (65.0) and Quality
@@ -383,13 +383,13 @@ next re-screen.
   either direction — a "72nd percentile ROIC" means nothing if the peer set
   mixes companies from different sub-industries or growth stages. Always
   record the peer universe's composition, size, and as-of date alongside the
-  score, the same discipline the PDQI (private-equity) skill applies to
+  score, the same discipline the NDQI (private-equity) skill applies to
   sector comps.
 - **Momentum factors decay fast and need frequent re-scoring.** Unlike
   quality or balance-sheet strength, a momentum percentile computed a month
   ago can already be stale — momentum is one of the fastest-decaying,
   fastest-reversing factors in the cross-sectional literature. Treat P4 as
-  perishable; don't act on a PESS run more than a few weeks old without
+  perishable; don't act on a NESS run more than a few weeks old without
   refreshing at minimum the momentum and short-interest inputs.
 - **Accounting-quality proxies can miss sophisticated fraud.** The Beneish
   M-Score is a real, validated forensic tool, but it is a statistical
@@ -402,9 +402,9 @@ next re-screen.
   quality, growth, and momentum are real, historically durable factors, but
   they are also widely known and widely traded — during sharp regime
   shifts or factor rotations (e.g. a violent value-to-growth or
-  quality-to-junk rotation), a high PESS name can underperform for an
+  quality-to-junk rotation), a high NESS name can underperform for an
   extended stretch precisely because it's crowded with other systematic
-  strategies making the same bet. The PESS ranks a universe as of today;
+  strategies making the same bet. The NESS ranks a universe as of today;
   it does not know when the market's factor regime is about to change.
 - **The model rewards clean, well-sourced data.** A genuinely strong
   business with an unclear or thinly-covered peer set will score lower on
@@ -418,5 +418,5 @@ next re-screen.
 
 Any change to a weight, formula, or anchor value is a version bump with an
 entry here — the whole point of a proprietary, named algorithm is that
-"PESS 72" means the same thing every time it's quoted. Silent tuning defeats
+"NESS 72" means the same thing every time it's quoted. Silent tuning defeats
 that.

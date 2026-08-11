@@ -1,4 +1,4 @@
-# Prabhakar India Macro Regime Index (PIMRI) — v1.0
+# Nishant India Macro Regime Index (NIMRI) — v1.0
 
 **Proprietary macro-regime classification methodology for the Indian economy,
 developed by Nishant Prabhakar.**
@@ -11,7 +11,7 @@ is correct and the script has a bug.
 Named in the tradition of established macro composite indices — the Chicago
 Fed National Activity Index, the OECD Composite Leading Indicators — where the
 point of a named, published methodology is that it becomes a fixed reference
-point across time: "PIMRI 84" or "PIMRI in Slowdown/Caution" should mean the
+point across time: "NIMRI 84" or "NIMRI in Slowdown/Caution" should mean the
 same thing in Q1 as it does in Q4, regardless of who ran the numbers. A macro
 narrative built from scratch every quarter drifts with whoever's telling it;
 a named composite doesn't.
@@ -20,7 +20,7 @@ a named composite doesn't.
 
 ## 1. Purpose and positioning
 
-The PIMRI classifies India's macro cycle into one of five named **regimes**,
+The NIMRI classifies India's macro cycle into one of five named **regimes**,
 not just a score, so that a portfolio conversation can move directly from
 "where are we in the cycle" to "what should that mean for the book" — asset
 allocation tilts are attached to each regime for exactly this reason (see §3).
@@ -42,7 +42,7 @@ It is deliberately **not** a black box: every sub-score is a named, auditable
 formula against a named, sourced input. If an input is unknown, the algorithm
 says so and degrades its confidence rating rather than guessing silently.
 
-**What the PIMRI is not:**
+**What the NIMRI is not:**
 
 - **Not a GDP forecast model.** It classifies the *current* reading of the
   cycle using data already released; it does not project next quarter's
@@ -50,7 +50,7 @@ says so and degrades its confidence rating rather than guessing silently.
 - **Not a market-timing signal on its own.** A regime label describes the
   macro backdrop, not an entry/exit trigger for any specific trade. Equity
   and rate markets frequently move on expectations well before an official
-  release confirms a regime shift — use PIMRI to frame the macro backdrop
+  release confirms a regime shift — use NIMRI to frame the macro backdrop
   behind a decision, not as the decision rule itself.
 - **Not a substitute for reading the actual release notes.** GDP and IIP
   data in particular carry base-effect and revision noise that a single
@@ -72,7 +72,7 @@ Six weighted pillars, each scored 0–100, rolled into one composite:
 | P6. Capital Flows & Market Confidence | 10% | Is global capital voting for India right now? |
 
 ```
-PIMRI = 0.25·P1 + 0.20·P2 + 0.20·P3 + 0.15·P4 + 0.10·P5 + 0.10·P6
+NIMRI = 0.25·P1 + 0.20·P2 + 0.20·P3 + 0.15·P4 + 0.10·P5 + 0.10·P6
 ```
 
 **Weighting rationale**: P1 and P2 together are 45% of the score by design —
@@ -92,7 +92,7 @@ dropped.
 
 ## 3. Regime classification and asset-allocation tilts
 
-| PIMRI | Regime | Asset-allocation tilt |
+| NIMRI | Regime | Asset-allocation tilt |
 |---|---|---|
 | 80–100 | **Expansion / Goldilocks** | Overweight equities, tilt toward cyclicals and small/mid-caps; risk-on across the book. |
 | 65–79 | **Moderate Growth / Balanced Expansion** | Balanced allocation with a modest equity overweight; favor quality large-caps over high-beta names. |
@@ -130,7 +130,7 @@ P1 = 0.40a + 0.25b + 0.35c
 **Why 6.5% is the GDP anchor, not a higher or lower number**: 6.5% is used
 here as India's approximate real potential/trend growth rate — the rate
 consistent with neither a positive nor negative output gap. Printing exactly
-at trend is "good, not remarkable" (score 60), mirroring how the PDQI treats
+at trend is "good, not remarkable" (score 60), mirroring how the NDQI treats
 paying the sector-median multiple as fair-but-unremarkable. Growth
 meaningfully above trend is what actually signals an expansion regime, not
 merely growth that's merely positive.
@@ -204,7 +204,7 @@ P4 = clamp(base + qualityAdjustment, 0, 100)
 ```
 
 Hitting the budgeted/glide-path target exactly scores 80 — good, not
-perfect, mirroring the PDQI's treatment of "at the sector median" as
+perfect, mirroring the NDQI's treatment of "at the sector median" as
 fair-but-unremarkable. Beating the target pushes the base score above 80;
 missing it costs 25 points per percentage point of GDP overshot, which is a
 deliberately steep penalty — fiscal slippage is one of the fastest ways a
@@ -280,7 +280,7 @@ before picking a number.
 
 `likertToScore`: linear interpolation is fine for non-integer averages (e.g.
 a rating of 3.5 → score 70). This is the same conversion function and scale
-used by the PDQI's qualitative rubrics — a deliberate consistency choice so
+used by the NDQI's qualitative rubrics — a deliberate consistency choice so
 that a 1–5 rating means the same thing across every skill in this library.
 
 ---
@@ -357,11 +357,11 @@ P6: a = lerp(6.2, [5,75]→[10,90]) = 75 + (6.2-5)/(10-5)×15 = 78.6
     c = lerp(65, [40,100]→[80,80]) = 100 + (65-40)/(80-40)×(80-100) = 87.5
 P6 = 0.45(78.6) + 0.35(89.4) + 0.20(87.5) = 84.2
 
-PIMRI = 0.25(70.4) + 0.20(85.8) + 0.20(90.5) + 0.15(92.5) + 0.10(93.0) + 0.10(84.2)
+NIMRI = 0.25(70.4) + 0.20(85.8) + 0.20(90.5) + 0.15(92.5) + 0.10(93.0) + 0.10(84.2)
     = 17.6 + 17.2 + 18.1 + 13.9 + 9.3 + 8.4 = 84.4
 ```
 
-**Result: PIMRI 84.4 — Expansion / Goldilocks regime.** Overweight equities,
+**Result: NIMRI 84.4 — Expansion / Goldilocks regime.** Overweight equities,
 tilt toward cyclicals and small/mid-caps. Growth (P1, 70.4) is the softest
 pillar relative to the rest of the composite — above-trend GDP and a strong
 composite PMI are doing the work, but IIP at 5.8% YoY is only middling on its
@@ -380,7 +380,7 @@ the version this was last confirmed against.)*
 
 - **Official growth data is noisy and gets revised.** India's GDP and IIP
   releases are routinely revised — sometimes materially — in subsequent
-  quarters as more complete data comes in. An early PIMRI read on a fresh
+  quarters as more complete data comes in. An early NIMRI read on a fresh
   GDP print is directionally useful but should be treated as provisional
   until at least the first revision.
 - **Monsoon and agricultural-output shocks aren't captured.** No pillar
@@ -392,7 +392,7 @@ the version this was last confirmed against.)*
 - **State-level heterogeneity is averaged away.** A national composite can
   read "Moderate Growth" while masking a state or region in outright
   contraction (or the reverse). For regionally concentrated exposure, don't
-  rely on the national PIMRI alone.
+  rely on the national NIMRI alone.
 - **Global risk-off contagion can override domestic fundamentals in the
   short run.** P6 (capital flows) and P3's INR-volatility sub-component can
   move sharply on global events — a Fed repricing, a regional crisis, a
@@ -402,7 +402,7 @@ the version this was last confirmed against.)*
   say so explicitly rather than reading it as an India-specific downgrade.
 - **Release-calendar misalignment.** PMI is monthly and near-real-time;
   CPI and IIP lag by roughly a month; GDP lags by about two months and
-  arrives quarterly. A single PIMRI read blends indicators of different
+  arrives quarterly. A single NIMRI read blends indicators of different
   vintages, which can make the composite look more current than its
   slowest-moving input actually is.
 
@@ -415,5 +415,5 @@ the version this was last confirmed against.)*
 | 1.0 | 2026-08-10 | Initial specification and reference implementation |
 
 Any change to a weight, formula, or anchor value is a version bump with an
-entry here — the whole point of a proprietary, named index is that "PIMRI 84"
+entry here — the whole point of a proprietary, named index is that "NIMRI 84"
 means the same thing every time it's quoted. Silent tuning defeats that.

@@ -1,11 +1,11 @@
 ---
 name: india-macro-regime
-description: Classify India's macro cycle into a named regime and asset-allocation tilt using the proprietary Prabhakar India Macro Regime Index (PIMRI) — a six-pillar, weighted composite covering growth momentum, inflation/monetary stance, external sector health, fiscal health, credit/liquidity, and capital flows/market confidence. Use whenever the user asks for India's macro outlook, to score or classify India's macro cycle, or for an asset-allocation tilt tied to the current regime — including from RBI/MOSPI/CMIE data, a macro note, or numbers typed into chat. Trigger phrases include "India macro outlook", "PIMRI", "India macro regime", "score India's macro cycle", "what's the macro regime", "asset allocation tilt for India", "India economic cycle analysis", "is India in a slowdown", "classify the Indian business cycle".
+description: Classify India's macro cycle into a named regime and asset-allocation tilt using the proprietary Nishant India Macro Regime Index (NIMRI) — a six-pillar, weighted composite covering growth momentum, inflation/monetary stance, external sector health, fiscal health, credit/liquidity, and capital flows/market confidence. Use whenever the user asks for India's macro outlook, to score or classify India's macro cycle, or for an asset-allocation tilt tied to the current regime — including from RBI/MOSPI/CMIE data, a macro note, or numbers typed into chat. Trigger phrases include "India macro outlook", "NIMRI", "India macro regime", "score India's macro cycle", "what's the macro regime", "asset allocation tilt for India", "India economic cycle analysis", "is India in a slowdown", "classify the Indian business cycle".
 ---
 
-# India Macro Regime Classification — PIMRI
+# India Macro Regime Classification — NIMRI
 
-This skill applies the **Prabhakar India Macro Regime Index (PIMRI)**, a
+This skill applies the **Nishant India Macro Regime Index (NIMRI)**, a
 proprietary six-pillar scoring algorithm developed by Nishant Prabhakar, to
 classify India's macro cycle into one of five named regimes and attach an
 asset-allocation tilt to it. Full methodology: `reference/algorithm.md`.
@@ -61,7 +61,7 @@ description of current conditions typed into chat.
    easy to get backwards by hand. It's the reference implementation
    specifically so the result is reproducible.
 
-3. **Report the regime and tilt, not just the number.** Lead with the PIMRI
+3. **Report the regime and tilt, not just the number.** Lead with the NIMRI
    score, the named regime, and its asset-allocation tilt, then walk through
    the two or three pillars that moved the score most (both up and down) —
    that's more useful to the reader than restating every sub-score. If
@@ -80,7 +80,7 @@ description of current conditions typed into chat.
 Unless the user asks for something else, structure the report as:
 
 ```
-## India Macro Regime — PIMRI: <score> (<Regime>, <confidence> confidence)
+## India Macro Regime — NIMRI: <score> (<Regime>, <confidence> confidence)
 
 **One-line take:** <what's driving this — the single biggest factor>
 
@@ -103,7 +103,7 @@ Unless the user asks for something else, structure the report as:
 
 This is one entry in a growing library of niche-specific skills
 (`.claude/skills/README.md` is the index, alongside `private-equity-analysis`
-for deal screening). If you're asked to adapt the PIMRI for a different
+for deal screening). If you're asked to adapt the NIMRI for a different
 economy or a sub-national (state-level) read, don't overwrite this one — copy
 the folder, rename it, and re-derive the pillar anchors for that economy's
 actual structural characteristics rather than reusing India-specific anchors

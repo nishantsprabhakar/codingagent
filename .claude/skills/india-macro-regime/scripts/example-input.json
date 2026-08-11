@@ -1,5 +1,5 @@
 {
-  "_comment": "Hypothetical quarter, illustrative only (not an actual RBI/MOSPI release). Matches the worked example in reference/algorithm.md section 7 — expected PIMRI ~84.4, Expansion/Goldilocks regime.",
+  "_comment": "Hypothetical quarter, illustrative only (not an actual RBI/MOSPI release). Matches the worked example in reference/algorithm.md section 7 — expected NIMRI ~84.4, Expansion/Goldilocks regime.",
   "growth": {
     "realGdpYoyPct": 7.2,
     "iipYoyPct": 5.8,

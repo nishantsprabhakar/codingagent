@@ -1,5 +1,5 @@
 {
-  "_comment": "Matches the worked example in reference/algorithm.md section 7 — expected PSTS ~75.3, Strong tier. Series A-stage B2B SaaS startup.",
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — expected NSTS ~75.3, Strong tier. Series A-stage B2B SaaS startup.",
   "team": {
     "domainExpertiseRubric": 4,
     "priorStartupExperienceRubric": 4,

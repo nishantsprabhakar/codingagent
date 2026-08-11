@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prabhakar Deal Quality Index (PDQI) — reference implementation, v1.0.
+ * Nishant Deal Quality Index (NDQI) — reference implementation, v1.0.
  * Developed by Nishant Prabhakar.
  *
  * This is a literal implementation of reference/algorithm.md. If you change a
@@ -20,7 +20,7 @@
 
 const fs = require("fs");
 
-const ALGORITHM_NAME = "Prabhakar Deal Quality Index (PDQI)";
+const ALGORITHM_NAME = "Nishant Deal Quality Index (NDQI)";
 const ALGORITHM_VERSION = "1.0";
 
 function clamp(x, lo, hi) {
@@ -264,11 +264,11 @@ function getByPath(obj, path) {
   return path.split(".").reduce((v, p) => (v == null ? undefined : v[p]), obj);
 }
 
-function tierFor(pdqi) {
-  if (pdqi >= 80) return "Strong";
-  if (pdqi >= 65) return "Attractive";
-  if (pdqi >= 50) return "Conditional";
-  if (pdqi >= 35) return "Weak";
+function tierFor(ndqi) {
+  if (ndqi >= 80) return "Strong";
+  if (ndqi >= 65) return "Attractive";
+  if (ndqi >= 50) return "Conditional";
+  if (ndqi >= 35) return "Weak";
   return "Pass";
 }
 
@@ -287,7 +287,7 @@ function computeScore(input) {
   const p5 = scoreP5(input, missing);
   const p6 = scoreP6(input);
 
-  const pdqi =
+  const ndqi =
     PILLAR_WEIGHTS.p1 * p1.score +
     PILLAR_WEIGHTS.p2 * p2.score +
     PILLAR_WEIGHTS.p3 * p3.score +
@@ -301,8 +301,8 @@ function computeScore(input) {
   return {
     algorithm: ALGORITHM_NAME,
     version: ALGORITHM_VERSION,
-    pdqi: Math.round(pdqi * 10) / 10,
-    tier: tierFor(pdqi),
+    ndqi: Math.round(ndqi * 10) / 10,
+    tier: tierFor(ndqi),
     confidence: confidenceFor(completeness),
     completeness: Math.round(completeness * 100) / 100,
     pillars: {
@@ -320,7 +320,7 @@ function computeScore(input) {
 function printHumanReadable(result) {
   const lines = [];
   lines.push(`${result.algorithm} v${result.version}`);
-  lines.push(`PDQI: ${result.pdqi} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`);
+  lines.push(`NDQI: ${result.ndqi} — ${result.tier} (confidence: ${result.confidence}, ${Math.round(result.completeness * 100)}% complete)`);
   lines.push("");
   for (const [key, pillar] of Object.entries(result.pillars)) {
     lines.push(`${key}  weight=${pillar.weight}  score=${Math.round(pillar.score * 10) / 10}`);
