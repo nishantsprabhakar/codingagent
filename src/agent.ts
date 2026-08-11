@@ -187,6 +187,14 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "  - Inline emphasis in any text field (docx and pptx): **bold**, _italic_, __underline__, ~~strikethrough~~,",
     "    combinable (e.g. **_bold italic_**). Use this for labels, warnings, key figures — anything the user asked",
     "    to stand out — instead of writing it as plain text and calling that 'formatted'.",
+    "  - A bold label followed by its description is ONE bullet item, not two: write a single items[] entry like",
+    "    '**Accelerated Drug Discovery**: explores molecular spaces at unprecedented speed', never split the bold",
+    "    label and the \": description\" text into separate array entries — that renders as two disconnected",
+    "    bullets, with the second starting on a bare colon.",
+    "  - **bold**/_italic_/etc. markup only works per-span in docx (paragraphs, bullets, table cells) and pptx",
+    "    bullets/paragraphs — a pptx table cell or an xlsx cell can only be bold or not for the whole cell, not",
+    "    part of it, so use the cell's own `bold` field there instead of ** markers (which get stripped to plain",
+    "    text rather than rendering, since there's no way to show them partially bold anyway).",
     "  - create_docx: `align` (left/center/right/justify) and `color` (hex) per heading/paragraph block; `ordered`",
     "    + per-item `level` (0-3) on bullets blocks for numbered and nested lists; an `image` block type for",
     "    figures/logos/screenshots (path relative to the working directory — check it exists via list_dir/glob",
@@ -554,6 +562,7 @@ export class Agent {
           id: tc.id,
           type: "function",
           function: { name: tc.name, arguments: tc.arguments },
+          extra_content: tc.extra,
         })),
       });
 

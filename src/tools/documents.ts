@@ -27,7 +27,7 @@ import PptxGenJS from "pptxgenjs";
 import ExcelJS from "exceljs";
 import type { ToolSpec } from "../types";
 import { resolveInRoot } from "./paths";
-import { parseInlineMarkup } from "./richText";
+import { parseInlineMarkup, stripInlineMarkup } from "./richText";
 import { loadImageFile, fitImageBox } from "./imageUtils";
 import { checkDocxQuality, checkPptxQuality, checkXlsxQuality } from "../documentQuality";
 
@@ -131,10 +131,37 @@ function normalizeListItem(raw: any): { text: string; level: number } {
   return { text: String(raw ?? ""), level: 0 };
 }
 
+/**
+ * Repairs a common model mistake: writing a bold "label" and its ": description" as two separate list items
+ * instead of one — e.g. `["**Accelerated Drug Discovery**", ": explores molecular spaces..."]` instead of
+ * `["**Accelerated Drug Discovery**: explores molecular spaces..."]` — which renders as two disconnected
+ * bullets (the second starting with a bare colon) instead of the intended single "**Label**: description"
+ * line. Merges any item whose text starts with a bare colon into the previous item instead of giving it its
+ * own bullet.
+ */
+function mergeColonContinuations(items: Array<{ text: string; level: number }>): Array<{ text: string; level: number }> {
+  const result: Array<{ text: string; level: number }> = [];
+  for (const item of items) {
+    if (item.text.trimStart().startsWith(":") && result.length > 0) {
+      result[result.length - 1] = { ...result[result.length - 1], text: result[result.length - 1].text + item.text.trimStart() };
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 interface CellSpec {
   text: string;
   align?: string;
   bold?: boolean;
+}
+
+/** See the pptx table-cell comment at its call site — cells can't mix formatting within one string, so this
+ *  strips markup delimiters to plain text and reports whether any span was meant to be bold. */
+function flattenCellMarkup(text: string): { text: string; anyBold: boolean } {
+  const spans = parseInlineMarkup(text);
+  return { text: spans.map((s) => s.text).join(""), anyBold: spans.some((s) => s.bold) };
 }
 
 function normalizeCell(raw: any): CellSpec {
@@ -296,7 +323,7 @@ export const createDocxTool: ToolSpec = {
           })
         );
       } else if (block.type === "bullets") {
-        const items = (block.items ?? []).map(normalizeListItem);
+        const items = mergeColonContinuations((block.items ?? []).map(normalizeListItem));
         const ordered = !!block.ordered;
         for (const item of items) {
           children.push(
@@ -516,7 +543,10 @@ function pptxBulletRuns(items: Array<{ text: string; level: number }>, base: Ppt
           italic: s.italic || undefined,
           strike: s.strike || undefined,
           underline: s.underline ? { style: "sng" } : undefined,
-          bullet: { characterCode: "2022" },
+          // Only the item's first run gets a bullet marker — pptxgenjs starts a new bullet paragraph at any
+          // run carrying one, so an item with mixed markup (e.g. "**Label**: description") would otherwise
+          // render as two separate bullets, one per inline-markup span, regardless of breakLine.
+          ...(i === 0 ? { bullet: { characterCode: "2022" } } : {}),
           indentLevel: item.level,
           breakLine: i === list.length - 1,
         },
@@ -718,20 +748,29 @@ export const createPptxTool: ToolSpec = {
         const tableRows: PptxGenJS.TableRow[] = [];
         if (headers.length) {
           tableRows.push(
-            headers.map((h) => ({
-              text: normalizeCell(h).text,
-              options: { bold: true, color: "FFFFFF", fill: { color: accent }, align: (normalizeCell(h).align as any) ?? "left" },
-            }))
+            headers.map((h) => {
+              // Unlike addText, pptxgenjs table cells take a plain string with one set of options for the
+              // whole cell — there's no per-run styling within a cell. Strip markup delimiters so a model's
+              // "**Total**" doesn't show as literal asterisks; the header row is already bold regardless.
+              const flat = flattenCellMarkup(normalizeCell(h).text);
+              return {
+                text: flat.text,
+                options: { bold: true, color: "FFFFFF", fill: { color: accent }, align: (normalizeCell(h).align as any) ?? "left" },
+              };
+            })
           );
         }
         rows.forEach((row, i) => {
           tableRows.push(
             row.map((cellVal) => {
               const cell = normalizeCell(cellVal);
+              const flat = flattenCellMarkup(cell.text);
               return {
-                text: cell.text,
+                text: flat.text,
                 options: {
-                  bold: cell.bold || undefined,
+                  // A cell can't be partially bold here, so a bold span anywhere in the text promotes the
+                  // whole cell — closer to what the model intended than showing raw "**" characters.
+                  bold: cell.bold || flat.anyBold || undefined,
                   color: bodyColor,
                   fill: i % 2 === 1 ? { color: zebraColor } : { color: bgColor },
                   align: (cell.align as any) ?? "left",
@@ -752,12 +791,12 @@ export const createPptxTool: ToolSpec = {
         }
       } else if (mode === "two_column") {
         const columns = Array.isArray(spec.columns) ? spec.columns : [[], []];
-        const left = (columns[0] ?? []).map(normalizeListItem);
-        const right = (columns[1] ?? []).map(normalizeListItem);
+        const left = mergeColonContinuations((columns[0] ?? []).map(normalizeListItem));
+        const right = mergeColonContinuations((columns[1] ?? []).map(normalizeListItem));
         if (left.length) slide.addText(pptxBulletRuns(left, bodyBase), { x: 0.5, y: 1.55, w: 4.3, h: 3.9, valign: "top" });
         if (right.length) slide.addText(pptxBulletRuns(right, bodyBase), { x: 5.2, y: 1.55, w: 4.3, h: 3.9, valign: "top" });
       } else {
-        const items = (spec.bullets ?? []).map(normalizeListItem);
+        const items = mergeColonContinuations((spec.bullets ?? []).map(normalizeListItem));
         if (items.length) {
           // Slide is 5.625in tall; a box taller than that (the old h:5 constant) is harmless only by luck —
           // it silently invites real overflow the day a slide has enough bullets to actually fill it.
@@ -807,10 +846,18 @@ function checkPptxHasContent(slides: any[] | undefined): string | null {
 
 // ---------- Excel (.xlsx) ----------
 
-/** A cell value of "=SOME_FORMULA" becomes a live Excel formula instead of a literal string. */
+/**
+ * A cell value of "=SOME_FORMULA" becomes a live Excel formula instead of a literal string. Any other string
+ * has markup delimiters stripped — Excel cells have no concept of an inline bold run within a value (unlike
+ * docx/pptx), so a model reusing the **bold** convention it was taught for those would otherwise show the
+ * literal asterisks in the spreadsheet instead of anything resembling emphasis.
+ */
 function toFormulaAwareCellValue(v: any): any {
   if (typeof v === "string" && v.startsWith("=") && v.length > 1) {
     return { formula: v.slice(1) };
+  }
+  if (typeof v === "string" && v.length > 0) {
+    return stripInlineMarkup(v);
   }
   return v;
 }
@@ -923,7 +970,7 @@ export const createXlsxTool: ToolSpec = {
       const cellBorder = { top: THIN, bottom: THIN, left: THIN, right: THIN };
 
       if (headers.length) {
-        const headerRow = sheet.addRow(headers.map((h) => h.name));
+        const headerRow = sheet.addRow(headers.map((h) => stripInlineMarkup(h.name)));
         headerRow.font = { bold: true, color: { argb: `FF${headerBand.text}` } };
         headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${headerBand.fill}` } };
         headerRow.eachCell((cell, colNumber) => {
@@ -942,6 +989,12 @@ export const createXlsxTool: ToolSpec = {
           cell.border = cellBorder;
           const align = headers[colNumber - 1]?.align;
           if (align === "center" || align === "right" || align === "left") cell.alignment = { horizontal: align as any };
+          // A cell can't be partially bold, so **markup** anywhere in the raw (pre-strip) value promotes the
+          // whole cell — same reasoning as the pptx table-cell fallback above.
+          const raw = row[colNumber - 1];
+          if (typeof raw === "string" && !raw.startsWith("=") && parseInlineMarkup(raw).some((s) => s.bold)) {
+            cell.font = { bold: true };
+          }
         });
       });
 

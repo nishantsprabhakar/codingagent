@@ -41,7 +41,7 @@ export async function consumeSseStream(
   let hasContent = false;
   let hasReasoning = false;
   let finishReason: string | null = null;
-  const toolCallAcc = new Map<number, { id: string; name: string; arguments: string }>();
+  const toolCallAcc = new Map<number, { id: string; name: string; arguments: string; extra?: Record<string, unknown> }>();
 
   const processLine = (line: string) => {
     const trimmed = line.trim();
@@ -77,6 +77,10 @@ export async function consumeSseStream(
         if (tc.id) existing.id = tc.id;
         if (tc.function?.name) existing.name = tc.function.name;
         if (typeof tc.function?.arguments === "string") existing.arguments += tc.function.arguments;
+        // Gemini's "thinking" models attach an opaque, non-streamed thought_signature here (via
+        // extra_content.google.thought_signature) that must round-trip back verbatim on the next turn's
+        // tool_calls, or the API rejects the follow-up request — see ToolCallRequest.extra's comment.
+        if (tc.extra_content && typeof tc.extra_content === "object") existing.extra = tc.extra_content;
         toolCallAcc.set(idx, existing);
       }
     }
@@ -96,7 +100,7 @@ export async function consumeSseStream(
 
   const toolCalls: ToolCallRequest[] = Array.from(toolCallAcc.entries())
     .sort((a, b) => a[0] - b[0])
-    .map(([, tc]) => ({ id: tc.id, name: tc.name, arguments: tc.arguments || "{}" }));
+    .map(([, tc]) => ({ id: tc.id, name: tc.name, arguments: tc.arguments || "{}", extra: tc.extra }));
 
   return {
     content: hasContent ? contentAcc : null,

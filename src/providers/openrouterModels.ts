@@ -52,11 +52,15 @@ export const GROQ_MODELS: ModelSummary[] = [
   { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant", free: true, contextLength: 131072 },
 ];
 
-/** Gemini's model list also requires auth to query live, so this is a small curated set of current free-tier models. */
+/** Gemini's model list also requires auth to query live, so this is a small curated set of current free-tier
+ *  models — re-verify against ai.google.dev/gemini-api/docs/models before trusting this list; Google has fully
+ *  shut down older model ids before (2.0-flash, 2.0-flash-lite are gone as of 2026-08) rather than just aliasing
+ *  them forward, so a stale id here fails as a hard 404, not a deprecation warning. */
 export const GEMINI_MODELS: ModelSummary[] = [
-  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", free: true, contextLength: 1048576 },
-  { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite", free: true, contextLength: 1048576 },
-  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", free: true, contextLength: 1048576 },
+  { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", free: true, contextLength: 1048576 },
+  { id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite", free: true, contextLength: 1048576 },
+  { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash", free: true, contextLength: 1048576 },
+  { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", free: true, contextLength: 1048576 },
 ];
 
 export const CEREBRAS_MODELS: ModelSummary[] = [
