@@ -32,3 +32,18 @@ export function saveGlobalInstructions(text: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, text, "utf-8");
 }
+
+/**
+ * Appends one standing preference line (from the remember_preference tool) without disturbing
+ * whatever the user has already written here by hand. Deduplicates exact repeats — restating the
+ * same preference in a later session shouldn't pile up identical lines.
+ */
+export function appendGlobalInstruction(text: string): void {
+  const clean = text.trim();
+  if (!clean) return;
+  const current = loadGlobalInstructions();
+  const lines = current.split("\n").map((l) => l.trim());
+  if (lines.includes(clean)) return;
+  const next = current.trim() ? `${current.trimEnd()}\n${clean}` : clean;
+  saveGlobalInstructions(next);
+}

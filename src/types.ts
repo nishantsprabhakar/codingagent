@@ -59,6 +59,12 @@ export interface ToolDefinition {
 export interface ToolExecResult {
   ok: boolean;
   output: string;
+  /**
+   * True when this tool ran a deterministic, model-agnostic structural quality gate on its own
+   * output and it passed — lets finalizeTransaction() treat a clean document-generation turn as
+   * genuinely verified instead of always falling back to the flat "unverified_changes" outcome.
+   */
+  qualityChecked?: boolean;
 }
 
 /** How dangerous an action is judged to be — drives permission UX and whether "always allow" is offered. */
@@ -106,6 +112,8 @@ export interface ActionLogEntry {
   timestamp: number;
   /** Present for file-mutating tools — the pre-change state, used for manual rollback. */
   fileSnapshot?: { path: string; existed: boolean; before: string | null };
+  /** Carried over from the tool's ToolExecResult — see ToolExecResult.qualityChecked. */
+  qualityChecked?: boolean;
 }
 
 export interface VerificationCheck {
@@ -148,6 +156,19 @@ export interface ProjectMemory {
   framework?: string;
   conventions?: string[];
   blockedCommands?: string[];
+  /**
+   * Standing formatting/tone/workflow preferences the user has explicitly stated for this project
+   * (via the remember_preference tool) — distinct from one-off asks, applies to every future turn.
+   */
+  preferences?: string[];
+  /**
+   * Short, specific lessons derived from a document quality-check failure that has now blocked a
+   * generation more than once in this project (see documentQuality.ts) — never a model's own
+   * unreliable self-assessment of what went wrong, always traceable back to a real, catalogued check.
+   */
+  learnedLessons?: string[];
+  /** Bookkeeping for learnedLessons: quality-check failure strings seen exactly once so far, not yet promoted. */
+  recentQualityFailures?: string[];
 }
 
 /** A past turn replayed to a freshly (re)connected client on session restore. */

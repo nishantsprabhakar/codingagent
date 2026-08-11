@@ -29,6 +29,7 @@ import type { ToolSpec } from "../types";
 import { resolveInRoot } from "./paths";
 import { parseInlineMarkup } from "./richText";
 import { loadImageFile, fitImageBox } from "./imageUtils";
+import { checkDocxQuality, checkPptxQuality, checkXlsxQuality } from "../documentQuality";
 
 const HEADING_LEVELS = [
   HeadingLevel.HEADING_1,
@@ -45,6 +46,35 @@ const DEFAULT_ACCENT_DARK_HEX = "1E3A8A";
 const TEXT_HEX = "1F2937";
 const BODY_FONT = "Calibri";
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+
+/** Default light-blue table-header/heading-band look for docx and xlsx, used when no custom accentColor is given. */
+const DOCX_HEADER_LIGHT_FILL = "DBEAFE";
+const DOCX_HEADER_LIGHT_TEXT = "1E3A8A";
+
+/** Default dark theme for pptx — slide background/text colors when theme !== "light". */
+const PPTX_DARK_BG = "0F172A";
+const PPTX_DARK_BODY_TEXT = "E2E8F0";
+const PPTX_DARK_TITLE_TEXT = "F8FAFC";
+const PPTX_DARK_ZEBRA = "1E293B";
+const PPTX_LIGHT_ZEBRA = "F3F4F6";
+
+/** Small curated icon vocabulary rendered as an emoji glyph inside an accent-colored circle badge — no
+ *  image assets or native-binary rendering dependencies (react-icons/sharp), so this always works the
+ *  same way on every machine this app is installed on. */
+const ICON_GLYPHS: Record<string, string> = {
+  check: "✓",
+  star: "★",
+  chart: "📊",
+  target: "🎯",
+  lock: "🔒",
+  warning: "⚠",
+  idea: "💡",
+  rocket: "🚀",
+  gear: "⚙",
+  arrow: "→",
+  dollar: "💲",
+  calendar: "📅",
+};
 
 const THIN_BORDER = { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB" } as const;
 const TABLE_BORDERS = {
@@ -65,6 +95,26 @@ function darkenHex(hex: string, factor = 0.35): string {
       .padStart(2, "0");
   };
   return (channel(0) + channel(2) + channel(4)).toUpperCase();
+}
+
+/** Lightens a 6-digit hex color toward white by `factor` (0-1) — used to derive a light header-band
+ *  fill from a custom accentColor, mirroring darkenHex, so a custom brand color still gets a coherent
+ *  light-tinted table header instead of always falling back to the hardcoded default blue tint. */
+function lightenHex(hex: string, factor = 0.82): string {
+  const channel = (offset: number) => {
+    const v = parseInt(hex.slice(offset, offset + 2), 16);
+    return Math.max(0, Math.min(255, Math.round(v + (255 - v) * factor)))
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return (channel(0) + channel(2) + channel(4)).toUpperCase();
+}
+
+/** Derives the light-blue-style header fill + dark text pair for docx/xlsx table headers: the fixed
+ *  default tint when no accentColor was given, or a tint derived from the custom accent so it stays
+ *  visually coherent with the rest of the document. */
+function headerBandColors(customAccent: string | undefined, accentDark: string): { fill: string; text: string } {
+  return customAccent ? { fill: lightenHex(customAccent), text: accentDark } : { fill: DOCX_HEADER_LIGHT_FILL, text: DOCX_HEADER_LIGHT_TEXT };
 }
 
 function optionalHexColor(input: unknown): string | undefined {
@@ -146,7 +196,10 @@ export const createDocxTool: ToolSpec = {
           title: { type: "string", description: "Document title, rendered as a large title heading at the top." },
           accentColor: {
             type: "string",
-            description: "Optional hex color (e.g. 'C026D3' or '#C026D3') used for headings and table header shading, instead of the default blue.",
+            description:
+              "Optional brand hex color (e.g. 'C026D3' or '#C026D3'). By default, top-level headings and table " +
+              "header rows use a light-blue band (dark navy text on a pale blue fill); passing accentColor derives " +
+              "a matching light tint of your color instead, so the look stays coherent with a custom brand color.",
           },
           blocks: {
             type: "array",
@@ -201,8 +254,13 @@ export const createDocxTool: ToolSpec = {
     const emptyCheck = checkDocxHasContent(args.blocks);
     if (emptyCheck) return { ok: false, output: emptyCheck };
 
-    const accent = optionalHexColor(args.accentColor) ?? DEFAULT_ACCENT_HEX;
-    const accentDark = optionalHexColor(args.accentColor) ? darkenHex(accent) : DEFAULT_ACCENT_DARK_HEX;
+    const quality = checkDocxQuality(args.blocks ?? []);
+    if (!quality.ok) return { ok: false, output: quality.blocking.join("\n") };
+
+    const customAccent = optionalHexColor(args.accentColor);
+    const accent = customAccent ?? DEFAULT_ACCENT_HEX;
+    const accentDark = customAccent ? darkenHex(accent) : DEFAULT_ACCENT_DARK_HEX;
+    const headerBand = headerBandColors(customAccent, accentDark);
 
     const filePath = resolveInRoot(ctx.root, args.path);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -217,11 +275,15 @@ export const createDocxTool: ToolSpec = {
     for (const block of args.blocks ?? []) {
       if (block.type === "heading") {
         const idx = Math.min(Math.max((block.level ?? 1) - 1, 0), HEADING_LEVELS.length - 1);
+        const isTopLevel = idx === 0;
         children.push(
           new Paragraph({
-            children: docxRuns(block.text ?? "", { color: optionalHexColor(block.color) }),
+            children: docxRuns(block.text ?? "", { color: optionalHexColor(block.color) ?? (isTopLevel ? headerBand.text : undefined) }),
             heading: HEADING_LEVELS[idx],
             alignment: docxAlign(block.align),
+            // A light-blue band behind H1 only — banding every heading level would stripe a long
+            // document throughout instead of just marking its major sections.
+            shading: isTopLevel && !optionalHexColor(block.color) ? { type: ShadingType.SOLID, fill: headerBand.fill } : undefined,
             spacing: { before: 240, after: 120 },
           })
         );
@@ -258,10 +320,10 @@ export const createDocxTool: ToolSpec = {
               children: headers.map((h) => {
                 const cell = normalizeCell(h);
                 return new TableCell({
-                  shading: { type: ShadingType.SOLID, fill: accent },
+                  shading: { type: ShadingType.SOLID, fill: headerBand.fill },
                   children: [
                     new Paragraph({
-                      children: docxRuns(cell.text, { color: "FFFFFF", bold: true }),
+                      children: docxRuns(cell.text, { color: headerBand.text, bold: true }),
                       alignment: docxAlign(cell.align),
                     }),
                   ],
@@ -360,7 +422,23 @@ export const createDocxTool: ToolSpec = {
     const buffer = await Packer.toBuffer(doc);
     fs.writeFileSync(filePath, buffer);
 
-    return { ok: true, output: `Created ${args.path} (${(args.blocks ?? []).length} content blocks, ${buffer.length} bytes)` };
+    const headingText = (args.blocks ?? [])
+      .filter((b: any) => b.type === "heading")
+      .map((b: any) => String(b.text ?? "").trim())
+      .filter(Boolean);
+    // Real structural content, not just a block count — this is what the independent critic actually
+    // reads (see critic.ts's stepSummary), so it can judge document quality against the stated intent
+    // instead of just seeing "Created report.docx (12 blocks, 48213 bytes)".
+    const structureSummary = [args.title ? `Title: ${args.title}` : null, headingText.length ? `Headings: ${headingText.join(" | ")}` : null]
+      .filter(Boolean)
+      .join(". ");
+    const warningSuffix = quality.warnings.length ? `\nQuality notes: ${quality.warnings.join(" ")}` : "";
+
+    return {
+      ok: true,
+      output: `Created ${args.path} (${(args.blocks ?? []).length} content blocks, ${buffer.length} bytes). ${structureSummary}${warningSuffix}`,
+      qualityChecked: true,
+    };
   },
 };
 
@@ -457,18 +535,30 @@ export const createPptxTool: ToolSpec = {
       description:
         "Create a well-formatted PowerPoint (.pptx) presentation from a list of slides. `slides` must contain " +
         "the actual content the user asked for — never call this with empty or placeholder slides. Bullet text " +
-        "supports inline markup: **bold**, _italic_, __underline__, ~~strikethrough~~.",
+        "supports inline markup: **bold**, _italic_, __underline__, ~~strikethrough~~. Defaults to a dark theme " +
+        "with an icon badge next to each slide title — pick a fitting `icon` for most slides rather than leaving " +
+        "it off, it's the deck's default look now, not a rare flourish.",
       parameters: {
         type: "object",
         properties: {
           path: { type: "string", description: "Output path relative to the working directory, ending in .pptx" },
           accentColor: { type: "string", description: "Optional hex color used for the title accent bar and section-divider backgrounds, instead of the default blue." },
+          theme: {
+            type: "string",
+            enum: ["dark", "light"],
+            description: "'dark' (default): dark slide background with light text. 'light': the classic white-background look.",
+          },
           slides: {
             type: "array",
             items: {
               type: "object",
               properties: {
                 title: { type: "string" },
+                icon: {
+                  type: "string",
+                  enum: Object.keys(ICON_GLYPHS),
+                  description: "Optional icon badge shown next to the title (or above it, for layout='section') in a small accent-colored circle.",
+                },
                 layout: {
                   type: "string",
                   enum: ["title_bullets", "section", "two_column"],
@@ -520,22 +610,55 @@ export const createPptxTool: ToolSpec = {
     const emptyCheck = checkPptxHasContent(args.slides);
     if (emptyCheck) return { ok: false, output: emptyCheck };
 
+    const quality = checkPptxQuality(args.slides ?? []);
+    if (!quality.ok) return { ok: false, output: quality.blocking.join("\n") };
+
     const accent = optionalHexColor(args.accentColor) ?? DEFAULT_ACCENT_HEX;
+    const isDark = args.theme !== "light";
+    const bgColor = isDark ? PPTX_DARK_BG : "FFFFFF";
+    const titleColor = isDark ? PPTX_DARK_TITLE_TEXT : TEXT_HEX;
+    const bodyColor = isDark ? PPTX_DARK_BODY_TEXT : "374151";
+    const zebraColor = isDark ? PPTX_DARK_ZEBRA : PPTX_LIGHT_ZEBRA;
+    const captionColor = isDark ? "94A3B8" : "6B7280";
 
     const filePath = resolveInRoot(ctx.root, args.path);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
 
     const pres = new PptxGenJS();
-    const bodyBase: PptxTextBase = { fontFace: BODY_FONT, fontSize: 16, color: "374151" };
+    const bodyBase: PptxTextBase = { fontFace: BODY_FONT, fontSize: 16, color: bodyColor };
+
+    /** A small emoji glyph centered in a colored circle — the deck's default icon motif. `onAccentBg`
+     *  inverts the badge (white circle, accent glyph) for section slides, whose background is already
+     *  the accent color — an accent-on-accent circle would otherwise be invisible, leaving only the
+     *  glyph floating with no visible badge. */
+    function addIconBadge(slide: PptxGenJS.Slide, icon: unknown, x: number, y: number, diameterIn: number, onAccentBg = false): void {
+      const glyph = typeof icon === "string" ? ICON_GLYPHS[icon] : undefined;
+      if (!glyph) return;
+      const circleColor = onAccentBg ? "FFFFFF" : accent;
+      const glyphColor = onAccentBg ? accent : "FFFFFF";
+      slide.addShape(pres.ShapeType.ellipse, { x, y, w: diameterIn, h: diameterIn, fill: { color: circleColor }, line: { type: "none" } });
+      slide.addText(glyph, {
+        x,
+        y,
+        w: diameterIn,
+        h: diameterIn,
+        align: "center",
+        valign: "middle",
+        fontSize: Math.round(diameterIn * 20),
+        color: glyphColor,
+        margin: 0,
+      });
+    }
 
     for (const spec of args.slides ?? []) {
       const slide = pres.addSlide();
-      slide.background = { color: "FFFFFF" };
+      slide.background = { color: bgColor };
 
       const mode = spec.image ? "image" : spec.table ? "table" : spec.layout === "section" ? "section" : spec.layout === "two_column" ? "two_column" : "title_bullets";
 
       if (mode === "section") {
         slide.background = { color: accent };
+        if (spec.icon) addIconBadge(slide, spec.icon, 4.55, 1.3, 0.9, true);
         slide.addText(String(spec.title ?? ""), {
           x: 0.5,
           y: 2.2,
@@ -553,17 +676,19 @@ export const createPptxTool: ToolSpec = {
 
       // No decorative accent stripe/underline here on purpose — a repeated geometric flourish under every title
       // is one of the most recognizable tells of an AI-generated deck. The accent color still does real work
-      // elsewhere (section backgrounds, table headers) instead of existing purely as decoration.
+      // elsewhere (icon badges, section backgrounds, table headers) instead of existing purely as decoration.
+      const hasIcon = !!spec.icon && ICON_GLYPHS[spec.icon];
+      if (hasIcon) addIconBadge(slide, spec.icon, 0.5, 0.35, 0.62);
       if (spec.title) {
         slide.addText(String(spec.title), {
-          x: 0.5,
+          x: hasIcon ? 1.3 : 0.5,
           y: 0.35,
-          w: 9,
+          w: hasIcon ? 8.2 : 9,
           h: 0.9,
           fontFace: BODY_FONT,
           fontSize: 36,
           bold: true,
-          color: TEXT_HEX,
+          color: titleColor,
         });
       }
 
@@ -579,7 +704,7 @@ export const createPptxTool: ToolSpec = {
         const x = Math.max(0.5, (10 - widthIn) / 2);
         slide.addImage({ data: `data:image/${loaded.type};base64,${loaded.buffer.toString("base64")}`, x, y, w: widthIn, h: heightIn });
         if (spec.image.caption) {
-          slide.addText(pptxRuns(String(spec.image.caption), { fontFace: BODY_FONT, fontSize: 13, color: "6B7280" }), {
+          slide.addText(pptxRuns(String(spec.image.caption), { fontFace: BODY_FONT, fontSize: 13, color: captionColor }), {
             x: 0.5,
             y: Math.min(y + heightIn + 0.15, 5.2),
             w: 9,
@@ -607,7 +732,8 @@ export const createPptxTool: ToolSpec = {
                 text: cell.text,
                 options: {
                   bold: cell.bold || undefined,
-                  fill: i % 2 === 1 ? { color: "F3F4F6" } : undefined,
+                  color: bodyColor,
+                  fill: i % 2 === 1 ? { color: zebraColor } : { color: bgColor },
                   align: (cell.align as any) ?? "left",
                 },
               };
@@ -615,7 +741,14 @@ export const createPptxTool: ToolSpec = {
           );
         });
         if (tableRows.length) {
-          slide.addTable(tableRows, { x: 0.5, y: 1.55, w: 9, fontFace: BODY_FONT, fontSize: 14, border: { type: "solid", color: "D1D5DB", pt: 0.5 } });
+          slide.addTable(tableRows, {
+            x: 0.5,
+            y: 1.55,
+            w: 9,
+            fontFace: BODY_FONT,
+            fontSize: 14,
+            border: { type: "solid", color: isDark ? "334155" : "D1D5DB", pt: 0.5 },
+          });
         }
       } else if (mode === "two_column") {
         const columns = Array.isArray(spec.columns) ? spec.columns : [[], []];
@@ -637,7 +770,18 @@ export const createPptxTool: ToolSpec = {
 
     await pres.writeFile({ fileName: filePath });
     const stat = fs.statSync(filePath);
-    return { ok: true, output: `Created ${args.path} (${(args.slides ?? []).length} slides, ${stat.size} bytes)` };
+
+    const slideTitles = (args.slides ?? []).map((s: any, i: number) => String(s.title ?? "").trim() || `(slide ${i + 1}, no title)`);
+    // Real slide titles, not just a count — see the matching comment in create_docx for why: this is
+    // what the independent critic actually reads to judge quality against the stated intent.
+    const structureSummary = `Slides: ${slideTitles.join(" | ")}`;
+    const warningSuffix = quality.warnings.length ? `\nQuality notes: ${quality.warnings.join(" ")}` : "";
+
+    return {
+      ok: true,
+      output: `Created ${args.path} (${(args.slides ?? []).length} slides, ${stat.size} bytes, ${isDark ? "dark" : "light"} theme). ${structureSummary}${warningSuffix}`,
+      qualityChecked: true,
+    };
   },
 };
 
@@ -704,7 +848,13 @@ export const createXlsxTool: ToolSpec = {
         type: "object",
         properties: {
           path: { type: "string", description: "Output path relative to the working directory, ending in .xlsx" },
-          accentColor: { type: "string", description: "Optional hex color for header row fill, instead of the default blue." },
+          accentColor: {
+            type: "string",
+            description:
+              "Optional brand hex color. By default, header rows use a light-blue fill with dark navy text and the " +
+              "sheet tab is colored to match; passing accentColor derives a matching light tint of your color and " +
+              "uses it for the sheet tab instead.",
+          },
           sheets: {
             type: "array",
             items: {
@@ -748,7 +898,13 @@ export const createXlsxTool: ToolSpec = {
     const emptyCheck = checkXlsxHasContent(args.sheets);
     if (emptyCheck) return { ok: false, output: emptyCheck };
 
-    const accent = optionalHexColor(args.accentColor) ?? DEFAULT_ACCENT_HEX;
+    const quality = checkXlsxQuality(args.sheets ?? []);
+    if (!quality.ok) return { ok: false, output: quality.blocking.join("\n") };
+
+    const customAccent = optionalHexColor(args.accentColor);
+    const accent = customAccent ?? DEFAULT_ACCENT_HEX;
+    const accentDark = customAccent ? darkenHex(accent) : DEFAULT_ACCENT_DARK_HEX;
+    const headerBand = headerBandColors(customAccent, accentDark);
 
     const filePath = resolveInRoot(ctx.root, args.path);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -759,6 +915,7 @@ export const createXlsxTool: ToolSpec = {
 
     sheetSpecs.forEach((sheetSpec: any, i: number) => {
       const sheet = workbook.addWorksheet(sheetSpec.name || `Sheet${i + 1}`);
+      sheet.properties.tabColor = { argb: `FF${accent}` };
       const headers: HeaderSpec[] = (sheetSpec.headers ?? []).map(normalizeHeader);
       const rows: any[][] = sheetSpec.rows ?? [];
 
@@ -767,8 +924,8 @@ export const createXlsxTool: ToolSpec = {
 
       if (headers.length) {
         const headerRow = sheet.addRow(headers.map((h) => h.name));
-        headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-        headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${accent}` } };
+        headerRow.font = { bold: true, color: { argb: `FF${headerBand.text}` } };
+        headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${headerBand.fill}` } };
         headerRow.eachCell((cell, colNumber) => {
           cell.border = cellBorder;
           const align = headers[colNumber - 1]?.align;
@@ -820,8 +977,21 @@ export const createXlsxTool: ToolSpec = {
     await workbook.xlsx.writeFile(filePath);
     const stat = fs.statSync(filePath);
 
-    const warningSuffix = allMergeWarnings.length ? `\nSome merge ranges were invalid and skipped: ${allMergeWarnings.join(", ")}` : "";
-    return { ok: true, output: `Created ${args.path} (${sheetSpecs.length} sheet(s), ${stat.size} bytes)${warningSuffix}` };
+    // Real sheet/header structure, not just a sheet count — see the matching comment in create_docx
+    // for why: this is what the independent critic actually reads to judge quality against intent.
+    const sheetSummaries = sheetSpecs.map((s: any, i: number) => {
+      const headerNames = (s.headers ?? []).map((h: any) => (h && typeof h === "object" ? h.name : h)).filter(Boolean);
+      return `${s.name || `Sheet${i + 1}`} [${headerNames.join(", ")}]`;
+    });
+    const structureSummary = `Sheets: ${sheetSummaries.join(" | ")}`;
+    const mergeSuffix = allMergeWarnings.length ? `\nSome merge ranges were invalid and skipped: ${allMergeWarnings.join(", ")}` : "";
+    const qualitySuffix = quality.warnings.length ? `\nQuality notes: ${quality.warnings.join(" ")}` : "";
+
+    return {
+      ok: true,
+      output: `Created ${args.path} (${sheetSpecs.length} sheet(s), ${stat.size} bytes). ${structureSummary}${mergeSuffix}${qualitySuffix}`,
+      qualityChecked: true,
+    };
   },
 };
 

@@ -8,6 +8,8 @@ import * as path from "path";
 import { chatCompletion } from "./llm";
 import { TOOLS, TOOL_DEFINITIONS } from "./tools";
 import { UPDATE_TASKS_DEFINITION } from "./tools/tasks";
+import { REMEMBER_PREFERENCE_DEFINITION, applyRememberedPreference } from "./tools/preferences";
+import { SAVE_SKILL_DEFINITION, loadProjectSkills, saveProjectSkill, formatSkillsIndexForPrompt, type SkillRecord } from "./tools/skills";
 import { PermissionManager } from "./permissions";
 import { gatherProjectContext } from "./projectContext";
 import { loadSession, saveSession, deleteSession, createSessionId, deriveTitle, pickMostRecentSessionId } from "./session";
@@ -15,7 +17,7 @@ import { McpManager } from "./mcp";
 import { loadGlobalInstructions, saveGlobalInstructions } from "./globalSettings";
 import { gitStatusPorcelain, snapshotFile, restoreSnapshot, type FileSnapshot } from "./workspaceSnapshot";
 import { appendTransaction, loadTransaction } from "./transactionLog";
-import { detectProjectMemory, updateProjectMemory, formatProjectMemoryForPrompt } from "./projectMemory";
+import { detectProjectMemory, updateProjectMemory, loadProjectMemory, formatProjectMemoryForPrompt } from "./projectMemory";
 import { runVerification } from "./verification";
 import { critiqueStep } from "./critic";
 import { withIdleTimeout } from "./timeout";
@@ -53,7 +55,7 @@ const CODE_FILE_RE = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|c|cpp|h|hpp|
 /** Shell commands that just inspect state — running a build/test suite after one of these would be pure noise. */
 const READ_ONLY_ISH_SHELL = /^\s*(ls|dir|pwd|cat|type|echo|git\s+(status|log|diff|show|branch(\s|$)|remote)|node\s+-v|npm\s+-v|npx\s+--version|which|where)\b/i;
 
-function systemPrompt(root: string, projectContext: string, globalInstructions: string, projectMemoryBlock: string): string {
+function systemPrompt(root: string, projectContext: string, globalInstructions: string, projectMemoryBlock: string, skillsBlock: string): string {
   return [
     "You are Wrexlyn, a terminal-based AI coding agent operating on a real project directory. Wrexlyn is your name",
     "and identity — when asked who or what you are, say you're Wrexlyn, created by Nishant Prabhakar, not the name",
@@ -103,6 +105,8 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "",
     projectMemoryBlock,
     "",
+    skillsBlock,
+    "",
     "Guidelines:",
     "- Investigate before editing: read relevant files (or grep/glob for them) before changing code you haven't seen.",
     "- Prefer edit_file for targeted changes; use write_file for new files or full rewrites.",
@@ -129,6 +133,21 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "  outcome) checks whether that step actually accomplished its goal, not just whether it ran without erroring.",
     "  If it flags a problem you'll get a follow-up message describing what it found — treat it as a real, credible",
     "  report and fix the actual issue, not as noise to argue with or dismiss.",
+    "- create_docx/create_pptx/create_xlsx run their own deterministic quality gate before writing the file —",
+    "  leftover placeholder text ('TODO', 'lorem ipsum', etc.), a table whose rows don't line up with its headers,",
+    "  or a table/sheet with headers but no data all fail the call closed with a specific reason. Fix the actual",
+    "  issue named in the error and call the tool again — this check is model-agnostic and always enforced, not",
+    "  something to work around. A clean pass on this gate is what lets a document-only turn get a real 'verified'",
+    "  confidence score instead of the default 'changes made, unverified'.",
+    "",
+    "Self-learning — you have two tools for carrying things forward beyond this one turn:",
+    "- remember_preference: call this the moment the user states a standing preference about formatting, tone, or",
+    "  workflow ('always use the light pptx theme', 'never use emoji in reports') — not for a one-off ask that only",
+    "  applies to the current request. It takes effect immediately, starting with your very next response.",
+    "- save_skill / recall_skill: when you complete a genuinely reusable multi-step pattern likely to recur in this",
+    "  project (a deployment sequence, a report's structure, a recurring analysis), call save_skill so it doesn't",
+    "  have to be re-derived from scratch next time. Saved skills for this project are listed by name below if any",
+    "  exist yet — call recall_skill(name) to retrieve one's full steps when it's relevant to what you're doing.",
     "",
     "Reliability discipline — this is what makes your output trustworthy no matter how capable the underlying model",
     "is. Treat every one of these as mandatory, not aspirational:",
@@ -176,7 +195,10 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "    long enough to need one (reports, specs), it's what makes a document feel genuinely professional rather",
     "    than a wall of text; per-cell `{text, align, bold}` in table headers/rows; a top-level `accentColor` (hex)",
     "    when the user specifies a brand/theme color instead of the default blue.",
-    "  - create_pptx: `layout` per slide — 'section' for a divider slide between parts of the deck, 'two_column'",
+    "  - create_pptx: defaults to a dark theme (`theme: 'light'` to opt out) with an accent-colored icon badge",
+    "    next to each slide's title — pick a fitting `icon` for most slides (see the tool's enum for the available",
+    "    set) rather than leaving it off; this is the deck's default look now, not a rare flourish. `layout` per",
+    "    slide — 'section' for a divider slide between parts of the deck, 'two_column'",
     "    (with `columns`) for side-by-side comparisons, default 'title_bullets' otherwise; `image` and `table`",
     "    fields on any slide for figures/data (don't cram a table into bullet text as a wall of dashes); nested",
     "    bullets via per-item `level`; a top-level `accentColor` (hex). Slide design taste, not just mechanics:",
@@ -251,6 +273,7 @@ export class Agent {
   private sysMessage: ChatMessage;
   private projectContext: string;
   private projectMemory: ProjectMemory;
+  private projectSkills: SkillRecord[];
   private sessionId: string;
   private sessionTitle = "New chat";
 
@@ -271,12 +294,32 @@ export class Agent {
     this.ctx = { root };
     this.projectContext = gatherProjectContext(root);
     this.projectMemory = detectProjectMemory(root);
-    this.sysMessage = {
-      role: "system",
-      content: systemPrompt(root, this.projectContext, loadGlobalInstructions(), formatProjectMemoryForPrompt(this.projectMemory)),
-    };
+    this.projectSkills = loadProjectSkills(root);
+    this.sysMessage = { role: "system", content: this.buildSystemPrompt() };
     this.sessionId = sessionId ?? pickMostRecentSessionId(root) ?? createSessionId();
     this.loadSessionData();
+  }
+
+  /** Renders the system prompt from current in-memory state (global instructions are always re-read from disk). */
+  private buildSystemPrompt(): string {
+    return systemPrompt(
+      this.ctx.root,
+      this.projectContext,
+      loadGlobalInstructions(),
+      formatProjectMemoryForPrompt(this.projectMemory),
+      formatSkillsIndexForPrompt(this.projectSkills)
+    );
+  }
+
+  /**
+   * Rebuilds the system prompt in place from current state and swaps it into the live message list —
+   * used any time something that feeds the prompt changes mid-session (global instructions, a learned
+   * project fact/lesson, a newly remembered preference, a newly saved skill), so it takes effect on
+   * the very next model call instead of only showing up the next time this project is opened.
+   */
+  private rebuildSysMessage(): void {
+    this.sysMessage = { role: "system", content: this.buildSystemPrompt() };
+    this.messages[0] = this.sysMessage;
   }
 
   private loadSessionData(): void {
@@ -357,11 +400,7 @@ export class Agent {
    */
   setGlobalInstructions(text: string): void {
     saveGlobalInstructions(text);
-    this.sysMessage = {
-      role: "system",
-      content: systemPrompt(this.ctx.root, this.projectContext, text, formatProjectMemoryForPrompt(this.projectMemory)),
-    };
-    this.messages[0] = this.sysMessage;
+    this.rebuildSysMessage();
   }
 
   /** Connects any MCP servers configured in <root>/mcp.json. Safe to not await — runs in the background. */
@@ -428,7 +467,13 @@ export class Agent {
           (heartbeat) =>
             chatCompletion(
               this.messages,
-              [...TOOL_DEFINITIONS, UPDATE_TASKS_DEFINITION, ...this.mcpManager.getToolDefinitions()],
+              [
+                ...TOOL_DEFINITIONS,
+                UPDATE_TASKS_DEFINITION,
+                REMEMBER_PREFERENCE_DEFINITION,
+                SAVE_SKILL_DEFINITION,
+                ...this.mcpManager.getToolDefinitions(),
+              ],
               this.llmConfig,
               (chunk) => {
                 heartbeat();
@@ -599,8 +644,22 @@ export class Agent {
         confidence = 40;
       }
     } else {
-      outcome = "unverified_changes";
-      confidence = 60;
+      // No code file/shell command needed build/test/lint verification (see shouldVerify/CODE_FILE_RE) —
+      // but if every successful action this turn was either low-risk or passed its own deterministic
+      // quality gate (create_docx/create_pptx/create_xlsx — see documentQuality.ts), that's genuinely
+      // verified, not just "changes were made, who knows if they're any good". A failed attempt doesn't
+      // count against this: the quality gate runs before the file is written, so a failed call left no
+      // artifact on disk to be uncertain about.
+      const successful = tx.actions.filter((a) => a.ok);
+      const allQualityBacked = successful.length > 0 && successful.every((a) => a.risk === "low" || a.qualityChecked);
+      const anyQualityChecked = successful.some((a) => a.qualityChecked);
+      if (allQualityBacked && anyQualityChecked) {
+        outcome = "verified";
+        confidence = 90;
+      } else {
+        outcome = "unverified_changes";
+        confidence = 60;
+      }
     }
 
     tx.endedAt = Date.now();
@@ -655,7 +714,15 @@ export class Agent {
     }
   }
 
-  /** Folds newly-observed facts (a test command that just worked, a command the user denied) into project memory. */
+  /** Document-generating tools whose failure output comes from documentQuality.ts's deterministic checks. */
+  private static readonly QUALITY_CHECKED_TOOLS = new Set(["create_docx", "create_pptx", "create_xlsx"]);
+
+  /**
+   * Folds newly-observed facts (a test command that just worked, a command the user denied, a document
+   * quality-check failure seen for the second time) into project memory, and — unlike the stale state
+   * this used to silently leave in place — rebuilds the system prompt in place so any of it actually
+   * takes effect for the rest of *this* session, not just the next time the project is opened.
+   */
   private learnFromActions(actions: ActionLogEntry[]): void {
     const patch: Partial<ProjectMemory> = {};
     let changed = false;
@@ -689,9 +756,39 @@ export class Agent {
       changed = true;
     }
 
+    // A quality-check failure seen for the SECOND time in this project is promoted to a durable lesson
+    // that steers future generations via the system prompt — never a model's own self-assessment of
+    // what went wrong, always a specific, catalogued check failure (see documentQuality.ts). This is
+    // the "safe self-healing" behavior: the app doesn't repeat a known mistake, without ever touching
+    // its own source code.
+    const recentSeen = new Set(this.projectMemory.recentQualityFailures ?? []);
+    const lessonsSeen = new Set(this.projectMemory.learnedLessons ?? []);
+    const newRecent: string[] = [...recentSeen];
+    let lessonsChanged = false;
+    for (const a of actions) {
+      if (a.ok || !Agent.QUALITY_CHECKED_TOOLS.has(a.name)) continue;
+      for (const line of a.output.split("\n").map((l) => l.trim()).filter(Boolean)) {
+        if (recentSeen.has(line)) {
+          if (!lessonsSeen.has(line)) {
+            lessonsSeen.add(line);
+            lessonsChanged = true;
+          }
+        } else if (!newRecent.includes(line)) {
+          newRecent.push(line);
+          lessonsChanged = true;
+        }
+      }
+    }
+    if (lessonsChanged) {
+      patch.recentQualityFailures = newRecent.slice(-30);
+      patch.learnedLessons = [...lessonsSeen].slice(-20);
+      changed = true;
+    }
+
     if (changed) {
       this.projectMemory = { ...this.projectMemory, ...patch };
       updateProjectMemory(this.ctx.root, patch);
+      this.rebuildSysMessage();
     }
   }
 
@@ -711,7 +808,8 @@ export class Agent {
     output: string,
     ok: boolean,
     risk: RiskLevel = "low",
-    fileSnapshot?: FileSnapshot
+    fileSnapshot?: FileSnapshot,
+    qualityChecked?: boolean
   ): string {
     this.reporter.toolResult(id, output, ok);
     this.historyLog.push({ type: "tool", id, name, label, args, output, ok });
@@ -726,6 +824,7 @@ export class Agent {
         output,
         timestamp: Date.now(),
         fileSnapshot,
+        qualityChecked,
       });
       if (ok) this.needsVerification = true;
     }
@@ -734,7 +833,7 @@ export class Agent {
 
   /** A call is safe to run concurrently with its neighbors if it can never hit a permission prompt. */
   private isReadOnlyCall(name: string): boolean {
-    if (name === "update_tasks") return true;
+    if (name === "update_tasks" || name === "remember_preference" || name === "save_skill") return true;
     if (this.mcpManager.isMcpTool(name)) return false; // arbitrary third-party code — always confirmed, so always sequential
     const tool = TOOLS[name];
     return tool ? !tool.mutating : false;
@@ -795,6 +894,12 @@ export class Agent {
     if (name === "update_tasks") {
       return this.handleUpdateTasks(id, args);
     }
+    if (name === "remember_preference") {
+      return this.handleRememberPreference(id, args);
+    }
+    if (name === "save_skill") {
+      return this.handleSaveSkill(id, args);
+    }
 
     if (this.mcpManager.isMcpTool(name)) {
       return this.executeMcpTool(id, name, args);
@@ -842,7 +947,7 @@ export class Agent {
       if (result.ok && FILE_PRODUCING_TOOLS.has(name) && typeof args.path === "string") {
         this.trackFile(args.path);
       }
-      return this.recordTool(id, name, label, args, result.output, result.ok, risk, fileSnapshot);
+      return this.recordTool(id, name, label, args, result.output, result.ok, risk, fileSnapshot, result.qualityChecked);
     } catch (err: any) {
       const message = `Tool ${name} threw an error: ${err.message ?? err}`;
       return this.recordTool(id, name, label, args, message, false, risk, fileSnapshot);
@@ -886,6 +991,39 @@ export class Agent {
     this.tasks = tasks;
     this.reporter.tasks(this.tasks);
     return this.recordTool(id, "update_tasks", label, args, `Task list updated (${tasks.length} tasks).`, true);
+  }
+
+  /** Persists a standing preference and rebuilds the system prompt immediately — see tools/preferences.ts. */
+  private handleRememberPreference(id: string, args: any): string {
+    const scope = args.scope === "global" ? "global" : "project";
+    const label = `remember preference (${scope})`;
+    this.reporter.toolCall(id, "remember_preference", label, args, "low");
+
+    const output = applyRememberedPreference(this.ctx.root, scope, args.text);
+    if (scope === "project") this.projectMemory = loadProjectMemory(this.ctx.root);
+    this.rebuildSysMessage();
+
+    return this.recordTool(id, "remember_preference", label, args, output, true);
+  }
+
+  /** Persists a reusable skill and rebuilds the system prompt's skills index immediately — see tools/skills.ts. */
+  private handleSaveSkill(id: string, args: any): string {
+    const name = typeof args.name === "string" ? args.name.trim() : "";
+    const description = typeof args.description === "string" ? args.description.trim() : "";
+    const steps = typeof args.steps === "string" ? args.steps.trim() : "";
+    const label = `save skill "${name || "(unnamed)"}"`;
+    this.reporter.toolCall(id, "save_skill", label, args, "low");
+
+    if (!name || !description || !steps) {
+      return this.recordTool(id, "save_skill", label, args, "name, description, and steps are all required to save a skill.", false);
+    }
+
+    const skill: SkillRecord = { name, description, steps };
+    saveProjectSkill(this.ctx.root, skill);
+    this.projectSkills = loadProjectSkills(this.ctx.root);
+    this.rebuildSysMessage();
+
+    return this.recordTool(id, "save_skill", label, args, `Saved skill "${name}" for this project.`, true);
   }
 }
 

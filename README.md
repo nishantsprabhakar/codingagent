@@ -195,8 +195,11 @@ REPL commands:
   permanent errors like 401/402/404.
 - **Tools**: `read_file`, `write_file`, `edit_file`, `list_dir`, `glob_search`,
   `grep_search`, `run_shell_command`, `create_docx`, `create_pptx`,
-  `create_xlsx`, `web_fetch` — file paths are sandboxed to the `--cwd` root (a
-  path that resolves outside it is rejected).
+  `create_xlsx`, `web_fetch`, `read_pdf`, `redline_docx`, `recall_skill` —
+  file paths are sandboxed to the `--cwd` root (a path that resolves outside
+  it is rejected). `update_tasks`, `remember_preference`, and `save_skill`
+  are handled specially (they update session/project state directly rather
+  than just touching the filesystem).
 - **Permissions**: read-only tools (including `web_fetch`) run automatically.
   Mutating tools (file writes, shell commands, MCP tool calls) print a preview
   (diff for edits, full content for new files, the literal command for shell)
@@ -218,7 +221,34 @@ REPL commands:
 - **Documents**: ask for a Word doc, PowerPoint deck, or Excel workbook and
   the agent generates a genuine, well-formatted `.docx`/`.pptx`/`.xlsx` file
   (headings, bullet lists, tables; bold header rows and auto-sized columns in
-  Excel) — not just a text file with the wrong extension.
+  Excel) — not just a text file with the wrong extension. PowerPoint defaults
+  to a dark theme with an accent-colored icon badge next to each slide title
+  (`theme: "light"` to opt out); Word and Excel default to a light-blue
+  header band on top-level headings and table/sheet header rows, with the
+  Excel sheet tab colored to match. A custom `accentColor` on any of the
+  three derives a matching tint instead of the hardcoded default blue.
+- **Document quality gate**: before writing a `.docx`/`.pptx`/`.xlsx` file,
+  the tool runs a deterministic (non-LLM) structural check — leftover
+  placeholder text ("TODO", "lorem ipsum", etc.), a table whose rows don't
+  match its header count, or a table/sheet with headers but no data all fail
+  the call closed with a specific reason, so the model corrects it before
+  anything is written. This is what's model-agnostic about output quality
+  here: it inspects the actual generated content, not the model's confidence
+  about it. A document-only turn that passes cleanly gets a genuine
+  "verified" confidence score in the end-of-turn transaction summary instead
+  of the default "changes made, unverified".
+- **Self-learning**: the agent has two tools for carrying things forward
+  beyond one turn. `remember_preference` persists a standing preference the
+  user states about formatting/tone/workflow (project-scoped, or global via
+  `~/.coding-agent/global-instructions.txt`) and takes effect immediately —
+  no restart needed. `save_skill` / `recall_skill` persist a reusable
+  multi-step pattern under `.coding-agent/skills/<name>.json`; every saved
+  skill's name and one-line description are listed in the system prompt from
+  then on, with `recall_skill` fetching the full steps on demand. Repeated
+  document quality-check failures of the *same specific kind* are also
+  folded into project memory as a short lesson (`ProjectMemory.learnedLessons`)
+  so the model stops making that particular mistake in this project — never
+  by editing the app's own code, only by steering what the model is told.
 - **Progress visualization**: for anything beyond a single trivial step, the
   agent lays out a plan as a task list, shown in the web UI as a percentage
   ring plus a connected step-by-step timeline (pulsing while a step is in

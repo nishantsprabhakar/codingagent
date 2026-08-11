@@ -106,5 +106,18 @@ export function formatProjectMemoryForPrompt(memory: ProjectMemory): string {
   if (memory.lintCommand) lines.push(`- Lint command: ${memory.lintCommand}`);
   if (memory.conventions?.length) lines.push(`- Conventions: ${memory.conventions.join("; ")}`);
   if (memory.blockedCommands?.length) lines.push(`- Previously blocked/denied commands: ${memory.blockedCommands.join("; ")}`);
+  if (memory.preferences?.length) lines.push(`- User preferences for this project: ${memory.preferences.join("; ")}`);
+  if (memory.learnedLessons?.length) lines.push(`- Lessons from past quality-check failures — don't repeat these: ${memory.learnedLessons.join("; ")}`);
   return lines.length ? `Known project facts (learned from past sessions):\n${lines.join("\n")}` : "";
+}
+
+/** Appends one standing preference (from remember_preference, scope=project), deduplicated. */
+export function addProjectPreference(root: string, text: string): { added: boolean; preferences: string[] } {
+  const clean = text.trim();
+  const memory = loadProjectMemory(root);
+  const existing = memory.preferences ?? [];
+  if (!clean || existing.includes(clean)) return { added: false, preferences: existing };
+  const preferences = [...existing, clean];
+  updateProjectMemory(root, { preferences });
+  return { added: true, preferences };
 }

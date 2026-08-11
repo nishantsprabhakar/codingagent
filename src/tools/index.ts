@@ -11,6 +11,7 @@ import { createDocxTool, createPptxTool, createXlsxTool } from "./documents";
 import { webFetchTool } from "./web";
 import { readPdfTool } from "./pdf";
 import { redlineDocxTool } from "./redline";
+import { recallSkillTool } from "./skills";
 
 export const TOOLS: Record<string, ToolSpec> = {
   read_file: readFileTool,
@@ -26,6 +27,7 @@ export const TOOLS: Record<string, ToolSpec> = {
   web_fetch: webFetchTool,
   read_pdf: readPdfTool,
   redline_docx: redlineDocxTool,
+  recall_skill: recallSkillTool,
 };
 
 export const TOOL_DEFINITIONS = Object.values(TOOLS).map((t) => t.definition);
