@@ -200,11 +200,11 @@ const PROVIDER_META = {
   },
   openrouter: {
     label: "OpenRouter",
-    model: "inclusionai/ling-3.0-flash:free",
+    model: "openai/gpt-oss-20b:free",
     needsKey: true,
     note: 'Free key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> — pick a ":free" model to avoid needing credits.',
     stream: (messages, apiKey, onDelta) =>
-      openAiCompatibleStream("https://openrouter.ai/api/v1/chat/completions", apiKey, "inclusionai/ling-3.0-flash:free", messages, onDelta),
+      openAiCompatibleStream("https://openrouter.ai/api/v1/chat/completions", apiKey, "openai/gpt-oss-20b:free", messages, onDelta),
   },
   gemini: {
     label: "Google Gemini",

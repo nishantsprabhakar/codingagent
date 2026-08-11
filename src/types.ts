@@ -36,7 +36,7 @@ export interface LlmConfig {
 export const DEFAULT_MODEL: Record<LlmProvider, string> = {
   pollinations: "openai",
   groq: "llama-3.3-70b-versatile",
-  openrouter: "inclusionai/ling-3.0-flash:free",
+  openrouter: "openai/gpt-oss-20b:free",
   gemini: "gemini-3.5-flash",
   cerebras: "llama-3.3-70b",
   mistral: "mistral-small-latest",

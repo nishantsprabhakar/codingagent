@@ -82,6 +82,16 @@ export function createOpenAiCompatibleProvider(config: OpenAiCompatibleConfig) {
           continue;
         }
 
+        if (res.status === 400) {
+          const text = await res.text().catch(() => "");
+          throwFatal(
+            `${config.label} rejected this request (400). This can happen after switching models/providers ` +
+              `mid-conversation, which can leave tool-call metadata in the history that ${config.label} doesn't ` +
+              `recognize — try switching back to the provider you started this conversation with, or start a new ` +
+              `session. Raw error: ${text.slice(0, 500)}`
+          );
+        }
+
         if (!res.ok) {
           const text = await res.text().catch(() => "");
           throwFatal(`${config.label} API error ${res.status}: ${text.slice(0, 800)}`);

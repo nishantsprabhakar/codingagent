@@ -14,11 +14,12 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 let cache: { models: ModelSummary[]; fetchedAt: number } | null = null;
 
 /**
- * OpenRouter's public model list (no auth needed), filtered to models that
- * actually support tool/function calling — this agent can't function
- * without that, and most of OpenRouter's 300+ models don't support it. Free
- * models are sorted first. Cached briefly since this list rarely changes
- * minute-to-minute and the modal may be opened repeatedly.
+ * OpenRouter's public model list (no auth needed), filtered to models that are
+ * both free (zero prompt/completion price — never a source of a surprise charge
+ * on the account) and support tool/function calling, which this agent can't
+ * function without and which most of OpenRouter's 300+ models don't support.
+ * Cached briefly since this list rarely changes minute-to-minute and the modal
+ * may be opened repeatedly.
  */
 export async function listOpenRouterModels(): Promise<ModelSummary[]> {
   if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) return cache.models;
@@ -29,16 +30,14 @@ export async function listOpenRouterModels(): Promise<ModelSummary[]> {
 
   const models: ModelSummary[] = (data.data ?? [])
     .filter((m: any) => Array.isArray(m.supported_parameters) && m.supported_parameters.includes("tools"))
+    .filter((m: any) => m.pricing?.prompt === "0" && m.pricing?.completion === "0")
     .map((m: any) => ({
       id: m.id,
       name: m.name ?? m.id,
-      free: m.pricing?.prompt === "0" && m.pricing?.completion === "0",
+      free: true,
       contextLength: m.context_length ?? 0,
     }))
-    .sort((a: ModelSummary, b: ModelSummary) => {
-      if (a.free !== b.free) return a.free ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
+    .sort((a: ModelSummary, b: ModelSummary) => a.name.localeCompare(b.name));
 
   cache = { models, fetchedAt: Date.now() };
   return models;

@@ -118,7 +118,7 @@ Options:
   --cwd <path>      Working directory the agent may read/write (default: current directory)
   --provider <name> "pollinations" (default, free, no key), "groq", or "openrouter" (both free tier, need a key)
   --model <name>    Model to use (default: "openai" for pollinations, "llama-3.3-70b-versatile" for groq,
-                    "inclusionai/ling-3.0-flash:free" for openrouter)
+                    "openai/gpt-oss-20b:free" for openrouter)
   --api-key <key>   API key for --provider groq/openrouter (or set GROQ_API_KEY / OPENROUTER_API_KEY)
   --yolo            Auto-approve all file writes / edits / shell commands (dangerous)
   --web             Serve the web UI instead of the terminal REPL
