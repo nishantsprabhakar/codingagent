@@ -5,6 +5,7 @@
  */
 import type { ChatMessage, ToolDefinition, ChatCompletionResult } from "../types";
 import { consumeSseStream } from "./sseStream";
+import { computeRetryDelayMs } from "./retryPolicy";
 
 const BASE_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -42,7 +43,7 @@ export async function chatCompletion(
       }
 
       if (res.status === 429 || res.status >= 500) {
-        const waitMs = Math.min(2000 * 2 ** attempt, 20000);
+        const waitMs = computeRetryDelayMs(res.status, res.headers.get("retry-after"), attempt);
         lastError = new Error(`Groq API returned ${res.status}`);
         await sleep(waitMs);
         continue;

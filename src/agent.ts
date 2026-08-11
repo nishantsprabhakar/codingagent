@@ -702,6 +702,15 @@ export class Agent {
     const roundActions = tx.actions.slice(actionsBefore).filter((a) => a.ok);
     if (!roundActions.length) return;
 
+    // A round where every action already passed its own deterministic structural quality gate
+    // (create_docx/create_pptx/create_xlsx — see documentQuality.ts) doesn't need an extra LLM
+    // round-trip to catch the same class of mistake a fast, free check already caught for free —
+    // this is a real request-count reduction on document-heavy turns, not a reliability trade-off,
+    // since the critic's marginal value here (checking structural/formatting correctness) is exactly
+    // what the quality gate already verified. Skip it only when *every* action in the round qualifies;
+    // a round that mixes a quality-checked document with a plain code edit still gets critiqued.
+    if (roundActions.every((a) => a.qualityChecked)) return;
+
     const stepSummary = roundActions
       .map((a) => `- ${a.label}\n  result: ${a.output.slice(0, MAX_CRITIQUE_ACTION_CHARS)}`)
       .join("\n");
