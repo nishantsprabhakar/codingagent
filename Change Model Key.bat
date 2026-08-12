@@ -1,6 +1,6 @@
 @echo off
-title Coding Agent
+title Wrexlyn
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\launch.ps1" -ResetApiKey
 echo.
-echo Coding Agent stopped.
+echo Wrexlyn stopped.
 pause >nul

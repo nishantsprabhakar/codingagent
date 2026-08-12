@@ -9,12 +9,23 @@
  */
 import type * as http from "http";
 
-/** Applied to every response — this app has no CDN scripts and no reason to be framed by another origin. */
-export function applySecureHeaders(res: http.ServerResponse): void {
+/**
+ * Applied to every response — this app has no CDN scripts and no reason to be framed by another origin.
+ * `scriptNonce` (a fresh random value per request, see server.ts) is the only thing allowed to run as an
+ * inline `<script>` — index.html's early theme-init snippet needs to run before its stylesheet loads to
+ * avoid a flash of the wrong theme, and a nonce lets it do that without a blanket 'unsafe-inline', which
+ * would reopen exactly the XSS surface this header exists to close. Google Fonts is the one legitimate
+ * cross-origin asset this app loads, so style-src/font-src carve out just those two hosts rather than 'self'.
+ */
+export function applySecureHeaders(res: http.ServerResponse, scriptNonce: string): void {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
-  res.setHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; connect-src 'self' ws: wss:");
+  res.setHeader(
+    "Content-Security-Policy",
+    `default-src 'self'; script-src 'self' 'nonce-${scriptNonce}'; style-src 'self' https://fonts.googleapis.com; ` +
+      `font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ws: wss:`
+  );
 }
 
 /**

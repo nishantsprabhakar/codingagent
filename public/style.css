@@ -343,11 +343,41 @@ html, body {
 }
 
 body {
-  background-image:
-    radial-gradient(circle at 15% 0%, rgba(var(--accent-rgb), 0.07), transparent 45%),
-    radial-gradient(circle at 85% 100%, rgba(var(--accent-2-rgb), 0.06), transparent 45%);
-  background-attachment: fixed;
+  position: relative;
   overflow: hidden;
+}
+
+/* Ambient background glow — a separate layer (not body's own background) so it can pulse in and out via
+   opacity/scale without dimming or resizing any real content painted above it. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(var(--accent-rgb), 0.09), transparent 45%),
+    radial-gradient(circle at 85% 100%, rgba(var(--accent-2-rgb), 0.08), transparent 45%);
+  background-attachment: fixed;
+  animation: bg-glow-breathe 10s ease-in-out infinite;
+}
+
+@keyframes bg-glow-breathe {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none;
+    opacity: 0.85;
+  }
 }
 
 #bg-canvas {

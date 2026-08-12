@@ -31,7 +31,7 @@ if (-not $nodePath -or -not $npmPath) {
     Add-Type -AssemblyName System.Windows.Forms
     [System.Windows.Forms.MessageBox]::Show(
         "Node.js is required but wasn't found. Please install it from https://nodejs.org, then double-click this launcher again.",
-        "Coding Agent - Node.js missing",
+        "Wrexlyn - Node.js missing",
         "OK",
         "Error"
     ) | Out-Null
@@ -40,7 +40,7 @@ if (-not $nodePath -or -not $npmPath) {
 
 Write-Host ""
 Write-Host "===================================" -ForegroundColor DarkCyan
-Write-Host "        Coding Agent" -ForegroundColor DarkCyan
+Write-Host "        Wrexlyn" -ForegroundColor DarkCyan
 Write-Host "===================================" -ForegroundColor DarkCyan
 Write-Host ""
 
@@ -82,7 +82,7 @@ $folder = $config.folder
 if (-not $folder -or -not (Test-Path $folder -PathType Container)) {
     Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dialog.Description = "Choose the project folder you want the Coding Agent to work on"
+    $dialog.Description = "Choose the project folder you want Wrexlyn to work on"
     $dialog.ShowNewFolderButton = $true
 
     Write-Step "Choose which folder the agent should work on..."
@@ -101,7 +101,7 @@ if (-not (Test-Path $folder -PathType Container)) {
     Add-Type -AssemblyName System.Windows.Forms
     [System.Windows.Forms.MessageBox]::Show(
         "That folder couldn't be found:`n$folder`n`nPlease double-click the launcher again and choose an existing folder.",
-        "Coding Agent - folder not found",
+        "Wrexlyn - folder not found",
         "OK",
         "Error"
     ) | Out-Null
@@ -119,7 +119,7 @@ if ($null -eq $config.apiKey) {
         "  - OpenRouter: https://openrouter.ai/keys`n`n" +
         "Leave this blank and click OK to skip (the agent will still run, but won't be able to take real actions " +
         "until you add a key here or via 'Change Model Key.bat').",
-        "Coding Agent - model key",
+        "Wrexlyn - model key",
         ""
     )
     $trimmedKey = if ($key) { $key.Trim() } else { "" }

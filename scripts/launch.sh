@@ -23,7 +23,7 @@ fi
 
 echo ""
 echo "==================================="
-echo "        Coding Agent"
+echo "        Wrexlyn"
 echo "==================================="
 echo ""
 

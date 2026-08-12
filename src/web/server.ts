@@ -4,6 +4,7 @@
  * See LICENSE for details.
  */
 import * as http from "http";
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -97,7 +98,8 @@ export function startWebServer(
 
   const httpServer = http.createServer((req, res) => {
     try {
-      applySecureHeaders(res);
+      const scriptNonce = crypto.randomBytes(16).toString("base64");
+      applySecureHeaders(res, scriptNonce);
 
       const clientKey = req.socket.remoteAddress ?? "unknown";
       if (!httpRateLimiter.tryConsume(clientKey)) {
@@ -114,7 +116,7 @@ export function startWebServer(
         }
       }
 
-      handleHttp(req, res, url, currentRoot, currentProvider, port, lan, auth);
+      handleHttp(req, res, url, currentRoot, currentProvider, port, lan, auth, scriptNonce);
     } catch (err: any) {
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end(`Internal error: ${err.message ?? err}`);
@@ -411,7 +413,8 @@ function handleHttp(
   provider: string,
   port: number,
   lan: boolean,
-  auth: WebAuth
+  auth: WebAuth,
+  scriptNonce: string
 ): void {
   if (url.pathname === "/api/pair") return handlePair(url, res, auth);
   if (url.pathname === "/api/tree") return handleTree(url, res, root);
@@ -430,7 +433,7 @@ function handleHttp(
   if (url.pathname === "/api/skill-library") return sendJson(res, 200, { skills: loadSkillLibrary(root) });
   if (url.pathname === "/api/starter-skills") return sendJson(res, 200, { skills: STARTER_SKILLS });
 
-  serveStatic(url.pathname, res);
+  serveStatic(url.pathname, res, scriptNonce);
 }
 
 /** Exchanges a valid, unexpired, single-use pairing token for the real (long-lived) auth token. This is the only unauthenticated /api/ route — its own token is short-lived and consumed on first use, so it never becomes a standing credential. */
@@ -749,7 +752,7 @@ function handleUpload(req: http.IncomingMessage, url: URL, res: http.ServerRespo
   });
 }
 
-function serveStatic(pathname: string, res: http.ServerResponse): void {
+function serveStatic(pathname: string, res: http.ServerResponse, scriptNonce: string): void {
   const safePath = pathname === "/" ? "/index.html" : pathname;
   if (safePath.includes("..")) {
     res.writeHead(400).end("bad path");
@@ -769,6 +772,16 @@ function serveStatic(pathname: string, res: http.ServerResponse): void {
     "Content-Type": MIME[ext] || "application/octet-stream",
     "Cache-Control": "no-cache",
   });
+
+  // index.html carries one inline <script> (the early theme-init snippet, run before the stylesheet loads
+  // to avoid a flash of the wrong theme) — it needs this response's actual nonce substituted in, so it's
+  // read as text and templated instead of streamed like every other static asset.
+  if (safePath === "/index.html") {
+    const html = fs.readFileSync(filePath, "utf-8").replace(/__CSP_NONCE__/g, scriptNonce);
+    res.end(html);
+    return;
+  }
+
   fs.createReadStream(filePath).pipe(res);
 }
 
