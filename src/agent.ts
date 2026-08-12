@@ -395,9 +395,9 @@ export class Agent {
     return this.llmConfig.model;
   }
 
-  /** Switches the active provider (and its model/key) for subsequent turns, without losing conversation history or recreating the agent. */
-  switchProvider(provider: LlmConfig["provider"], model: string, apiKey: string | undefined): void {
-    this.llmConfig = { provider, model, apiKey };
+  /** Switches the active provider (and its model/key/baseUrl) for subsequent turns, without losing conversation history or recreating the agent. */
+  switchProvider(provider: LlmConfig["provider"], model: string, apiKey: string | undefined, baseUrl?: string): void {
+    this.llmConfig = { provider, model, apiKey, baseUrl };
   }
 
   getProvider(): LlmConfig["provider"] {

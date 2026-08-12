@@ -31,13 +31,16 @@ export interface ChatCompletionResult {
   usage?: TokenUsage;
 }
 
-export type LlmProvider = "pollinations" | "groq" | "openrouter" | "gemini" | "cerebras" | "mistral";
+export type LlmProvider = "pollinations" | "groq" | "openrouter" | "gemini" | "cerebras" | "mistral" | "custom";
 
 export interface LlmConfig {
   provider: LlmProvider;
   model: string;
-  /** Required for "groq"/"openrouter"; ignored by "pollinations". */
+  /** Required for "groq"/"openrouter"/etc; optional for "custom" (many local model servers need none); ignored by "pollinations". */
   apiKey?: string;
+  /** Full chat-completions endpoint URL — "custom" only. Lets any OpenAI-compatible API (a provider not built in, or a
+   *  locally-running model server like Ollama/LM Studio/llama.cpp) be used without a code change. */
+  baseUrl?: string;
 }
 
 /** Fallback model when switching to a provider with no explicit model chosen yet. Shared by the CLI and the web server's live provider switch. */
@@ -48,6 +51,8 @@ export const DEFAULT_MODEL: Record<LlmProvider, string> = {
   gemini: "gemini-3.5-flash",
   cerebras: "llama-3.3-70b",
   mistral: "mistral-small-latest",
+  // No sensible default — the model id on a custom/local endpoint is entirely user-defined.
+  custom: "",
 };
 
 export interface ChatMessage {

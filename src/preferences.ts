@@ -9,6 +9,8 @@ import * as path from "path";
 
 interface Preferences {
   lastModel?: Record<string, string>;
+  /** Chat-completions endpoint URL for the "custom" provider — any OpenAI-compatible API, including a local model server. */
+  customBaseUrl?: string;
 }
 
 function storePath(): string {
@@ -43,5 +45,16 @@ export function loadLastModel(provider: string): string | null {
 export function saveLastModel(provider: string, model: string): void {
   const prefs = load();
   prefs.lastModel = { ...prefs.lastModel, [provider]: model };
+  save(prefs);
+}
+
+/** The saved endpoint for the "custom" provider, or null if unset/cleared. Empty string counts as unset. */
+export function loadCustomBaseUrl(): string | null {
+  return load().customBaseUrl || null;
+}
+
+export function saveCustomBaseUrl(baseUrl: string): void {
+  const prefs = load();
+  prefs.customBaseUrl = baseUrl;
   save(prefs);
 }

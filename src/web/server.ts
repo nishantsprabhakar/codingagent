@@ -14,7 +14,7 @@ import { PermissionManager, type PermissionDecision } from "../permissions";
 import { resolveInRoot } from "../tools/paths";
 import { WebSocketReporter, createConfirmFn } from "./reporter";
 import { loadRecentFolders, addRecentFolder } from "../recentFolders";
-import { saveLastModel, loadLastModel } from "../preferences";
+import { saveLastModel, loadLastModel, loadCustomBaseUrl, saveCustomBaseUrl } from "../preferences";
 import { loadGlobalInstructions } from "../globalSettings";
 import { loadApiKey, saveApiKey, clearApiKey, maskApiKey, API_KEY_PROVIDERS, type ApiKeyProvider } from "../apiKeys";
 import { describeActiveBackend } from "../secretStore";
@@ -85,6 +85,7 @@ export function startWebServer(
   let currentProvider = llmConfig.provider;
   let currentModel = llmConfig.model;
   let currentApiKey = llmConfig.apiKey;
+  let currentBaseUrl = llmConfig.baseUrl;
   addRecentFolder(currentRoot);
 
   const auth = new WebAuth();
@@ -161,7 +162,7 @@ export function startWebServer(
     const reporter = new WebSocketReporter(send);
     const confirmFn = createConfirmFn(send, pending);
     const permissions = new PermissionManager(yolo, confirmFn);
-    let agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey }, permissions, reporter);
+    let agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter);
     agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
 
     sendInit();
@@ -195,7 +196,7 @@ export function startWebServer(
           await agent.dispose();
           currentRoot = target;
           addRecentFolder(currentRoot);
-          agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey }, permissions, reporter);
+          agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter);
           agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
           sendInit();
           sendSessions();
@@ -217,7 +218,15 @@ export function startWebServer(
             return;
           }
           let apiKey: string | undefined;
-          if (provider !== "pollinations") {
+          let baseUrl: string | undefined;
+          if (provider === "custom") {
+            baseUrl = loadCustomBaseUrl() ?? undefined;
+            if (!baseUrl) {
+              reporter.error(`No base URL configured for the custom provider yet — add one from Settings > API Keys > Custom / Local Model first.`);
+              return;
+            }
+            apiKey = (await loadApiKey("custom")) ?? undefined; // optional — many local model servers need none
+          } else if (provider !== "pollinations") {
             apiKey = (await loadApiKey(provider as ApiKeyProvider)) ?? undefined;
             if (!apiKey) {
               reporter.error(`No API key saved for ${provider} yet — add one from Settings > API Keys first.`);
@@ -228,7 +237,8 @@ export function startWebServer(
           currentProvider = provider;
           currentModel = model;
           currentApiKey = apiKey;
-          agent.switchProvider(currentProvider, currentModel, currentApiKey);
+          currentBaseUrl = baseUrl;
+          agent.switchProvider(currentProvider, currentModel, currentApiKey, currentBaseUrl);
           saveLastModel(currentProvider, currentModel);
           send({ type: "provider_changed", provider: currentProvider, model: currentModel });
         } else if (msg.type === "new_session") {
@@ -289,11 +299,35 @@ export function startWebServer(
           send({ type: "settings_saved", which: "api_keys" });
         } else if (msg.type === "clear_api_key") {
           await clearApiKey(msg.provider);
+          if (msg.provider === "custom") saveCustomBaseUrl(""); // full reset — a bare key clear would leave a dangling endpoint
           if (msg.provider === currentProvider) {
             currentApiKey = undefined;
-            agent.switchProvider(currentProvider, currentModel, currentApiKey);
+            if (msg.provider === "custom") currentBaseUrl = undefined;
+            agent.switchProvider(currentProvider, currentModel, currentApiKey, currentBaseUrl);
           }
           send({ type: "settings_saved", which: "api_keys" });
+        } else if (msg.type === "update_custom_provider") {
+          const baseUrl = msg.baseUrl?.trim();
+          const model = msg.model?.trim();
+          const apiKey = msg.apiKey?.trim() ?? "";
+          if (!baseUrl || !model) {
+            reporter.error("Base URL and Model ID are both required for the custom provider.");
+            return;
+          }
+          saveCustomBaseUrl(baseUrl);
+          saveLastModel("custom", model);
+          if (apiKey) {
+            await saveApiKey("custom", apiKey);
+          } else {
+            await clearApiKey("custom");
+          }
+          if (currentProvider === "custom") {
+            currentBaseUrl = baseUrl;
+            currentModel = model;
+            currentApiKey = apiKey || undefined;
+            agent.switchProvider(currentProvider, currentModel, currentApiKey, currentBaseUrl);
+          }
+          send({ type: "settings_saved", which: "custom_provider" });
         }
       } catch (err: any) {
         // A single bad request/response should never take the whole server
@@ -340,7 +374,9 @@ export function startWebServer(
     console.log(`root: ${currentRoot}`);
     console.log(`model: ${llmConfig.provider} · ${currentModel}${yolo ? "  (yolo mode: all actions auto-approved)" : ""}`);
     console.log(`API key storage: ${await describeActiveBackend()}\n`);
-    if (API_KEY_PROVIDERS.includes(llmConfig.provider as ApiKeyProvider) && !llmConfig.apiKey) {
+    if (llmConfig.provider === "custom" && !llmConfig.baseUrl) {
+      console.log(`(custom provider selected but no base URL configured — add one from Settings > API Keys > Custom / Local Model)\n`);
+    } else if (llmConfig.provider !== "custom" && API_KEY_PROVIDERS.includes(llmConfig.provider as ApiKeyProvider) && !llmConfig.apiKey) {
       console.log(`(no API key set for ${llmConfig.provider} yet — add one from Settings > API Keys in the web UI)\n`);
     }
   });
@@ -510,12 +546,22 @@ function handleGlobalInstructions(res: http.ServerResponse): void {
 
 /** Never returns raw keys — just whether one is set and a masked hint, so the client can never leak/log a real key. */
 async function handleApiKeys(res: http.ServerResponse): Promise<void> {
-  const providers = API_KEY_PROVIDERS;
-  const result: Record<string, { set: boolean; masked: string | null }> = {};
-  for (const provider of providers) {
+  const result: Record<string, { set: boolean; masked: string | null; baseUrl?: string | null; model?: string | null }> = {};
+  for (const provider of API_KEY_PROVIDERS) {
+    if (provider === "custom") continue; // "custom" has its own shape below — "set" means configured, not just keyed
     const key = await loadApiKey(provider);
     result[provider] = { set: !!key, masked: key ? maskApiKey(key) : null };
   }
+  const customBaseUrl = loadCustomBaseUrl();
+  const customModel = loadLastModel("custom");
+  const customKey = await loadApiKey("custom");
+  result.custom = {
+    // A key is optional for local model servers — "configured" means it has an endpoint and a model, not a key.
+    set: !!customBaseUrl && !!customModel,
+    masked: customKey ? maskApiKey(customKey) : null,
+    baseUrl: customBaseUrl,
+    model: customModel,
+  };
   sendJson(res, 200, result);
 }
 
@@ -537,6 +583,12 @@ async function handleModels(res: http.ServerResponse, provider: string): Promise
     if (provider === "gemini") return sendJson(res, 200, { models: GEMINI_MODELS });
     if (provider === "cerebras") return sendJson(res, 200, { models: CEREBRAS_MODELS });
     if (provider === "mistral") return sendJson(res, 200, { models: MISTRAL_MODELS });
+    if (provider === "custom") {
+      return sendJson(res, 200, {
+        models: [],
+        note: "Custom/local models are configured in Settings > API Keys > Custom / Local Model — set a Base URL and Model ID there, then switch to this provider from here.",
+      });
+    }
     return sendJson(res, 200, {
       models: [],
       note: "Pollinations doesn't support model selection for tool-calling.",

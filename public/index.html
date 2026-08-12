@@ -281,6 +281,38 @@
 
       <div id="apikey-rows"></div>
 
+      <div class="apikey-row">
+        <div class="apikey-row-label">
+          <span>Custom / Local Model</span>
+          <span id="apikey-custom-current" class="apikey-current">Not set</span>
+        </div>
+        <div class="apikey-row-fields apikey-row-fields-wrap">
+          <input
+            id="apikey-custom-baseurl"
+            class="folder-input"
+            type="text"
+            placeholder="Base URL, e.g. http://localhost:11434/v1/chat/completions"
+            autocomplete="off"
+          />
+          <input id="apikey-custom-model" class="folder-input" type="text" placeholder="Model ID, e.g. llama3.1" autocomplete="off" />
+          <input
+            id="apikey-custom-apikey"
+            class="folder-input"
+            type="password"
+            placeholder="API key (optional — leave blank for local models)"
+            autocomplete="off"
+          />
+          <button id="apikey-custom-clear" class="btn btn-secondary">Clear</button>
+          <button id="apikey-custom-save" class="btn btn-primary">Save</button>
+        </div>
+        <p class="settings-hint">
+          Any OpenAI-compatible chat-completions endpoint — a paid API not listed above, or a local server like
+          Ollama (<code>http://localhost:11434/v1/chat/completions</code>) or LM Studio
+          (<code>http://localhost:1234/v1/chat/completions</code>). Tool-calling support varies by local model —
+          small models often can't take real actions reliably.
+        </p>
+      </div>
+
       <div class="settings-panel-actions">
         <span id="settings-apikeys-status" class="settings-save-status"></span>
       </div>

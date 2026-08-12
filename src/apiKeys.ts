@@ -20,10 +20,12 @@ import * as os from "os";
 import * as path from "path";
 import { getSecretStore } from "./secretStore";
 
-export type ApiKeyProvider = "groq" | "openrouter" | "gemini" | "cerebras" | "mistral";
+export type ApiKeyProvider = "groq" | "openrouter" | "gemini" | "cerebras" | "mistral" | "custom";
 
-/** Every provider that needs a stored key — single source of truth for iterating "all key-based providers". */
-export const API_KEY_PROVIDERS: readonly ApiKeyProvider[] = ["groq", "openrouter", "gemini", "cerebras", "mistral"];
+/** Every provider that needs a stored key — single source of truth for iterating "all key-based providers".
+ *  "custom" is here too even though its key is optional (many local model servers need none) — it still
+ *  goes through the same secure-storage path when one is supplied. */
+export const API_KEY_PROVIDERS: readonly ApiKeyProvider[] = ["groq", "openrouter", "gemini", "cerebras", "mistral", "custom"];
 
 let baseDirOverride: string | null = null;
 /** Test-only: production code must never call this. */

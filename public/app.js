@@ -398,7 +398,7 @@
         break;
       case "settings_saved":
         if (msg.which === "instructions") flashStatus(el.settingsInstructionsStatus, "Saved.");
-        if (msg.which === "api_keys") {
+        if (msg.which === "api_keys" || msg.which === "custom_provider") {
           flashStatus(el.settingsApiKeysStatus, "Saved.");
           loadApiKeysStatus();
         }
@@ -1310,6 +1310,7 @@
     gemini: "Google Gemini",
     cerebras: "Cerebras",
     mistral: "Mistral",
+    custom: "Custom / Local",
   };
 
   // Which provider's models the picker is currently browsing — starts on the active one each time it opens, but
@@ -1335,7 +1336,7 @@
 
   function renderProviderChips() {
     el.modelProviderChips.innerHTML = "";
-    for (const provider of ["pollinations", ...API_KEY_PROVIDERS]) {
+    for (const provider of ["pollinations", ...API_KEY_PROVIDERS, "custom"]) {
       const hasKey = provider === "pollinations" || !!pickerKeyStatus[provider]?.set;
       const chip = document.createElement("button");
       chip.type = "button";
@@ -1568,7 +1569,26 @@
       currentEl.classList.toggle("apikey-current-set", info.set);
       inputEl.value = "";
     }
+
+    const custom = data.custom || { set: false, masked: null, baseUrl: null, model: null };
+    const customCurrent = document.getElementById("apikey-custom-current");
+    customCurrent.textContent = custom.set ? `Set (${custom.model})` : "Not set";
+    customCurrent.classList.toggle("apikey-current-set", custom.set);
+    document.getElementById("apikey-custom-baseurl").value = custom.baseUrl || "";
+    document.getElementById("apikey-custom-model").value = custom.model || "";
+    document.getElementById("apikey-custom-apikey").value = "";
   }
+
+  document.getElementById("apikey-custom-save").addEventListener("click", () => {
+    const baseUrl = document.getElementById("apikey-custom-baseurl").value.trim();
+    const model = document.getElementById("apikey-custom-model").value.trim();
+    const apiKey = document.getElementById("apikey-custom-apikey").value.trim();
+    if (!baseUrl || !model) return;
+    send({ type: "update_custom_provider", baseUrl, model, apiKey });
+  });
+  document.getElementById("apikey-custom-clear").addEventListener("click", () => {
+    send({ type: "clear_api_key", provider: "custom" });
+  });
 
   async function loadPhoneConnectInfo() {
     el.phoneQrcode.innerHTML = "";

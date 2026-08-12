@@ -10,7 +10,7 @@ import * as readline from "readline";
 import { Agent } from "./agent";
 import { PermissionManager, type ConfirmFn } from "./permissions";
 import { printBanner, printError, ConsoleReporter, color } from "./ui";
-import { loadLastModel } from "./preferences";
+import { loadLastModel, loadCustomBaseUrl } from "./preferences";
 import { loadApiKey, API_KEY_PROVIDERS, type ApiKeyProvider } from "./apiKeys";
 import { describeActiveBackend } from "./secretStore";
 import { listSessions } from "./session";
@@ -34,6 +34,7 @@ const API_KEY_ENV: Record<LlmProvider, string | null> = {
   gemini: "GEMINI_API_KEY",
   cerebras: "CEREBRAS_API_KEY",
   mistral: "MISTRAL_API_KEY",
+  custom: null, // optional for "custom" — many local model servers need none
 };
 
 interface CliOptions {
@@ -49,6 +50,7 @@ async function parseArgs(argv: string[]): Promise<CliOptions> {
   let provider: LlmProvider = (process.env.AGENT_PROVIDER as LlmProvider) || "pollinations";
   let model: string | undefined = process.env.AGENT_MODEL;
   let apiKey: string | undefined;
+  let baseUrl: string | undefined = process.env.AGENT_BASE_URL;
 
   const options: CliOptions = {
     root: process.cwd(),
@@ -70,6 +72,8 @@ async function parseArgs(argv: string[]): Promise<CliOptions> {
       if (value === "pollinations" || API_KEY_PROVIDERS.includes(value as ApiKeyProvider)) provider = value as LlmProvider;
     } else if (arg === "--api-key") {
       apiKey = argv[++i];
+    } else if (arg === "--base-url") {
+      baseUrl = argv[++i];
     } else if (arg === "--yolo") {
       options.yolo = true;
     } else if (arg === "--web") {
@@ -93,7 +97,10 @@ async function parseArgs(argv: string[]): Promise<CliOptions> {
   // chosen for this provider via the web UI's model picker, then the
   // hardcoded default.
   const resolvedModel = model || loadLastModel(provider) || DEFAULT_MODEL[provider];
-  options.llmConfig = { provider, model: resolvedModel, apiKey };
+  // Same fallback chain for "custom"'s endpoint: explicit --base-url/env wins, else whatever was saved via the
+  // web UI's Settings > API Keys > Custom / Local Model row.
+  if (provider === "custom" && !baseUrl) baseUrl = loadCustomBaseUrl() ?? undefined;
+  options.llmConfig = { provider, model: resolvedModel, apiKey, baseUrl: provider === "custom" ? baseUrl : undefined };
   return options;
 }
 
@@ -105,11 +112,16 @@ Usage: agent [options]
 Options:
   --cwd <path>      Working directory the agent may read/write (default: current directory)
   --provider <name> "pollinations" (default, free, no key, but tool-calling requires a paid account as of 2026-07),
-                    "groq", "openrouter", "gemini", "cerebras", or "mistral" (all free tier, need an API key)
+                    "groq", "openrouter", "gemini", "cerebras", "mistral" (all free tier, need an API key), or
+                    "custom" (any OpenAI-compatible chat-completions API — a provider not listed here, or a local
+                    model server like Ollama/LM Studio/llama.cpp; needs --base-url, --api-key is optional)
   --model <name>    Model to use (default depends on --provider — see DEFAULT_MODEL in index.ts, or just omit this
                     and pick a model from the web UI's model picker)
   --api-key <key>   API key for the chosen --provider (or set GROQ_API_KEY / OPENROUTER_API_KEY / GEMINI_API_KEY /
                     CEREBRAS_API_KEY / MISTRAL_API_KEY, or save one once via the web UI's Settings > API Keys tab)
+  --base-url <url>  Full chat-completions endpoint URL for --provider custom, e.g.
+                    http://localhost:11434/v1/chat/completions (Ollama) or http://localhost:1234/v1/chat/completions
+                    (LM Studio). Or set AGENT_BASE_URL, or save one via Settings > API Keys > Custom / Local Model.
   --yolo            Auto-approve all file writes / edits / shell commands (dangerous)
   --web             Serve the web UI instead of the terminal REPL
   --port <n>        Port for the web UI (default: 4390)
@@ -133,6 +145,10 @@ async function main(): Promise<void> {
     // The web UI can't be reached to fix this without starting first — the CLI REPL has no such fallback,
     // so failing fast here with a clear message beats a confusing runtime error on the first message.
     printError(`--provider ${options.llmConfig.provider} requires an API key: pass --api-key or set ${envVar}.`);
+    process.exit(1);
+  }
+  if (options.llmConfig.provider === "custom" && !options.llmConfig.baseUrl && !options.web) {
+    printError(`--provider custom requires an endpoint: pass --base-url, set AGENT_BASE_URL, or configure one via the web UI's Settings > API Keys > Custom / Local Model first.`);
     process.exit(1);
   }
 

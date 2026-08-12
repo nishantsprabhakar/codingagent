@@ -10,6 +10,7 @@ import * as openrouter from "./providers/openrouter";
 import * as gemini from "./providers/gemini";
 import * as cerebras from "./providers/cerebras";
 import * as mistral from "./providers/mistral";
+import * as custom from "./providers/custom";
 
 export type { ChatCompletionResult } from "./types";
 
@@ -57,9 +58,11 @@ function sanitizeMessagesForProvider(messages: ChatMessage[], provider: LlmProvi
   });
 }
 
-/** Every provider except pollinations needs a key — same shape, so route them through one table instead of a growing if-chain. */
+/** Providers with a fixed baseUrl and a required key — same shape, so route them through one table instead of a
+ *  growing if-chain. "custom" is handled separately below: its baseUrl is only known at runtime, and its key is
+ *  optional (many local model servers need none), so it doesn't fit this table's contract. */
 const KEYED_PROVIDERS: Record<
-  Exclude<LlmProvider, "pollinations">,
+  Exclude<LlmProvider, "pollinations" | "custom">,
   { chatCompletion: typeof groq.chatCompletion; envHint: string }
 > = {
   groq: { chatCompletion: groq.chatCompletion, envHint: "GROQ_API_KEY" },
@@ -79,6 +82,13 @@ export async function chatCompletion(
 
   if (config.provider === "pollinations") {
     return pollinations.chatCompletion(safeMessages, tools, config.model, undefined, onDelta);
+  }
+
+  if (config.provider === "custom") {
+    if (!config.baseUrl) {
+      throw new Error(`custom provider selected but no base URL was configured (--base-url, or Settings > API Keys > Custom / Local Model).`);
+    }
+    return custom.chatCompletion(safeMessages, tools, config.model, config.apiKey ?? "", config.baseUrl, undefined, onDelta);
   }
 
   const entry = KEYED_PROVIDERS[config.provider];

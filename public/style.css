@@ -1830,6 +1830,13 @@ body {
   font-size: 14px;
   padding: 6px 10px;
 }
+/* The custom-provider row has 3 inputs + 2 buttons — too many for one unwrapped flex line at narrow widths. */
+.apikey-row-fields-wrap {
+  flex-wrap: wrap;
+}
+.apikey-row-fields-wrap .folder-input {
+  flex: 1 1 160px;
+}
 
 .apikey-signup-link {
   display: inline-block;
