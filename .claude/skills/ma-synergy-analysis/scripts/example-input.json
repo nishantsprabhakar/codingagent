@@ -1,0 +1,48 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — Atlas Health Systems (acquirer) / Meridian Clinical Analytics (target). Expected NMSI ~70.6, Credible-but-verify-weak-links tier.",
+  "dealContext": {
+    "acquirer": "Atlas Health Systems",
+    "target": "Meridian Clinical Analytics"
+  },
+  "revenueSynergy": {
+    "claimedAnnualRevenueSynergy": 18000000,
+    "targetStandaloneRevenue": 220000000,
+    "marketAdjacencyRubric": 4,
+    "priorDealsRevenueSynergyCaptureRatePct": 55
+  },
+  "costSynergy": {
+    "claimedAnnualCostSynergy": 30000000,
+    "targetCostBase": 150000000,
+    "itemizedSynergyCoveragePct": 65,
+    "thirdPartyValidated": false,
+    "headcountOrFacilitiesOverlapPct": 22
+  },
+  "culturalFit": {
+    "keyLeaderRetentionCoveragePct": 70,
+    "acquirerIntegrationTrackRecord": "dedicated_pmi",
+    "culturalDistanceRubric": 3
+  },
+  "integrationComplexity": {
+    "dealValue": 650000000,
+    "acquirerEnterpriseValue": 4300000000,
+    "systemsIntegrationComplexityRubric": 3,
+    "regulatoryAntitrustComplexityRubric": 4
+  },
+  "dealStructure": {
+    "entryEvEbitdaMultiple": 14.5,
+    "comparableTransactionMedianMultiple": 12.8,
+    "proFormaNetDebtToEbitda": 4.2,
+    "sectorMedianLeverage": 3.5,
+    "earnoutStructureQualityRubric": 3
+  },
+  "governance": {
+    "imoQuality": "dedicated_imo",
+    "day1Day100EvidencedWorkstreams": [
+      "it_systems_cutover_plan",
+      "customer_communications_plan",
+      "org_design_day1_reporting_lines",
+      "revenue_synergy_execution_roadmap"
+    ],
+    "retentionPackageDesignQualityRubric": 4
+  }
+}

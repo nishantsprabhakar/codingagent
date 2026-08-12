@@ -62,6 +62,15 @@ export function saveProjectSkill(root: string, skill: SkillRecord): void {
   }
 }
 
+/** Best-effort, idempotent — deleting a name that doesn't exist (or never existed) is not an error. */
+export function deleteProjectSkill(root: string, name: string): void {
+  try {
+    fs.rmSync(path.join(skillsDir(root), `${slugify(name)}.json`), { force: true });
+  } catch (err: any) {
+    console.error("[coding-agent] warning: failed to delete skill:", err.message ?? err);
+  }
+}
+
 /** Renders the name+description index for the system prompt — full `steps` stay out to keep the prompt small. */
 export function formatSkillsIndexForPrompt(skills: SkillRecord[]): string {
   if (!skills.length) return "";

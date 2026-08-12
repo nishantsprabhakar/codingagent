@@ -67,10 +67,12 @@
     settingsTabInstructions: document.getElementById("settings-tab-instructions"),
     settingsTabMcp: document.getElementById("settings-tab-mcp"),
     settingsTabApiKeys: document.getElementById("settings-tab-apikeys"),
+    settingsTabSkills: document.getElementById("settings-tab-skills"),
     settingsTabPhone: document.getElementById("settings-tab-phone"),
     settingsPanelInstructions: document.getElementById("settings-panel-instructions"),
     settingsPanelMcp: document.getElementById("settings-panel-mcp"),
     settingsPanelApiKeys: document.getElementById("settings-panel-apikeys"),
+    settingsPanelSkills: document.getElementById("settings-panel-skills"),
     settingsPanelPhone: document.getElementById("settings-panel-phone"),
     settingsApiKeysStatus: document.getElementById("settings-apikeys-status"),
     apikeyRows: document.getElementById("apikey-rows"),
@@ -84,6 +86,10 @@
     mcpAddBtn: document.getElementById("mcp-add-btn"),
     settingsMcpSave: document.getElementById("settings-mcp-save"),
     settingsMcpStatus: document.getElementById("settings-mcp-status"),
+    learnedSkillsList: document.getElementById("learned-skills-list"),
+    starterSkillsList: document.getElementById("starter-skills-list"),
+    skillLibrarySection: document.getElementById("skill-library-section"),
+    skillLibraryList: document.getElementById("skill-library-list"),
   };
 
   const TOOL_ICONS = {
@@ -405,6 +411,9 @@
         break;
       case "mcp_reloaded":
         flashStatus(el.settingsMcpStatus, `Saved — ${msg.toolCount} tool${msg.toolCount === 1 ? "" : "s"} available.`);
+        break;
+      case "skills_changed":
+        if (!el.settingsPanelSkills.hidden) loadSkillsPanel();
         break;
     }
   }
@@ -1505,11 +1514,14 @@
     el.settingsTabInstructions.classList.toggle("active", tab === "instructions");
     el.settingsTabMcp.classList.toggle("active", tab === "mcp");
     el.settingsTabApiKeys.classList.toggle("active", tab === "apikeys");
+    el.settingsTabSkills.classList.toggle("active", tab === "skills");
     el.settingsTabPhone.classList.toggle("active", tab === "phone");
     el.settingsPanelInstructions.hidden = tab !== "instructions";
     el.settingsPanelMcp.hidden = tab !== "mcp";
     el.settingsPanelApiKeys.hidden = tab !== "apikeys";
+    el.settingsPanelSkills.hidden = tab !== "skills";
     el.settingsPanelPhone.hidden = tab !== "phone";
+    if (tab === "skills") loadSkillsPanel();
   }
 
   // Rows are built from this list rather than hand-duplicated HTML, so adding a future provider
@@ -1589,6 +1601,99 @@
   document.getElementById("apikey-custom-clear").addEventListener("click", () => {
     send({ type: "clear_api_key", provider: "custom" });
   });
+
+  // ---------- Skills ----------
+
+  async function loadSkillsPanel() {
+    await Promise.all([loadLearnedSkills(), loadStarterSkills(), loadSkillLibrary()]);
+  }
+
+  async function loadLearnedSkills() {
+    let skills = [];
+    try {
+      const res = await apiFetch("/api/skills");
+      skills = (await res.json()).skills || [];
+    } catch {
+      skills = [];
+    }
+    el.learnedSkillsList.innerHTML = "";
+    if (!skills.length) {
+      el.learnedSkillsList.innerHTML = `<div class="skills-list-empty">No skills saved yet — ask the agent to save one after a multi-step task, or add a starter below.</div>`;
+      return;
+    }
+    for (const skill of skills) {
+      const item = document.createElement("div");
+      item.className = "skill-item";
+      item.innerHTML = `
+        <div class="skill-item-body">
+          <div class="skill-item-name">${escapeHtml(skill.name)}</div>
+          <div class="skill-item-desc">${escapeHtml(skill.description)}</div>
+          <details class="skill-item-steps">
+            <summary>Steps</summary>
+            <pre>${escapeHtml(skill.steps)}</pre>
+          </details>
+        </div>
+        <button class="skill-item-action skill-item-danger" type="button">Delete</button>
+      `;
+      item.querySelector("button").addEventListener("click", () => {
+        send({ type: "delete_skill", name: skill.name });
+      });
+      el.learnedSkillsList.appendChild(item);
+    }
+  }
+
+  async function loadStarterSkills() {
+    let starters = [];
+    let learnedNames = new Set();
+    try {
+      const [starterRes, learnedRes] = await Promise.all([apiFetch("/api/starter-skills"), apiFetch("/api/skills")]);
+      starters = (await starterRes.json()).skills || [];
+      learnedNames = new Set(((await learnedRes.json()).skills || []).map((s) => s.name));
+    } catch {
+      starters = [];
+    }
+    el.starterSkillsList.innerHTML = "";
+    for (const skill of starters) {
+      const alreadyAdded = learnedNames.has(skill.name);
+      const item = document.createElement("div");
+      item.className = "skill-item";
+      item.innerHTML = `
+        <div class="skill-item-body">
+          <div class="skill-item-name">${escapeHtml(skill.name)}</div>
+          <div class="skill-item-desc">${escapeHtml(skill.description)}</div>
+        </div>
+        <button class="skill-item-action" type="button" ${alreadyAdded ? "disabled" : ""}>${alreadyAdded ? "Added" : "Add"}</button>
+      `;
+      const btn = item.querySelector("button");
+      if (!alreadyAdded) {
+        btn.addEventListener("click", () => send({ type: "add_starter_skill", name: skill.name }));
+      }
+      el.starterSkillsList.appendChild(item);
+    }
+  }
+
+  async function loadSkillLibrary() {
+    let skills = [];
+    try {
+      const res = await apiFetch("/api/skill-library");
+      skills = (await res.json()).skills || [];
+    } catch {
+      skills = [];
+    }
+    el.skillLibrarySection.hidden = skills.length === 0;
+    el.skillLibraryList.innerHTML = "";
+    for (const skill of skills) {
+      const item = document.createElement("div");
+      item.className = "skill-item";
+      item.innerHTML = `
+        <div class="skill-item-body">
+          <div class="skill-item-name">${escapeHtml(skill.name)}</div>
+          <div class="skill-item-desc">${escapeHtml(skill.description)}</div>
+        </div>
+      `;
+      el.skillLibraryList.appendChild(item);
+    }
+  }
 
   async function loadPhoneConnectInfo() {
     el.phoneQrcode.innerHTML = "";
@@ -1769,6 +1874,7 @@
   el.settingsTabInstructions.addEventListener("click", () => showSettingsTab("instructions"));
   el.settingsTabMcp.addEventListener("click", () => showSettingsTab("mcp"));
   el.settingsTabApiKeys.addEventListener("click", () => showSettingsTab("apikeys"));
+  el.settingsTabSkills.addEventListener("click", () => showSettingsTab("skills"));
   el.settingsTabPhone.addEventListener("click", () => {
     showSettingsTab("phone");
     loadPhoneConnectInfo();

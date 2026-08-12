@@ -236,6 +236,7 @@
       <button id="settings-tab-instructions" class="settings-tab active">Global Instructions</button>
       <button id="settings-tab-mcp" class="settings-tab">MCP Servers</button>
       <button id="settings-tab-apikeys" class="settings-tab">API Keys</button>
+      <button id="settings-tab-skills" class="settings-tab">Skills</button>
       <button id="settings-tab-phone" class="settings-tab">Connect from Phone</button>
     </div>
 
@@ -315,6 +316,31 @@
 
       <div class="settings-panel-actions">
         <span id="settings-apikeys-status" class="settings-save-status"></span>
+      </div>
+    </div>
+
+    <div id="settings-panel-skills" class="settings-panel" hidden>
+      <p class="settings-hint">
+        Reusable multi-step patterns the agent can save and recall for this project, plus a starter
+        catalog to add from instead of beginning with an empty list.
+      </p>
+
+      <h4 class="settings-subheading">This project</h4>
+      <div id="learned-skills-list" class="skills-list">
+        <div class="skills-list-empty">No skills saved yet — ask the agent to save one after a multi-step task, or add a starter below.</div>
+      </div>
+
+      <h4 class="settings-subheading">Starter skills</h4>
+      <p class="settings-hint">Generic, reusable patterns — not specific to this project, but a reasonable place to start.</p>
+      <div id="starter-skills-list" class="skills-list"></div>
+
+      <div id="skill-library-section" hidden>
+        <h4 class="settings-subheading">Skill library (reference)</h4>
+        <p class="settings-hint">
+          This project's <code>.claude/skills/</code> reference material, used by Claude Code — not invoked
+          directly by Wrexlyn's own agent. Shown here read-only, for visibility.
+        </p>
+        <div id="skill-library-list" class="skills-list"></div>
       </div>
     </div>
 

@@ -6,9 +6,9 @@ something reusable and consistent, instead of re-deriving judgment calls from
 scratch every session.
 
 [`skills-library-pitch.pptx`](skills-library-pitch.pptx) is a short deck
-covering the library's positioning and all eight algorithms' verified
-headline scores — useful for introducing the library to someone who hasn't
-seen it before.
+covering the library's positioning and the original eight algorithms'
+verified headline scores — useful for introducing the library to someone who
+hasn't seen it before (predates the two most recent additions below).
 
 ## Available skills
 
@@ -22,6 +22,8 @@ seen it before.
 | [`drug-discovery-screening`](drug-discovery-screening/SKILL.md) | Pharma / biotech pipeline | **Nishant Asset Viability Score (NAVS)** | Clinical-stage-adjusted probability of success, efficacy signal strength, safety, target validation, competitive/commercial position, regulatory/IP risk. |
 | [`india-macro-regime`](india-macro-regime/SKILL.md) | India macroeconomics | **Nishant India Macro Regime Index (NIMRI)** | Classifies India's macro cycle into a named regime (growth, inflation/policy, external sector, fiscal, credit, capital flows) with an asset-allocation tilt, not just a number. |
 | [`logistics-network-optimization`](logistics-network-optimization/SKILL.md) | Logistics / supply chain | **Nishant Logistics Network Efficiency Score (NLNES)** + **Nishant Consolidation Heuristic (NCH)** | A network-health diagnostic score, plus an actual route-consolidation heuristic (Clarke-Wright savings backbone + a proprietary priority-weighting overlay for tier/urgency/carbon). |
+| [`saas-business-health`](saas-business-health/SKILL.md) | SaaS / subscription businesses | **Nishant SaaS Health Score (NSHS)** | Revenue retention/expansion, growth efficiency, unit economics, churn & cohort quality, capital efficiency/burn, and qualitative/governance risk. |
+| [`ma-synergy-analysis`](ma-synergy-analysis/SKILL.md) | M&A / corporate development | **Nishant M&A Synergy & Integration Score (NMSI)** | Scores a *proposed transaction's* synergy realism and integration risk — revenue- and cost-synergy realism, cultural fit, integration complexity, valuation/deal-structure discipline, execution governance. Distinct from NDQI, which scores a standalone deal as an investment. |
 
 Each skill's `reference/algorithm.md` is the authoritative spec; `scripts/score.js`
 (and, for logistics, `scripts/consolidate.js`) is a literal, runnable

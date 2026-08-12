@@ -1,0 +1,32 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7. Run node score.js example-input.json to reproduce the numbers exactly.",
+  "company": "Series C vertical B2B SaaS platform for mid-market logistics operators, ~$20M ARR, sales-led with annual committed contracts",
+  "retention": {
+    "nrr": 108,
+    "grr": 92
+  },
+  "growth": {
+    "arrGrowthYoyPct": 35,
+    "fcfMarginPct": -10,
+    "cacPaybackMonths": 18
+  },
+  "unitEconomics": {
+    "ltvToCac": 3.5,
+    "grossMarginPct": 78
+  },
+  "churn": {
+    "annualizedLogoChurnPct": 8,
+    "cohortRetentionCurveRubric": 3
+  },
+  "capitalEfficiency": {
+    "isFcfPositive": false,
+    "burnMultiple": 1.3,
+    "runwayMonths": 20
+  },
+  "qualitative": {
+    "founderMarketFitRubric": 4,
+    "productMoatRubric": 3,
+    "top10CustomerConcentrationPct": 18,
+    "governanceRedFlags": ["cfo_departure_outside_succession_plan"]
+  }
+}

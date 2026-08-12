@@ -26,6 +26,9 @@ import type { LlmConfig, LlmProvider } from "../types";
 import { WebAuth, extractBearerToken } from "../webAuth";
 import { applySecureHeaders, RateLimiter, isAllowedOrigin } from "./security";
 import { isValidId } from "../idValidation";
+import { loadProjectSkills, saveProjectSkill, deleteProjectSkill } from "../tools/skills";
+import { loadSkillLibrary } from "../skillLibrary";
+import { STARTER_SKILLS } from "../starterSkills";
 
 const VALID_PROVIDERS: LlmProvider[] = ["pollinations", ...API_KEY_PROVIDERS];
 
@@ -328,6 +331,22 @@ export function startWebServer(
             agent.switchProvider(currentProvider, currentModel, currentApiKey, currentBaseUrl);
           }
           send({ type: "settings_saved", which: "custom_provider" });
+        } else if (msg.type === "delete_skill") {
+          const name = msg.name?.trim();
+          if (!name) {
+            reporter.error("No skill name provided.");
+            return;
+          }
+          deleteProjectSkill(currentRoot, name);
+          send({ type: "skills_changed" });
+        } else if (msg.type === "add_starter_skill") {
+          const starter = STARTER_SKILLS.find((s) => s.name === msg.name);
+          if (!starter) {
+            reporter.error(`Unknown starter skill: ${msg.name}`);
+            return;
+          }
+          saveProjectSkill(currentRoot, starter);
+          send({ type: "skills_changed" });
         }
       } catch (err: any) {
         // A single bad request/response should never take the whole server
@@ -407,6 +426,9 @@ function handleHttp(
   if (url.pathname === "/api/api-keys") return void handleApiKeys(res);
   if (url.pathname === "/api/lan-info") return handleLanInfo(res, port, lan);
   if (url.pathname === "/api/lan-qrcode") return void handleLanQrCode(res, port, lan, auth);
+  if (url.pathname === "/api/skills") return sendJson(res, 200, { skills: loadProjectSkills(root) });
+  if (url.pathname === "/api/skill-library") return sendJson(res, 200, { skills: loadSkillLibrary(root) });
+  if (url.pathname === "/api/starter-skills") return sendJson(res, 200, { skills: STARTER_SKILLS });
 
   serveStatic(url.pathname, res);
 }

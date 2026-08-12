@@ -27,7 +27,8 @@ export type ServerMessage =
   | { type: "verification_result"; result: VerificationResult }
   | { type: "critique_result"; pass: boolean; reason: string }
   | { type: "transaction_summary"; transactionId: string; confidence: number; outcome: TransactionOutcome; rollbackAvailable: boolean }
-  | { type: "rollback_result"; transactionId: string; ok: boolean; restored: string[] };
+  | { type: "rollback_result"; transactionId: string; ok: boolean; restored: string[] }
+  | { type: "skills_changed" };
 
 export type ClientMessage =
   | { type: "user_message"; text: string }
@@ -44,4 +45,6 @@ export type ClientMessage =
   | { type: "rollback_request"; transactionId: string }
   | { type: "update_api_key"; provider: "groq" | "openrouter" | "gemini" | "cerebras" | "mistral"; apiKey: string }
   | { type: "clear_api_key"; provider: "groq" | "openrouter" | "gemini" | "cerebras" | "mistral" | "custom" }
-  | { type: "update_custom_provider"; baseUrl: string; model: string; apiKey: string };
+  | { type: "update_custom_provider"; baseUrl: string; model: string; apiKey: string }
+  | { type: "delete_skill"; name: string }
+  | { type: "add_starter_skill"; name: string };
