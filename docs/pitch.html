@@ -87,6 +87,46 @@
   .btn { font-family: var(--mono); font-size: 13.5px; padding: 11px 20px; border-radius: var(--radius); text-decoration: none; }
   .btn-primary { background: var(--accent); color: var(--bg); }
   .btn-secondary { border: 1px solid var(--line); color: var(--ink-dim); }
+  img, video, canvas, svg { max-width: 100%; height: auto; }
+  pre { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .slide, .body, .cols > *, .col-step p { min-width: 0; overflow-wrap: anywhere; }
+
+  @media (max-width: 760px) {
+    html { scroll-padding-top: 112px; }
+    body { overflow-x: hidden; }
+    .topbar { padding: 10px 14px; gap: 9px; flex-wrap: wrap; align-items: center; }
+    .topbar .mark { font-size: 13px; flex: 1 1 auto; }
+    .topbar .mark .byline { display: none; }
+    .topbar nav { order: 3; width: 100%; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-top: 2px; }
+    .topbar nav::-webkit-scrollbar { display: none; }
+    .topbar nav a { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; text-decoration: none; font-size: 11px; }
+    .topbar nav a.current { border-color: var(--accent); }
+    .dl-btn { flex: 0 0 auto; padding: 7px 10px; font-size: 11px; }
+    .deck { width: 100%; max-width: none; }
+    .slide { padding: 52px 20px; }
+    .hero-slide { min-height: auto; padding-top: 68px; padding-bottom: 68px; }
+    .hero-slide h1 { font-size: clamp(37px, 13vw, 54px); line-height: 1.05; overflow-wrap: anywhere; }
+    .hero-slide .sub { font-size: 16px; line-height: 1.55; }
+    .slide h2 { font-size: clamp(24px, 8vw, 32px); line-height: 1.15; overflow-wrap: anywhere; }
+    .slide .body p { font-size: 15px; }
+    .cols { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+    .col-step { gap: 8px; }
+    .table-wrap { max-width: calc(100vw - 40px); overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line-soft); }
+    table { min-width: 680px; font-size: 12px; }
+    th, td { padding: 8px 10px; }
+    .shot { max-width: 100%; overflow: hidden; }
+    .shot img { width: 100%; height: auto; display: block; }
+    .closing { min-height: auto; padding-top: 80px; padding-bottom: 80px; }
+    .closing h2 { font-size: 27px; }
+    .closing .actions { flex-direction: column; width: 100%; }
+    .closing .actions .btn { width: 100%; text-align: center; }
+  }
+  @media (max-width: 420px) {
+    .slide { padding-left: 15px; padding-right: 15px; }
+    .table-wrap { max-width: calc(100vw - 30px); }
+    .dl-btn { font-size: 0; }
+    .dl-btn::after { content: "PPTX ↓"; font-size: 10px; }
+  }
 </style>
 </head>
 <body>
@@ -94,7 +134,8 @@
 <div class="topbar">
   <div class="mark"><span class="dot"></span>WREXLYN<span class="byline">by Nishant Prabhakar</span></div>
   <nav>
-    <a href="index.html">Chat demo</a>
+    <a href="index.html">Home</a>
+    <a href="demo.html">Demo</a>
     <a href="documentation.html">Documentation</a>
     <a href="pitch.html" class="current">Pitch deck</a>
   </nav>

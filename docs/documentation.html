@@ -181,16 +181,71 @@
   footer.doc-footer { padding: 40px 56px; color: var(--ink-faint); font-family: var(--mono); font-size: 12px; }
 
   code.inline { background: var(--surface-2); border: 1px solid var(--line-soft); padding: 1px 6px; border-radius: 3px; font-size: 0.88em; color: var(--accent); }
+
+  .mobile-bar { display: none; }
+  img, video, canvas, svg { max-width: 100%; height: auto; }
+  pre { max-width: 100%; overflow-x: auto; white-space: pre; -webkit-overflow-scrolling: touch; }
+  .table-wrap { max-width: 100%; -webkit-overflow-scrolling: touch; }
+  .prose, .card, .step .body, .kv-row .v { min-width: 0; overflow-wrap: anywhere; }
+
+  @media (max-width: 860px) {
+    html { scroll-padding-top: 66px; }
+    body { overflow-x: hidden; }
+    .mobile-bar {
+      position: sticky; top: 0; z-index: 20; display: flex; align-items: center;
+      gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line-soft);
+      background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(12px);
+      overflow-x: auto; scrollbar-width: none; white-space: nowrap;
+    }
+    .mobile-bar::-webkit-scrollbar { display: none; }
+    .mobile-bar .mobile-brand { color: var(--accent); font-weight: 700; margin-right: 6px; }
+    .mobile-bar a { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px; padding: 7px 11px; color: var(--ink-dim); font: 11px var(--mono); }
+    .mobile-bar a.current { border-color: var(--accent); color: var(--accent); }
+    main { padding-bottom: 60px; min-width: 0; }
+    .cover { padding: 44px 22px 32px; max-width: none; }
+    .cover h1 { font-size: clamp(32px, 11vw, 44px); overflow-wrap: anywhere; }
+    .cover .tagline { font-size: 16px; line-height: 1.55; }
+    .cover .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 14px; width: 100%; }
+    section.chapter { padding: 38px 22px 18px; max-width: none; }
+    .chapter-head { gap: 10px; margin-bottom: 20px; }
+    .chapter-head h2 { font-size: clamp(21px, 7vw, 28px); overflow-wrap: anywhere; }
+    .chapter-num { width: 25px; flex: 0 0 25px; }
+    .prose p, .prose li { font-size: 15px; }
+    .grid-2, .grid-3, .shot-row { grid-template-columns: minmax(0, 1fr); }
+    .card { padding: 16px; }
+    .shot { max-width: 100%; margin: 18px 0; }
+    .shot.shot-portrait { width: min(100%, 300px); }
+    table { min-width: 620px; font-size: 12px; }
+    th, td { padding: 8px 10px; }
+    .kv-row { flex-direction: column; gap: 2px; align-items: stretch; padding-bottom: 10px; border-bottom: 1px solid var(--line-soft); }
+    .kv-row .k { min-width: 0; }
+    .step { gap: 10px; }
+    footer.doc-footer { padding: 28px 22px; }
+  }
+  @media (max-width: 430px) {
+    .cover, section.chapter { padding-left: 16px; padding-right: 16px; }
+    .cover .facts { grid-template-columns: 1fr; gap: 12px; }
+    .callout { padding: 11px 12px; }
+  }
 </style>
 </head>
 <body>
+
+<div class="mobile-bar" aria-label="Mobile navigation">
+  <span class="mobile-brand">WREXLYN</span>
+  <a href="index.html">Home</a>
+  <a href="demo.html">Demo</a>
+  <a href="documentation.html" class="current">Docs</a>
+  <a href="pitch.html">Pitch</a>
+</div>
 
 <div class="shell">
   <aside class="rail">
     <div class="rail-mark"><span class="dot"></span>WREXLYN</div>
     <div class="rail-meta">by Nishant Prabhakar<br />Technical Documentation<br />v0.1 &middot; August 2026</div>
     <div class="site-nav">
-      <a href="index.html">&larr; Chat demo</a>
+      <a href="index.html">&larr; Wrexlyn home</a>
+      <a href="demo.html">Chat demo</a>
       <a href="documentation.html" class="current">Documentation</a>
       <a href="pitch.html">Pitch deck</a>
       <a href="https://github.com/nishantsprabhakar/codingagent" target="_blank" rel="noopener">GitHub &#8599;</a>
