@@ -13,7 +13,16 @@ while ((Get-Date) -lt $deadline) {
         $client.Connect("127.0.0.1", $Port)
         if ($client.Connected) {
             $client.Close()
-            Start-Process "http://localhost:$Port"
+            # The server writes its per-process auth token to this file the moment it starts
+            # listening (see src/web/server.ts) — read it so the opened tab is already
+            # authenticated instead of hitting webAuth's 401 on every API/WebSocket call.
+            $tokenFile = Join-Path $env:TEMP "wrexlyn-token-$Port.txt"
+            $url = "http://localhost:$Port"
+            if (Test-Path $tokenFile) {
+                $token = (Get-Content $tokenFile -Raw -ErrorAction SilentlyContinue)
+                if ($token) { $url = "$url/?token=$($token.Trim())" }
+            }
+            Start-Process $url
             exit 0
         }
     } catch {

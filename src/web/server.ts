@@ -311,7 +311,25 @@ export function startWebServer(
     });
   });
 
+  // The double-click launcher (scripts/launch.ps1) spawns the browser-opener in a separate
+  // process that only knows the port, not this run's freshly-generated auth token — so it can't
+  // build a URL that will pass webAuth's check. Drop the token in a per-port temp file that
+  // opener reads once the port is accepting connections; clean it up on exit so it doesn't
+  // linger as a standing secret on disk.
+  const tokenFilePath = path.join(os.tmpdir(), `wrexlyn-token-${port}.txt`);
+  const cleanupTokenFile = () => {
+    try {
+      fs.unlinkSync(tokenFilePath);
+    } catch {}
+  };
+  process.once("exit", cleanupTokenFile);
+  process.once("SIGINT", () => process.exit(0));
+  process.once("SIGTERM", () => process.exit(0));
+
   httpServer.listen(port, bindHost, async () => {
+    try {
+      fs.writeFileSync(tokenFilePath, auth.authToken, "utf-8");
+    } catch {}
     console.log(`\nWrexlyn web UI running at http://127.0.0.1:${port}/?token=${auth.authToken}`);
     if (lan) {
       console.log(`  LAN-ACCESSIBLE: reachable from other devices on this network (started with --lan).`);
