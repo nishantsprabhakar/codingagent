@@ -207,10 +207,11 @@
       <a class="navlink" href="#security"><span class="num">08</span>Security &amp; privacy</a>
       <a class="navlink" href="#roadmap"><span class="num">09</span>Roadmap</a>
       <a class="navlink" href="#skills-library"><span class="num">10</span>Skills library</a>
-      <a class="navlink" href="#differentiation"><span class="num">11</span>Why it&#8217;s differentiated</a>
+      <a class="navlink" href="#differentiation"><span class="num">11</span>Why the skills library is differentiated</a>
       <a class="navlink" href="#quality-gate"><span class="num">12</span>Document quality gate</a>
       <a class="navlink" href="#self-learning"><span class="num">13</span>Self-learning</a>
       <a class="navlink" href="#convergence"><span class="num">14</span>The Nishant Convergence Protocol</a>
+      <a class="navlink" href="#positioning"><span class="num">15</span>Competitive positioning</a>
     </nav>
   </aside>
 
@@ -423,7 +424,7 @@
     </section>
 
     <section class="chapter" id="differentiation">
-      <div class="chapter-head"><span class="chapter-num">11</span><h2>Why this is differentiated</h2></div>
+      <div class="chapter-head"><span class="chapter-num">11</span><h2>Why the skills library is differentiated</h2></div>
       <div class="prose">
         <p class="lede">Most quantitative screening in these sectors runs on an analyst&rsquo;s gut-check translated into a number that means something different depending on who&rsquo;s asking and when. These eight algorithms replace that with named, versioned frameworks built to one shared design discipline &mdash; not eight unrelated one-off scoring hacks.</p>
       </div>
@@ -499,6 +500,39 @@
       <div class="callout warn"><strong>Adaptive, not blanket.</strong> The ensemble only engages once a first, single-shot repair attempt has already failed (repair attempt 2 of the existing 3-round ceiling). Most repairs succeed on the first try; spending three extra model calls on every one of them would be a direct cost and rate-limit regression, working against the retry/backoff efficiency work described elsewhere in this document. NCP spends its extra compute only once a turn has already proven itself stuck &mdash; exactly where the marginal value of a second opinion is highest and the frequency of that moment is naturally low.</div>
       <div class="prose" style="margin-top:20px;">
         <p class="dim">All four pure functions underlying NCP &mdash; the relevance ranker, the recurrence check, the score formula, and the ensemble orchestrator itself &mdash; are covered by unit tests against a mocked model backend, including the fail-open path when a provider is unavailable. Full methodology, formal scoring derivation, and the acquisition-relevant IP framing are documented separately as a private technical whitepaper, available for review under NDA.</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="positioning">
+      <div class="chapter-head"><span class="chapter-num">15</span><h2>Competitive positioning</h2></div>
+      <div class="prose">
+        <p class="lede">Four categories of tool currently answer &ldquo;how do I get an AI to write my code,&rdquo; and each optimizes for something Wrexlyn deliberately does not trade away to get. This is a map of the actual trade-off, not a claim that the other categories are bad at what they optimize for.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Category</th><th>What it optimizes for</th><th>What you give up</th><th>Where Wrexlyn sits</th></tr>
+          <tr><td class="strong">Inline autocomplete assistants</td><td>Speed of a single suggestion, in-editor</td><td>No multi-file planning, no verification loop, no memory across sessions</td><td class="yes">A full agent loop with its own risk-gating and repair &mdash; a different tier of task, not a faster version of the same one</td></tr>
+          <tr><td class="strong">IDE-embedded agentic assistants</td><td>Convenience &mdash; one tool, one subscription, tied to a specific editor</td><td>Usually a fixed model, usually a subscription regardless of which free tiers exist upstream</td><td class="yes">Editor-agnostic, 6 swappable providers, free-tier eligible by default (&sect;05)</td></tr>
+          <tr><td class="strong">Hosted autonomous SaaS agents</td><td>Fire-and-forget delegation &mdash; describe the task, walk away</td><td>Your code and prompts leave your machine; verification, if any, happens on infrastructure you can't inspect</td><td class="yes">Runs as one local Node process; every risk-gate, snapshot, and verification step in &sect;02 executes on your machine, inspectable in the open-source runtime</td></tr>
+          <tr><td class="strong">Other local/terminal agents</td><td>Also local, also model-agnostic in the better ones &mdash; the closest real comparison</td><td>Typically no independent critique step, no formalized confidence score, no structural gate on generated documents</td><td class="yes">V-Cycle&rsquo;s independent critic (&sect;02), the document quality gate (&sect;12), and the Nishant Convergence Protocol (&sect;14) are the specific, checkable things that differ, not a general claim of being &ldquo;better&rdquo;</td></tr>
+        </table>
+      </div>
+      <div class="prose" style="margin-top:20px;">
+        <p>The honest version of this pitch is narrower than &ldquo;better at everything&rdquo;: Wrexlyn's actual bet is that <strong>verified reliability compounds</strong> where raw generation speed does not. A tool that is 20% slower per turn but catches its own mistakes before calling a turn done, remembers what you told it, and gets measurably better at repairing itself over the course of a project, ends up costing less real time than one that is fast per turn and wrong an unflagged fraction of them &mdash; especially once free/lower-cost models, not always the frontier ones, are doing the generating.</p>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <h3><span class="tick">&check;</span>Evidence, not claims</h3>
+          <p>Every mechanism cited on this page &mdash; retry/backoff behavior, the document quality gate, the Nishant Convergence Protocol &mdash; ships with unit tests against a mocked model backend, in the open-source repository linked in the rail. A claim you can run is a different kind of claim than one you can only read.</p>
+        </div>
+        <div class="card">
+          <h3><span class="tick">&check;</span>Named, versioned mechanisms</h3>
+          <p>&ldquo;The V-Cycle runtime,&rdquo; &ldquo;the document quality gate,&rdquo; &ldquo;the Nishant Convergence Protocol&rdquo; are specific, citable names for specific pieces of code &mdash; not a marketing umbrella over whatever the model happened to do that day.</p>
+        </div>
+        <div class="card">
+          <h3><span class="tick">&check;</span>Disclosed limits, not just wins</h3>
+          <p>Every differentiation claim on this page has a matching &ldquo;honest scope&rdquo; callout stating what it does <em>not</em> do &mdash; &sect;02's sandbox disclaimer, &sect;14's capability-vs-reliability distinction. A tool that discloses its own ceiling is more trustworthy at the claims it does make, not less.</p>
+        </div>
       </div>
     </section>
 
