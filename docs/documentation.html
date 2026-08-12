@@ -210,6 +210,7 @@
       <a class="navlink" href="#differentiation"><span class="num">11</span>Why it&#8217;s differentiated</a>
       <a class="navlink" href="#quality-gate"><span class="num">12</span>Document quality gate</a>
       <a class="navlink" href="#self-learning"><span class="num">13</span>Self-learning</a>
+      <a class="navlink" href="#convergence"><span class="num">14</span>The Nishant Convergence Protocol</a>
     </nav>
   </aside>
 
@@ -480,6 +481,24 @@
       </div>
       <div class="prose" style="margin-top:20px;">
         <p class="dim">This is deliberately scoped to memory and prompts, not code. Wrexlyn never edits its own shipped source autonomously in response to a mistake &mdash; a genuine code-level bug is fixed the way any real bug is: as a normal, permission-gated, reviewed, and verified change. Only the safe part &mdash; what to remember, what to prefer, what pattern worked &mdash; is automatic.</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="convergence">
+      <div class="chapter-head"><span class="chapter-num">14</span><h2>The Nishant Convergence Protocol</h2></div>
+      <div class="prose">
+        <p class="lede">A weak or free model is rarely bad at writing a first attempt. It is bad at self-correcting when that attempt fails &mdash; given a generic &ldquo;fix the root cause and try again,&rdquo; it disproportionately repeats a near-identical change or thrashes to something unrelated. The Nishant Convergence Protocol (NCP) targets exactly that moment, formalized as a named, versioned, unit-tested algorithm (<code class="inline">src/convergence.ts</code>) rather than a loose heuristic.</p>
+        <p>Said plainly, upfront: NCP does not make a small model reason like a large one. No runtime layer manufactures capability the underlying weights don&rsquo;t have. What it closes is the <em>reliability</em> gap on tasks with an external check &mdash; a build, a test, a structural document rule &mdash; the same category &sect;02&rsquo;s reliability runtime already operates on. It is the mechanism that makes that runtime&rsquo;s repair step measurably smarter, not a claim of raw intelligence uplift.</p>
+      </div>
+      <div class="stepline">
+        <div class="step"><span class="idx">01</span><div class="body"><h4>Divergent diagnosis ensemble</h4><p>Once a plain repair attempt has already failed once, two independently-framed root-cause diagnoses are generated in parallel from the same failure evidence &mdash; one biased toward the obvious cause, one explicitly asked to look past it for a side effect or stale assumption.</p></div></div>
+        <div class="step"><span class="idx">02</span><div class="body"><h4>Pairwise adjudication</h4><p>A dedicated comparative call judges the two diagnoses against each other rather than scoring either in isolation &mdash; a measurably more reliable judgment for an LLM to make &mdash; and returns a winner plus a margin: clear or close.</p></div></div>
+        <div class="step"><span class="idx">03</span><div class="body"><h4>Lesson-steered regeneration</h4><p>The project&rsquo;s learned lessons (&sect;13) are ranked by keyword-overlap relevance to the current failure and foregrounded directly inside both diagnosis prompts as explicit constraints &mdash; the first mechanism to actively retrieve self-learned lessons rather than leave them as passive system-prompt context.</p></div></div>
+        <div class="step"><span class="idx">04</span><div class="body"><h4>Formalized convergence score</h4><p><code class="inline">ConvergenceScore = clamp(0, 100, OutcomeBase &minus; 6&times;RepairRounds + 8&times;[clear NCP win] &minus; 15&times;[known failure recurred])</code>. On the common case &mdash; zero repair rounds, NCP never invoked &mdash; this returns the existing outcome-based score completely unchanged; it&rsquo;s a strict refinement, not a replacement.</p></div></div>
+      </div>
+      <div class="callout warn"><strong>Adaptive, not blanket.</strong> The ensemble only engages once a first, single-shot repair attempt has already failed (repair attempt 2 of the existing 3-round ceiling). Most repairs succeed on the first try; spending three extra model calls on every one of them would be a direct cost and rate-limit regression, working against the retry/backoff efficiency work described elsewhere in this document. NCP spends its extra compute only once a turn has already proven itself stuck &mdash; exactly where the marginal value of a second opinion is highest and the frequency of that moment is naturally low.</div>
+      <div class="prose" style="margin-top:20px;">
+        <p class="dim">All four pure functions underlying NCP &mdash; the relevance ranker, the recurrence check, the score formula, and the ensemble orchestrator itself &mdash; are covered by unit tests against a mocked model backend, including the fail-open path when a provider is unavailable. Full methodology, formal scoring derivation, and the acquisition-relevant IP framing are documented separately as a private technical whitepaper, available for review under NDA.</p>
       </div>
     </section>
 

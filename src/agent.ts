@@ -20,6 +20,7 @@ import { appendTransaction, loadTransaction } from "./transactionLog";
 import { detectProjectMemory, updateProjectMemory, loadProjectMemory, formatProjectMemoryForPrompt } from "./projectMemory";
 import { runVerification } from "./verification";
 import { critiqueStep } from "./critic";
+import { runDivergentRepairEnsemble, computeConvergenceScore, hasRecurredKnownFailure } from "./convergence";
 import { withIdleTimeout } from "./timeout";
 import type {
   ChatMessage,
@@ -535,13 +536,32 @@ export class Agent {
 
         if (willRepair) {
           tx.repairAttempts++;
-          this.messages.push({
-            role: "user",
-            content:
-              `Automatic verification failed after your last changes:\n${summarizeVerification(verification!)}\n\n` +
-              `Fix the root cause (repair attempt ${tx.repairAttempts}/${MAX_REPAIR_ATTEMPTS}). Don't repeat a ` +
-              `command that already failed unchanged — diagnose why it failed first.`,
-          });
+          let repairInstruction =
+            `Automatic verification failed after your last changes:\n${summarizeVerification(verification!)}\n\n` +
+            `Fix the root cause (repair attempt ${tx.repairAttempts}/${MAX_REPAIR_ATTEMPTS}). Don't repeat a ` +
+            `command that already failed unchanged — diagnose why it failed first.`;
+
+          // Nishant Convergence Protocol: a plain "try again" is exactly where weak/free models
+          // struggle most. Once one attempt has already failed (this is at least the second try),
+          // spend a small, bounded ensemble — two independently-framed diagnoses, adjudicated
+          // against each other — and hand the model the winning diagnosis instead of a generic
+          // retry prompt. Skipped on the first attempt: most repairs succeed on the first try, and
+          // paying three extra calls on every one would be a pure cost/latency regression there.
+          if (tx.repairAttempts >= 2) {
+            const ncp = await runDivergentRepairEnsemble(
+              this.llmConfig,
+              tx.intent,
+              summarizeVerification(verification!),
+              this.projectMemory.learnedLessons ?? []
+            );
+            tx.ncpInvoked = ncp.invoked;
+            tx.ncpMargin = ncp.margin;
+            if (ncp.invoked && ncp.diagnosis) {
+              repairInstruction += `\n\nAn independent, adjudicated diagnosis pass points to:\n${ncp.diagnosis}`;
+            }
+          }
+
+          this.messages.push({ role: "user", content: repairInstruction });
           this.historyLog.push({
             type: "user",
             text: `(automatic) verification failed — requesting repair (${tx.repairAttempts}/${MAX_REPAIR_ATTEMPTS})`,
@@ -674,7 +694,20 @@ export class Agent {
     tx.endedAt = Date.now();
     tx.gitStatusAfter = gitStatusPorcelain(this.ctx.root);
     tx.outcome = outcome;
-    tx.confidence = confidence;
+
+    // Nishant Convergence Protocol: refine the outcome-based score above with what actually
+    // happened during repair, if anything did. On the common case (no repair rounds, NCP never
+    // invoked, no recurrence) this returns `confidence` completely unchanged — see convergence.ts.
+    const failureLines = tx.actions
+      .filter((a) => !a.ok && Agent.QUALITY_CHECKED_TOOLS.has(a.name))
+      .flatMap((a) => a.output.split("\n").map((l) => l.trim()).filter(Boolean));
+    tx.confidence = computeConvergenceScore({
+      outcomeBase: confidence,
+      repairRoundsUsed: tx.repairAttempts,
+      ncpInvoked: tx.ncpInvoked ?? false,
+      ncpMargin: tx.ncpMargin ?? "n/a",
+      recurredKnownFailure: hasRecurredKnownFailure(failureLines, this.projectMemory.learnedLessons ?? []),
+    });
     appendTransaction(this.ctx.root, this.sessionId, tx);
 
     if (outcome !== "no_changes") {

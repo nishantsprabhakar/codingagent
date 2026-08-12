@@ -154,6 +154,9 @@ export interface TransactionRecord {
   criticCalls: number;
   outcome: TransactionOutcome;
   confidence: number;
+  /** Nishant Convergence Protocol bookkeeping (see convergence.ts) — set only when its divergent-repair-ensemble path actually ran this turn (repair attempt 2+). */
+  ncpInvoked?: boolean;
+  ncpMargin?: "clear" | "close" | "n/a";
 }
 
 /** Durable, per-project facts the agent has learned — never secrets. Persisted to .coding-agent/memory.json. */
