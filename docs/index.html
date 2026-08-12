@@ -1,92 +1,60 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Wrexlyn — Chat Demo</title>
-<meta name="description" content="Browser-only chat demo of Wrexlyn — sign in, bring your own API key, talk to the model. No file/shell tools; that requires the local desktop app." />
-<link rel="icon" href="icon-512.png" />
-<link rel="stylesheet" href="style.css?v=20260810" />
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Wrexlyn is the proprietary, local-first AI agent for verified code and professional business deliverables.">
+  <meta property="og:title" content="Wrexlyn — Stop Chatting. Start Shipping.">
+  <meta property="og:description" content="Code, models, reports and decks. Executed locally. Verified before delivery.">
+  <meta property="og:type" content="website">
+  <title>Wrexlyn — Stop Chatting. Start Shipping.</title>
+  <link rel="icon" href="icon-512.png">
+  <link rel="stylesheet" href="landing.css">
 </head>
 <body>
+<main id="top">
+  <div class="noise" aria-hidden="true"></div>
+  <nav class="nav shell" aria-label="Main navigation">
+    <a href="#top" class="brand"><span class="mark">W</span><span>WREXLYN</span></a>
+    <div class="navlinks"><a href="#platform">Platform</a><a href="#compare">Compare</a><a href="documentation.html">Documentation</a><a href="pitch.html">Pitch</a></div>
+    <a class="navcta" href="demo.html">Launch demo <span>↗</span></a>
+  </nav>
 
-<div class="bg-glow" id="bg-glow" aria-hidden="true"></div>
+  <section class="hero shell">
+    <div class="eyebrow"><span class="pulse"></span> LOCAL-FIRST AGENTIC WORKSTATION <b>PROPRIETARY</b></div>
+    <h1>STOP CHATTING.<br><span>START SHIPPING.</span></h1>
+    <p class="heroCopy">The AI agent that writes the code, runs the checks, builds the spreadsheet, creates the deck—and shows you the evidence.</p>
+    <div class="heroActions"><a class="primary" href="demo.html">Experience Wrexlyn <span>→</span></a><a class="secondary" href="documentation.html"><span class="play">▶</span> Read documentation</a></div>
+    <div class="trust"><span><span class="check">✓</span> Proprietary platform</span><span><span class="check">✓</span> Bring your own model</span><span><span class="check">✓</span> Runs on your machine</span></div>
 
-<div class="topbar">
-  <div class="brand">
-    <img src="icon-512.png" alt="" />
-    WREXLYN
-    <span class="brand-sub">// browser chat demo</span>
-  </div>
-  <div class="topbar-links">
-    <a href="documentation.html">Documentation</a>
-    <a href="pitch.html">Pitch deck</a>
-  </div>
-  <div class="user-chip" id="user-chip" hidden>
-    <img id="user-avatar" alt="" hidden />
-    <span id="user-name"></span>
-    <span class="signout-link" id="signout-link">sign out</span>
-  </div>
-</div>
-
-<div class="gate" id="gate">
-  <div class="gate-card">
-
-    <div id="gate-signed-out">
-      <h1 class="gate-title">// SIGN IN TO CONTINUE</h1>
-      <p class="gate-desc">
-        This is a browser-only chat demo of Wrexlyn — sign in, then bring your own API key for whichever provider
-        you like, and talk to the model. It has no file or shell tools; that's what the
-        <a href="https://github.com/nishantsprabhakar/codingagent" target="_blank" rel="noopener">local desktop app</a>
-        is for — a static page genuinely can't run code on your machine.
-      </p>
-      <div id="google-signin-btn"></div>
-      <p class="disclaimer">
-        Sign-in runs entirely in your browser (Google Identity Services) — nothing about who you are is sent to or
-        stored on any server. It's just used to show your name here for this session.
-      </p>
+    <div class="consoleWrap"><div class="orbit orbit1"></div><div class="orbit orbit2"></div>
+      <div class="console"><div class="consoleTop"><div class="dots"><i></i><i></i><i></i></div><span>WREXLYN // ACTIVE MISSION</span><div class="secure"><i></i> LOCAL SESSION</div></div>
+        <div class="consoleBody"><aside><div class="sideLabel">WORKSPACE</div><div class="project"><span>◆</span> ACME DILIGENCE</div><div class="tree"><p>⌄ &nbsp;src</p><p>　◇ analysis.ts</p><p>　◇ model.ts</p><p>◇ research.pdf</p></div><div class="sideLabel outputLabel">OUTPUTS</div><div class="output"><span class="doc xls">X</span> Operating Model.xlsx</div><div class="output"><span class="doc ppt">P</span> IC Presentation.pptx</div></aside>
+          <div class="work"><div class="taskHead"><div><small>MISSION / 04</small><h3>Build the model. Find the risk. Brief the room.</h3></div><span class="running"><i></i> RUNNING</span></div>
+            <div class="steps"><div class="step done"><b>01</b><span><strong>Evidence extracted</strong><small>42 source references mapped</small></span><em>✓</em></div><div class="step done"><b>02</b><span><strong>Operating model built</strong><small>Formulas reconciled · 0 broken refs</small></span><em>✓</em></div><div class="step active"><b>03</b><span><strong>Generating IC presentation</strong><small>12 / 16 slides complete</small><span class="progress"><i></i></span></span><em>72%</em></div><div class="step"><b>04</b><span><strong>Cross-artifact verification</strong><small>Queued</small></span><em>—</em></div></div>
+            <div class="verified"><div class="shield">✓</div><div><small>VERIFICATION STATUS</small><strong>Evidence-backed execution</strong></div><div class="metric"><b>18</b><small>CHECKS PASSED</small></div><div class="metric"><b>0</b><small>CONFLICTS</small></div></div>
+          </div></div>
+      </div>
     </div>
+  </section>
 
-    <div id="gate-setup" hidden>
-      <h1 class="gate-title">// SET UP YOUR PROVIDER</h1>
-      <p class="gate-desc">Pick a provider and paste in your own free API key — Groq takes about a minute, no credit card. It's saved only in this browser's local storage and sent directly from your browser to that provider — never to us, because there's no "us" here to send it to.</p>
+  <section class="manifesto"><div class="shell manifestoGrid"><p class="sectionTag">THE PROBLEM</p><div><h2>MOST AI TOOLS STOP<br>AT <span>“HERE’S SOME CODE.”</span></h2><p>Wrexlyn keeps going. It executes. It validates. It produces the finished artifact. Because an answer is not an outcome—and your work deserves more than autocomplete with a marketing budget.</p></div></div></section>
 
-      <label class="field-label" for="provider-select">Provider</label>
-      <select id="provider-select"></select>
+  <section class="platform shell" id="platform"><div class="sectionIntro"><p class="sectionTag">THE WREXLYN SYSTEM</p><h2>ONE AGENT.<br><span>THE WHOLE MISSION.</span></h2><p>From first instruction to verified deliverable, Wrexlyn operates across your actual workspace.</p></div>
+    <div class="featureGrid"><article><span class="featureN">01</span><div class="featureIcon">⌁</div><h3>Ships outcomes, not suggestions</h3><p>Plans the work, edits files, runs commands, verifies results and repairs failures.</p><a href="documentation.html">EXPLORE CAPABILITY →</a></article><article><span class="featureN">02</span><div class="featureIcon">▦</div><h3>Code + business deliverables</h3><p>Build the feature, Excel model, Word report and executive deck from one workspace.</p><a href="documentation.html#documents">EXPLORE CAPABILITY →</a></article><article><span class="featureN">03</span><div class="featureIcon">◈</div><h3>Your machine. Your model.</h3><p>Run locally with the provider that fits the mission and keep control of your stack.</p><a href="documentation.html#providers">EXPLORE CAPABILITY →</a></article><article><span class="featureN">04</span><div class="featureIcon">◎</div><h3>Every action leaves evidence</h3><p>Approvals, diffs, verification, history and rollback make autonomous work inspectable.</p><a href="documentation.html#security">EXPLORE CAPABILITY →</a></article></div>
+  </section>
 
-      <label class="field-label" id="api-key-label" for="api-key-input">API key</label>
-      <input type="password" id="api-key-input" autocomplete="off" placeholder="Paste your API key" />
-      <div class="provider-note" id="provider-note"></div>
+  <section class="outcomes"><div class="shell"><div class="outcomeHead"><div><p class="sectionTag">FROM PROMPT TO PROOF</p><h2>BUILT FOR WORK<br>THAT HAS TO <span>HOLD UP.</span></h2></div><p>Every mutation is permissioned. Every result is inspectable. Every controlled file change is tracked.</p></div><div class="pipeline"><div><b>01</b><strong>PLAN</strong><small>Break the mission into executable steps</small></div><i>→</i><div><b>02</b><strong>ACT</strong><small>Edit, calculate, generate and run</small></div><i>→</i><div><b>03</b><strong>VERIFY</strong><small>Test the output against real checks</small></div><i>→</i><div class="lit"><b>04</b><strong>DELIVER</strong><small>Ship artifacts with an audit trail</small></div></div></div></section>
 
-      <div class="error-text" id="setup-error"></div>
-      <button class="btn btn-primary btn-full" id="start-btn">Start chatting</button>
+  <section class="compare shell" id="compare"><div class="compareHead"><div><p class="sectionTag">NO POLITE COMPARISONS</p><h2>THEY HELP YOU CODE.<br><span>WREXLYN HELPS YOU FINISH.</span></h2></div><p>Local agentic execution and professional artifact creation in one proprietary, provider-independent platform.</p></div>
+    <div class="tableWrap"><table><thead><tr><th>CAPABILITY</th><th class="wrex"><span class="miniMark">W</span> WREXLYN</th><th>CURSOR</th><th>CLAUDE CODE</th><th>AIDER</th></tr></thead><tbody><tr><td>Local-first agent</td><td class="wrex"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr><tr><td>Choose your model provider</td><td class="wrex"><span class="yes">✓</span></td><td><span class="limited">Limited</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td></tr><tr><td>Native Word / Excel / PowerPoint</td><td class="wrex"><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr><tr><td>Deterministic document checks</td><td class="wrex"><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr><tr><td>Built-in verification loop</td><td class="wrex"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="limited">Basic</span></td></tr><tr><td>Browser UI + terminal</td><td class="wrex"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr></tbody></table></div><p class="disclaimer">Comparison reflects publicly documented product capabilities and Wrexlyn’s current product specification. Competitor capabilities change over time.</p>
+  </section>
 
-      <div class="gate-divider">or</div>
-      <button class="btn btn-full" id="quickstart-btn">Try instantly, no signup — Pollinations (free, occasionally unavailable)</button>
-    </div>
+  <section class="freedom"><div class="shell freedomGrid"><div><p class="sectionTag">MODEL FREEDOM</p><h2>YOUR INTELLIGENCE.<br><span>YOUR ECONOMICS.</span></h2><p>Bring the provider that fits the mission—and switch without abandoning the workflow.</p><a class="primary dark" href="demo.html">Launch the demo <span>→</span></a></div><div class="providers"><div class="core">W<small>WREXLYN</small></div><div class="provider p0">GROQ</div><div class="provider p1">GEMINI</div><div class="provider p2">MISTRAL</div><div class="provider p3">CEREBRAS</div><div class="provider p4">OPENROUTER</div></div></div></section>
 
-  </div>
-</div>
+  <section class="finalCta shell"><div class="ctaGlow"></div><p class="sectionTag">CHOOSE YOUR ENTRY POINT</p><h2>SEE THE SYSTEM.<br>READ THE PROOF.</h2><p>Experience the interface, inspect the architecture, or review the commercial case.</p><div class="heroActions"><a class="primary" href="demo.html">Launch demo <span>↗</span></a><a class="secondary" href="documentation.html">Documentation →</a><a class="secondary" href="pitch.html">View pitch →</a></div><small>Proprietary · Local-first · Private deployment available</small></section>
 
-<div class="chat-shell" id="chat-shell">
-  <div class="chat-meta">
-    <span id="chat-meta-provider"></span>
-    <a id="change-setup-link">change provider/key</a>
-  </div>
-  <div class="chat-log" id="chat-log"></div>
-  <div class="composer">
-    <textarea id="composer-input" rows="1" placeholder="Message Wrexlyn…"></textarea>
-    <button class="btn btn-primary" id="send-btn">Send</button>
-  </div>
-</div>
-
-<div class="footer-note">
-  Wrexlyn — chat-only browser demo. <a href="documentation.html">Documentation</a> &middot; <a href="pitch.html">Pitch deck</a> &middot;
-  Full local agent: <a href="https://github.com/nishantsprabhakar/codingagent" target="_blank" rel="noopener">github.com/nishantsprabhakar/codingagent</a>
-</div>
-
-<script src="providers.js?v=20260810"></script>
-<script src="app.js?v=20260810"></script>
+  <footer class="shell"><a href="#top" class="brand"><span class="mark">W</span><span>WREXLYN</span></a><p>THE VERIFIABLE LOCAL AGENT FOR CODE &amp; BUSINESS DELIVERABLES.</p><div><a href="demo.html">Demo</a><a href="documentation.html">Documentation</a><a href="pitch.html">Pitch</a><a href="#top">Top ↑</a></div></footer>
+</main>
 </body>
 </html>
