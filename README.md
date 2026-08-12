@@ -143,6 +143,25 @@ bar immediately after reading it). See `docs/architecture/` for the full
 threat model and what's intentionally out of scope for a single-user local
 tool.
 
+API keys saved via Settings > API Keys are stored using your OS's own secure
+storage when available — the Windows Data Protection API (tied to your
+Windows login, so the stored value is useless copied to another machine or
+read by another account), the macOS Keychain, or the Linux Secret Service
+(libsecret) — falling back to a local plaintext file only when none of those
+are available, with a clear one-time warning when that happens. The startup
+banner always prints which one is active (`API key storage: ...`). A key
+saved before this existed is moved into secure storage automatically the
+first time it's read.
+
+The `web_fetch` tool resolves a URL's hostname and validates every resolved
+address (not just the hostname string) against a blocklist covering
+loopback, private, link-local — including the cloud metadata endpoint every
+major provider exposes at `169.254.169.254` — and multicast/reserved ranges,
+for IPv4 and IPv6 alike, and connects to that pre-validated address directly
+rather than re-resolving at connect time. The same check runs again on every
+redirect hop, so a redirect can't be used to reach something the original
+URL wouldn't have been allowed to.
+
 ### Using Groq or OpenRouter instead of Pollinations
 
 **As of 2026-07-30, Pollinations requires a paid account for tool-calling

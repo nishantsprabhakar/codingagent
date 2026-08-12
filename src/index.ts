@@ -12,6 +12,7 @@ import { PermissionManager, type ConfirmFn } from "./permissions";
 import { printBanner, printError, ConsoleReporter, color } from "./ui";
 import { loadLastModel } from "./preferences";
 import { loadApiKey, API_KEY_PROVIDERS, type ApiKeyProvider } from "./apiKeys";
+import { describeActiveBackend } from "./secretStore";
 import { listSessions } from "./session";
 import { DEFAULT_MODEL } from "./types";
 import type { LlmConfig, LlmProvider } from "./types";
@@ -44,7 +45,7 @@ interface CliOptions {
   lan: boolean;
 }
 
-function parseArgs(argv: string[]): CliOptions {
+async function parseArgs(argv: string[]): Promise<CliOptions> {
   let provider: LlmProvider = (process.env.AGENT_PROVIDER as LlmProvider) || "pollinations";
   let model: string | undefined = process.env.AGENT_MODEL;
   let apiKey: string | undefined;
@@ -86,7 +87,7 @@ function parseArgs(argv: string[]): CliOptions {
   const envVar = API_KEY_ENV[provider];
   if (!apiKey && envVar) apiKey = process.env[envVar];
   // Explicit --api-key, then the env var, then whatever was saved via the web UI's Settings > API Keys tab.
-  if (!apiKey && API_KEY_PROVIDERS.includes(provider as ApiKeyProvider)) apiKey = loadApiKey(provider as ApiKeyProvider) ?? undefined;
+  if (!apiKey && API_KEY_PROVIDERS.includes(provider as ApiKeyProvider)) apiKey = (await loadApiKey(provider as ApiKeyProvider)) ?? undefined;
 
   // Explicit --model/env wins; otherwise fall back to whatever was last
   // chosen for this provider via the web UI's model picker, then the
@@ -120,7 +121,7 @@ Options:
 }
 
 async function main(): Promise<void> {
-  const options = parseArgs(process.argv.slice(2));
+  const options = await parseArgs(process.argv.slice(2));
 
   if (!fs.existsSync(options.root) || !fs.statSync(options.root).isDirectory()) {
     printError(`Working directory does not exist: ${options.root}`);
@@ -168,6 +169,7 @@ async function runRepl(options: CliOptions): Promise<void> {
   agent.replayCurrentState();
 
   printBanner(options.root, `${options.llmConfig.provider} · ${options.llmConfig.model}`);
+  console.log(`API key storage: ${await describeActiveBackend()}\n`);
   if (options.yolo) {
     console.log("(yolo mode: all actions auto-approved)\n");
   }

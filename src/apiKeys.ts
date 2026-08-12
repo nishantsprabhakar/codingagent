@@ -4,68 +4,122 @@
  * See LICENSE for details.
  *
  * Machine-wide API key storage for providers that need one (Groq,
- * OpenRouter — Pollinations needs none). Lets the web UI's Settings modal
- * set a key once instead of requiring --api-key or an env var on every
- * launch. Stored in plain JSON like preferences.ts/globalSettings.ts — this
- * is local-machine convenience storage, not a secrets vault; never log a
- * raw key or send one anywhere but the provider's own API.
+ * OpenRouter, etc. — Pollinations needs none). Lets the web UI's Settings
+ * modal set a key once instead of requiring --api-key or an env var on
+ * every launch.
+ *
+ * Backed by secretStore.ts: OS-backed secure storage (Windows DPAPI, macOS
+ * Keychain, Linux Secret Service) when available, falling back to the
+ * plaintext JSON file this project always used otherwise — see
+ * secretStore.ts's header comment for the full rationale and the specific
+ * trade-offs of each backend. Never log a raw key or send one anywhere but
+ * the provider's own API.
  */
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { getSecretStore } from "./secretStore";
 
 export type ApiKeyProvider = "groq" | "openrouter" | "gemini" | "cerebras" | "mistral";
 
 /** Every provider that needs a stored key — single source of truth for iterating "all key-based providers". */
 export const API_KEY_PROVIDERS: readonly ApiKeyProvider[] = ["groq", "openrouter", "gemini", "cerebras", "mistral"];
 
-interface StoredApiKeys {
-  groq?: string;
-  openrouter?: string;
-  gemini?: string;
-  cerebras?: string;
-  mistral?: string;
+let baseDirOverride: string | null = null;
+/** Test-only: production code must never call this. */
+export function _setApiKeysBaseDirForTesting(dir: string | null): void {
+  baseDirOverride = dir;
+}
+function legacyPlaintextPath(): string {
+  return path.join(baseDirOverride ?? path.join(os.homedir(), ".coding-agent"), "api-keys.json");
 }
 
-function storePath(): string {
-  return path.join(os.homedir(), ".coding-agent", "api-keys.json");
+/**
+ * One-time-per-process migration: if a secure backend is active (not the plaintext fallback itself) and the
+ * legacy plaintext file still has entries, move each one into secure storage and remove it from the plaintext
+ * file — so a key saved before this feature existed ends up properly protected without the user re-entering it.
+ * Safe to call repeatedly; only does real work the first time there's something to migrate.
+ */
+let migrated = false;
+/** Test-only: production code must never call this. */
+export function _resetApiKeysMigrationForTesting(): void {
+  migrated = false;
 }
+async function migrateLegacyPlaintextKeysIfNeeded(): Promise<void> {
+  if (migrated) return;
+  migrated = true;
 
-function load(): StoredApiKeys {
+  const store = await getSecretStore();
+  if (store.backendName.includes("plaintext")) return; // nothing to migrate TO — the fallback IS the legacy format
+
+  let legacy: Record<string, string>;
   try {
-    const filePath = storePath();
-    if (!fs.existsSync(filePath)) return {};
-    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    const filePath = legacyPlaintextPath();
+    if (!fs.existsSync(filePath)) return;
+    legacy = JSON.parse(fs.readFileSync(filePath, "utf-8"));
   } catch {
-    return {};
+    return;
   }
-}
 
-function save(keys: StoredApiKeys): void {
-  try {
-    const filePath = storePath();
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(keys, null, 2), "utf-8");
-  } catch {
-    // best-effort — a save failure just means the user has to re-enter it next time
+  const remaining: Record<string, string> = {};
+  let movedAny = false;
+  for (const [provider, key] of Object.entries(legacy)) {
+    if (typeof key !== "string" || !key) continue;
+    try {
+      await store.set(provider, key);
+      movedAny = true;
+    } catch (err: any) {
+      // Couldn't move this one into secure storage — leave it in the legacy file rather than lose it.
+      remaining[provider] = key;
+      console.warn(`[coding-agent] warning: failed to migrate the stored ${provider} API key into secure storage: ${err.message ?? err}`);
+    }
+  }
+
+  if (movedAny) {
+    try {
+      const filePath = legacyPlaintextPath();
+      if (Object.keys(remaining).length) {
+        fs.writeFileSync(filePath, JSON.stringify(remaining, null, 2), "utf-8");
+      } else {
+        fs.rmSync(filePath, { force: true });
+      }
+      console.log("[coding-agent] Existing API key(s) were moved from a local plaintext file into OS-backed secure storage.");
+    } catch {
+      // best-effort — the keys are safely in secure storage either way; leaving the old plaintext copy around
+      // is a minor residual exposure, not a lost-data problem
+    }
   }
 }
 
 /** The stored key for a provider, or null if none is set. Never throws. */
-export function loadApiKey(provider: ApiKeyProvider): string | null {
-  return load()[provider] ?? null;
+export async function loadApiKey(provider: ApiKeyProvider): Promise<string | null> {
+  await migrateLegacyPlaintextKeysIfNeeded();
+  try {
+    const store = await getSecretStore();
+    return await store.get(provider);
+  } catch {
+    return null;
+  }
 }
 
-export function saveApiKey(provider: ApiKeyProvider, apiKey: string): void {
-  const keys = load();
-  keys[provider] = apiKey;
-  save(keys);
+export async function saveApiKey(provider: ApiKeyProvider, apiKey: string): Promise<void> {
+  await migrateLegacyPlaintextKeysIfNeeded();
+  try {
+    const store = await getSecretStore();
+    await store.set(provider, apiKey);
+  } catch (err: any) {
+    // best-effort — a save failure just means the user has to re-enter it next time
+    console.error(`[coding-agent] warning: failed to save the ${provider} API key:`, err.message ?? err);
+  }
 }
 
-export function clearApiKey(provider: ApiKeyProvider): void {
-  const keys = load();
-  delete keys[provider];
-  save(keys);
+export async function clearApiKey(provider: ApiKeyProvider): Promise<void> {
+  try {
+    const store = await getSecretStore();
+    await store.delete(provider);
+  } catch (err: any) {
+    console.error(`[coding-agent] warning: failed to clear the ${provider} API key:`, err.message ?? err);
+  }
 }
 
 /** Never send a raw stored key to the client — only whether one is set, and a masked hint. */

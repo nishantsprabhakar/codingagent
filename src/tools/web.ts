@@ -4,31 +4,11 @@
  * See LICENSE for details.
  */
 import type { ToolSpec } from "../types";
+import { safeFetch, SafeFetchError } from "../net/safeFetch";
 
 const MAX_OUTPUT_CHARS = 20_000;
 const FETCH_TIMEOUT_MS = 15_000;
 const USER_AGENT = "Wrexlyn/0.1 (+https://github.com/nishantsprabhakar/codingagent)";
-
-/**
- * Literal-hostname SSRF guard. This isn't DNS-rebinding-proof (that would need
- * an actual dns.lookup + IP-range check), but it stops the obvious case of the
- * model being steered — by content it just fetched — into hitting the user's
- * own local services (e.g. this very agent's web UI) or link-local metadata
- * endpoints, which is the realistic risk for a tool that runs without a
- * permission prompt.
- */
-const BLOCKED_HOSTNAMES = new Set(["localhost", "0.0.0.0", "::1"]);
-function isBlockedHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  if (BLOCKED_HOSTNAMES.has(h)) return true;
-  if (/^127\./.test(h)) return true;
-  if (/^10\./.test(h)) return true;
-  if (/^192\.168\./.test(h)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-  if (/^169\.254\./.test(h)) return true;
-  if (/^\[?fe80:/i.test(h) || /^\[?::1\]?$/.test(h)) return true;
-  return false;
-}
 
 function stripHtml(html: string): string {
   return html
@@ -77,27 +57,21 @@ export const webFetchTool: ToolSpec = {
     } catch {
       return { ok: false, output: `"${args.url}" is not a valid URL.` };
     }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return { ok: false, output: `Unsupported protocol "${parsed.protocol}" — only http:// and https:// are allowed.` };
-    }
-    if (isBlockedHost(parsed.hostname)) {
-      return { ok: false, output: `Refusing to fetch "${parsed.hostname}" — local/private network addresses are blocked.` };
-    }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await fetch(parsed.toString(), {
-        signal: controller.signal,
-        redirect: "follow",
+      // safeFetch (src/net/safeFetch.ts) resolves the hostname, validates every resolved address against
+      // ipSafety.ts's blocklist, connects to the pre-validated literal IP directly, and re-validates on every
+      // redirect hop — see that module's header comment for why a hostname-string check alone isn't enough.
+      const res = await safeFetch(parsed.toString(), {
+        timeoutMs: FETCH_TIMEOUT_MS,
         headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/json,text/plain,*/*" },
       });
 
-      if (!res.ok) {
+      if (res.status < 200 || res.status >= 300) {
         return { ok: false, output: `HTTP ${res.status} ${res.statusText} fetching ${parsed.toString()}` };
       }
 
-      const contentType = res.headers.get("content-type") ?? "";
+      const contentType = res.headers["content-type"] ?? "";
       const raw = await res.text();
       const text = contentType.includes("html") ? stripHtml(raw) : raw.trim();
 
@@ -106,12 +80,13 @@ export const webFetchTool: ToolSpec = {
       const note = truncated ? `\n\n... (truncated, ${text.length} total characters)` : "";
       return { ok: true, output: `[${res.status}] ${res.url || parsed.toString()}\n\n${body || "(empty response)"}${note}` };
     } catch (err: any) {
-      if (err.name === "AbortError") {
+      if (err instanceof SafeFetchError && err.code === "TIMEOUT") {
         return { ok: false, output: `Request to ${parsed.toString()} timed out after ${FETCH_TIMEOUT_MS / 1000}s.` };
       }
+      if (err instanceof SafeFetchError && err.code === "BLOCKED_ADDRESS") {
+        return { ok: false, output: `Refusing to fetch "${parsed.hostname}" — it resolves to a local/private/reserved address.` };
+      }
       return { ok: false, output: `Failed to fetch ${parsed.toString()}: ${err.message ?? err}` };
-    } finally {
-      clearTimeout(timer);
     }
   },
 };

@@ -1,29 +1,28 @@
 # Backlog — Phases 3 through 13, plus deferred Phase 1/2 items
 
-Date: 2026-08-12. This is the required written backlog: nothing below was
-implemented in this milestone. It exists so the next session can pick up
-without re-deriving priority from scratch. Ordered by what most directly
-protects users or unlocks the next layer of work — not by the phase numbers
-in the original spec, since e.g. some Phase 1 hardening is higher priority
-than most of Phase 3.
+Date: 2026-08-12, updated 2026-08-12. This is the required written backlog.
+Ordered by what most directly protects users or unlocks the next layer of
+work — not by the phase numbers in the original spec, since e.g. some
+Phase 1 hardening is higher priority than most of Phase 3.
+
+**Update:** items 1 and 2 below (SSRF-hardened fetch, OS-backed secret
+storage) are now DONE — see `2026-08-ssrf-fetch-and-secret-storage.md` for
+what was implemented, tested, and verified (including live, on this
+machine's real pre-existing configuration). Left here, struck through, so
+the history of what was originally flagged stays visible; the doc above is
+the authoritative record of what actually shipped.
 
 ## Immediately next (before any Phase 3+ feature work)
 
-1. **SSRF-hardened outbound web fetch** (deferred Phase 1C). Resolve
-   hostnames before connecting; block loopback/private/link-local/
-   multicast/reserved/cloud-metadata ranges for IPv4 *and* IPv6; re-validate
-   on every redirect hop (don't just follow `fetch`'s automatic redirect —
-   handle it manually); cap redirect count, response size, and decompressed
-   size; tests for redirect-to-private-IP, DNS-rebinding, and IPv6 variants.
-   High severity if this agent's web-fetch tool is ever pointed at
-   attacker-influenced URLs (e.g. fetching a URL a model was told to visit
-   based on untrusted page content).
-2. **OS-backed secret storage for API keys** (deferred Phase 1D). Move off
-   plain-JSON storage (`src/apiKeys.ts`) onto OS keychain / Windows
-   Credential Manager / libsecret, with an explicit, documented fallback
-   (still plaintext, but behind a flag and a startup warning) when secure
-   storage isn't available — per-OS, needs real integration testing, not a
-   quick library swap.
+1. ~~**SSRF-hardened outbound web fetch**~~ — DONE. See
+   `2026-08-ssrf-fetch-and-secret-storage.md` §1.
+2. ~~**OS-backed secret storage for API keys**~~ — DONE, with one honest
+   caveat: the macOS and Linux backends are implemented against each OS's
+   documented CLI syntax but not live-verified on those operating systems
+   in this session (only Windows/DPAPI and the plaintext fallback were).
+   See `2026-08-ssrf-fetch-and-secret-storage.md` §2 for the exact scope of
+   what "verified" means here before relying on the macOS/Linux paths in
+   production.
 3. **MCP environment scrubbing + explicit per-var allowlist** (deferred
    Phase 1D). Audit whether `src/mcp.ts` spawns child processes with the
    full parent environment; if so, require an explicit allowlist of env

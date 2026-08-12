@@ -17,6 +17,7 @@ import { loadRecentFolders, addRecentFolder } from "../recentFolders";
 import { saveLastModel, loadLastModel } from "../preferences";
 import { loadGlobalInstructions } from "../globalSettings";
 import { loadApiKey, saveApiKey, clearApiKey, maskApiKey, API_KEY_PROVIDERS, type ApiKeyProvider } from "../apiKeys";
+import { describeActiveBackend } from "../secretStore";
 import { listOpenRouterModels, GROQ_MODELS, GEMINI_MODELS, CEREBRAS_MODELS, MISTRAL_MODELS } from "../providers/openrouterModels";
 import { listSessions } from "../session";
 import type { ClientMessage, ServerMessage } from "./protocol";
@@ -217,7 +218,7 @@ export function startWebServer(
           }
           let apiKey: string | undefined;
           if (provider !== "pollinations") {
-            apiKey = loadApiKey(provider as ApiKeyProvider) ?? undefined;
+            apiKey = (await loadApiKey(provider as ApiKeyProvider)) ?? undefined;
             if (!apiKey) {
               reporter.error(`No API key saved for ${provider} yet — add one from Settings > API Keys first.`);
               return;
@@ -280,14 +281,14 @@ export function startWebServer(
             reporter.error("No API key provided.");
             return;
           }
-          saveApiKey(msg.provider, key);
+          await saveApiKey(msg.provider, key);
           if (msg.provider === currentProvider) {
             currentApiKey = key;
             agent.switchProvider(currentProvider, currentModel, currentApiKey);
           }
           send({ type: "settings_saved", which: "api_keys" });
         } else if (msg.type === "clear_api_key") {
-          clearApiKey(msg.provider);
+          await clearApiKey(msg.provider);
           if (msg.provider === currentProvider) {
             currentApiKey = undefined;
             agent.switchProvider(currentProvider, currentModel, currentApiKey);
@@ -310,7 +311,7 @@ export function startWebServer(
     });
   });
 
-  httpServer.listen(port, bindHost, () => {
+  httpServer.listen(port, bindHost, async () => {
     console.log(`\nWrexlyn web UI running at http://127.0.0.1:${port}/?token=${auth.authToken}`);
     if (lan) {
       console.log(`  LAN-ACCESSIBLE: reachable from other devices on this network (started with --lan).`);
@@ -319,9 +320,8 @@ export function startWebServer(
       console.log(`  Local-only: not reachable from any other device. Pass --lan to allow LAN/phone access.`);
     }
     console.log(`root: ${currentRoot}`);
-    console.log(
-      `model: ${llmConfig.provider} · ${currentModel}${yolo ? "  (yolo mode: all actions auto-approved)" : ""}\n`
-    );
+    console.log(`model: ${llmConfig.provider} · ${currentModel}${yolo ? "  (yolo mode: all actions auto-approved)" : ""}`);
+    console.log(`API key storage: ${await describeActiveBackend()}\n`);
     if (API_KEY_PROVIDERS.includes(llmConfig.provider as ApiKeyProvider) && !llmConfig.apiKey) {
       console.log(`(no API key set for ${llmConfig.provider} yet — add one from Settings > API Keys in the web UI)\n`);
     }
@@ -350,7 +350,7 @@ function handleHttp(
   if (url.pathname === "/api/browse/mkdir" && req.method === "POST") return handleMkdir(req, res);
   if (url.pathname === "/api/global-instructions") return handleGlobalInstructions(res);
   if (url.pathname === "/api/mcp-config") return handleMcpConfig(res, root);
-  if (url.pathname === "/api/api-keys") return handleApiKeys(res);
+  if (url.pathname === "/api/api-keys") return void handleApiKeys(res);
   if (url.pathname === "/api/lan-info") return handleLanInfo(res, port, lan);
   if (url.pathname === "/api/lan-qrcode") return void handleLanQrCode(res, port, lan, auth);
 
@@ -491,11 +491,11 @@ function handleGlobalInstructions(res: http.ServerResponse): void {
 }
 
 /** Never returns raw keys — just whether one is set and a masked hint, so the client can never leak/log a real key. */
-function handleApiKeys(res: http.ServerResponse): void {
+async function handleApiKeys(res: http.ServerResponse): Promise<void> {
   const providers = API_KEY_PROVIDERS;
   const result: Record<string, { set: boolean; masked: string | null }> = {};
   for (const provider of providers) {
-    const key = loadApiKey(provider);
+    const key = await loadApiKey(provider);
     result[provider] = { set: !!key, masked: key ? maskApiKey(key) : null };
   }
   sendJson(res, 200, result);
