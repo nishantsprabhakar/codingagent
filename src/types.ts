@@ -18,9 +18,17 @@ export interface ToolCallRequest {
   extra?: Record<string, unknown>;
 }
 
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export interface ChatCompletionResult {
   content: string | null;
   toolCalls: ToolCallRequest[];
+  /** Present only when the provider actually reported it — never fabricated. */
+  usage?: TokenUsage;
 }
 
 export type LlmProvider = "pollinations" | "groq" | "openrouter" | "gemini" | "cerebras" | "mistral";

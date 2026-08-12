@@ -38,6 +38,7 @@ export async function chatCompletion(
           temperature: 0.15,
           max_tokens: 8000,
           stream: true,
+          stream_options: { include_usage: true },
         }),
       });
 
@@ -67,7 +68,7 @@ export async function chatCompletion(
         throwFatal(`Pollinations API error ${res.status}: ${text.slice(0, 800)}`);
       }
 
-      const { content, reasoning, toolCalls, finishReason } = await consumeSseStream(res, onDelta);
+      const { content, reasoning, toolCalls, finishReason, usage } = await consumeSseStream(res, onDelta);
       const rawContent = content?.trim() ? content : reasoning?.trim() ? reasoning : null;
 
       if (finishReason === "length") {
@@ -80,7 +81,7 @@ export async function chatCompletion(
         continue;
       }
 
-      return { content: rawContent, toolCalls };
+      return { content: rawContent, toolCalls, usage };
     } catch (err: any) {
       lastError = err;
       if (err.fatal) throw err;

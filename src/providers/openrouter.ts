@@ -35,6 +35,7 @@ export async function chatCompletion(
           temperature: 0.15,
           max_tokens: 8000,
           stream: true,
+          stream_options: { include_usage: true },
         }),
       });
 
@@ -89,13 +90,13 @@ export async function chatCompletion(
         throwFatal(`OpenRouter API error ${res.status}: ${text.slice(0, 800)}`);
       }
 
-      const { content, toolCalls, finishReason } = await consumeSseStream(res, onDelta);
+      const { content, toolCalls, finishReason, usage } = await consumeSseStream(res, onDelta);
 
       if (finishReason === "length") {
         console.error("[coding-agent] warning: response was truncated by the token limit (finish_reason=length)");
       }
 
-      return { content, toolCalls };
+      return { content, toolCalls, usage };
     } catch (err: any) {
       lastError = err;
       if (err.fatal) throw err;

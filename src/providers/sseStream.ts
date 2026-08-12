@@ -5,12 +5,20 @@
  */
 import type { ToolCallRequest } from "../types";
 
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export interface StreamAccumulated {
   content: string | null;
   /** Some providers (e.g. Pollinations) occasionally stream output as `delta.reasoning` instead of `delta.content`. */
   reasoning: string | null;
   toolCalls: ToolCallRequest[];
   finishReason: string | null;
+  /** Present only for providers that actually report it — never fabricated when absent (see callers' handling of `undefined`). */
+  usage?: TokenUsage;
 }
 
 /**
@@ -41,6 +49,7 @@ export async function consumeSseStream(
   let hasContent = false;
   let hasReasoning = false;
   let finishReason: string | null = null;
+  let usage: TokenUsage | undefined;
   const toolCallAcc = new Map<number, { id: string; name: string; arguments: string; extra?: Record<string, unknown> }>();
 
   const processLine = (line: string) => {
@@ -54,6 +63,17 @@ export async function consumeSseStream(
       json = JSON.parse(payload);
     } catch {
       return; // an incomplete/malformed event — nothing safe to do but skip it
+    }
+
+    // The usage-bearing final chunk (only sent when the request opted in via `stream_options.include_usage`)
+    // typically has an EMPTY `choices` array alongside a top-level `usage` object — so this must be checked
+    // before the `if (!choice) return` below, or the one chunk that carries token counts is silently skipped.
+    if (json.usage && typeof json.usage.total_tokens === "number") {
+      usage = {
+        promptTokens: json.usage.prompt_tokens ?? 0,
+        completionTokens: json.usage.completion_tokens ?? 0,
+        totalTokens: json.usage.total_tokens,
+      };
     }
 
     const choice = json.choices?.[0];
@@ -107,5 +127,6 @@ export async function consumeSseStream(
     reasoning: hasReasoning ? reasoningAcc : null,
     toolCalls,
     finishReason,
+    usage,
   };
 }

@@ -22,6 +22,7 @@ import { runVerification } from "./verification";
 import { critiqueStep } from "./critic";
 import { runDivergentRepairEnsemble, computeConvergenceScore, hasRecurredKnownFailure } from "./convergence";
 import { withIdleTimeout } from "./timeout";
+import { recordSessionStart, recordSessionEnd, recordToolUsage, recordModelUsage } from "./usageLedger";
 import type {
   ChatMessage,
   ToolContext,
@@ -307,6 +308,7 @@ export class Agent {
     this.sysMessage = { role: "system", content: this.buildSystemPrompt() };
     this.sessionId = sessionId ?? pickMostRecentSessionId(root) ?? createSessionId();
     this.loadSessionData();
+    recordSessionStart(this.sessionId, this.ctx.root);
   }
 
   /** Renders the system prompt from current in-memory state (global instructions are always re-read from disk). */
@@ -431,6 +433,7 @@ export class Agent {
 
   /** Releases MCP server subprocesses. Call when this Agent instance is done (e.g. on disconnect). */
   async dispose(): Promise<void> {
+    recordSessionEnd(this.sessionId);
     await this.mcpManager.closeAll();
   }
 
@@ -502,6 +505,9 @@ export class Agent {
         return;
       }
       this.reporter.thinking(false);
+      if (result.usage) {
+        recordModelUsage(this.sessionId, this.llmConfig.provider, this.llmConfig.model, result.usage);
+      }
 
       if (result.toolCalls.length === 0) {
         const text = result.content ?? "(no response)";
@@ -864,6 +870,7 @@ export class Agent {
   ): string {
     this.reporter.toolResult(id, output, ok);
     this.historyLog.push({ type: "tool", id, name, label, args, output, ok });
+    recordToolUsage(this.sessionId, name, ok, risk);
     if (risk !== "low" && this.currentTransaction) {
       this.currentTransaction.actions.push({
         toolCallId: id,

@@ -35,6 +35,7 @@ export async function chatCompletion(
           temperature: 0.15,
           max_tokens: 8000,
           stream: true,
+          stream_options: { include_usage: true },
         }),
       });
 
@@ -57,13 +58,13 @@ export async function chatCompletion(
       // Once the stream starts, its content may already be visible to the user via
       // onDelta — retrying from here would re-emit/duplicate that, so a failure past
       // this point surfaces as a real error instead of being silently retried.
-      const { content, toolCalls, finishReason } = await consumeSseStream(res, onDelta);
+      const { content, toolCalls, finishReason, usage } = await consumeSseStream(res, onDelta);
 
       if (finishReason === "length") {
         console.error("[coding-agent] warning: response was truncated by the token limit (finish_reason=length)");
       }
 
-      return { content, toolCalls };
+      return { content, toolCalls, usage };
     } catch (err: any) {
       lastError = err;
       if (err.fatal) throw err;
