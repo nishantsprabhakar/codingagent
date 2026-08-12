@@ -41,6 +41,7 @@ interface CliOptions {
   yolo: boolean;
   web: boolean;
   port: number;
+  lan: boolean;
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -54,6 +55,7 @@ function parseArgs(argv: string[]): CliOptions {
     yolo: false,
     web: false,
     port: 4390,
+    lan: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -73,6 +75,8 @@ function parseArgs(argv: string[]): CliOptions {
       options.web = true;
     } else if (arg === "--port") {
       options.port = Number(argv[++i]) || options.port;
+    } else if (arg === "--lan") {
+      options.lan = true;
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -108,6 +112,9 @@ Options:
   --yolo            Auto-approve all file writes / edits / shell commands (dangerous)
   --web             Serve the web UI instead of the terminal REPL
   --port <n>        Port for the web UI (default: 4390)
+  --lan             Bind the web UI to all network interfaces so another device (e.g. a phone) on the same
+                    network can reach it (default: local-only, bound to 127.0.0.1). Every connection — local
+                    or LAN — still requires the auth token printed at startup, or a paired QR-code link.
   --help            Show this help
 `);
 }
@@ -130,7 +137,7 @@ async function main(): Promise<void> {
 
   if (options.web) {
     const { startWebServer } = await import("./web/server");
-    startWebServer(options.root, options.llmConfig, options.yolo, options.port);
+    startWebServer(options.root, options.llmConfig, options.yolo, options.port, options.lan);
     return;
   }
 

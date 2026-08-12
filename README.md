@@ -123,8 +123,25 @@ Options:
   --yolo            Auto-approve all file writes / edits / shell commands (dangerous)
   --web             Serve the web UI instead of the terminal REPL
   --port <n>        Port for the web UI (default: 4390)
+  --lan             Bind the web UI to all network interfaces so another device (e.g. a phone) on the same
+                    network can reach it (default: local-only, bound to 127.0.0.1). Every connection — local
+                    or LAN — still requires the auth token printed at startup, or a paired QR-code link.
   --help            Show this help
 ```
+
+### Security defaults
+
+The web UI (`--web`) binds to `127.0.0.1` by default — it is **not** reachable
+from another device on your network unless you explicitly pass `--lan`. On
+startup it prints a URL containing a random per-run auth token
+(`http://127.0.0.1:4390/?token=...`); every HTTP route and the WebSocket
+connection require that token (as a header or, for contexts like `<img>` tags
+that can't set one, a `?token=` query param). The token lives only in memory
+for that process and in the browser's `sessionStorage` — it's never written
+to disk and never persists in the URL (the page strips it from the address
+bar immediately after reading it). See `docs/architecture/` for the full
+threat model and what's intentionally out of scope for a single-user local
+tool.
 
 ### Using Groq or OpenRouter instead of Pollinations
 
@@ -293,14 +310,17 @@ REPL commands:
   small, stable lineup is listed directly. Your choice is remembered per
   provider (`~/.coding-agent/preferences.json`) and reused on the next
   launch.
-- **Phone access**: Settings → "Connect from Phone" shows a QR code and the
-  URL for reaching this machine from any device on the same Wi-Fi (the server
-  already listens on all interfaces, not just localhost) — scan it from an
-  iPhone, then Share → Add to Home Screen for a standalone, app-like icon. The
-  UI is responsive down to phone widths, and iOS-specific quirks (input
-  auto-zoom, dynamic viewport height, Dynamic Island/home-indicator overlap in
-  standalone mode) are handled. If it doesn't load, check Windows Firewall
-  hasn't blocked Node.js on private networks.
+- **Phone access**: requires starting with `--lan` (see "Security defaults"
+  above — plain `--web` alone is local-only and phones can't reach it).
+  With `--lan`, Settings → "Connect from Phone" shows a QR code encoding a
+  time-limited (10-minute), single-use pairing link — scanning it exchanges
+  once for the real session token, so the long-lived credential is never
+  itself the thing printed into a QR code. After scanning, Share → Add to
+  Home Screen gives a standalone, app-like icon. The UI is responsive down to
+  phone widths, and iOS-specific quirks (input auto-zoom, dynamic viewport
+  height, Dynamic Island/home-indicator overlap in standalone mode) are
+  handled. If it doesn't load, check Windows Firewall hasn't blocked Node.js
+  on private networks.
 
 ## Known limitations
 

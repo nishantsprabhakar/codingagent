@@ -117,6 +117,60 @@
     streamingBubble: null,
   };
 
+  // ---------- Auth ----------
+  // The server requires a bearer token on every /api/ route and the WebSocket
+  // handshake (see src/web/server.ts). It arrives one of two ways: as a
+  // `?token=` URL param the very first time this machine's own browser opens
+  // the app (from the URL the server printed at startup), or as a `?pair=`
+  // URL param from a scanned QR code, exchanged once for the real token via
+  // /api/pair. Either way it's moved into sessionStorage and stripped from
+  // the URL immediately — never left sitting in the address bar/history.
+  const AUTH_STORAGE_KEY = "wrexlyn_auth_token";
+
+  function getAuthToken() {
+    return sessionStorage.getItem(AUTH_STORAGE_KEY);
+  }
+
+  function stripSearchParams(names) {
+    const params = new URLSearchParams(location.search);
+    for (const name of names) params.delete(name);
+    const query = params.toString();
+    history.replaceState(null, "", location.pathname + (query ? `?${query}` : ""));
+  }
+
+  async function bootstrapAuthToken() {
+    const params = new URLSearchParams(location.search);
+    const urlToken = params.get("token");
+    const pairToken = params.get("pair");
+
+    if (urlToken) {
+      sessionStorage.setItem(AUTH_STORAGE_KEY, urlToken);
+      stripSearchParams(["token"]);
+      return;
+    }
+
+    if (pairToken) {
+      try {
+        const res = await fetch(`/api/pair?token=${encodeURIComponent(pairToken)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authToken) sessionStorage.setItem(AUTH_STORAGE_KEY, data.authToken);
+        }
+      } catch {
+        // fall through — connect() will fail its auth check and the UI shows a disconnected state
+      }
+      stripSearchParams(["pair"]);
+    }
+  }
+
+  /** Use this instead of raw fetch() for every /api/ call — attaches the auth token the same way every time. */
+  async function apiFetch(url, opts = {}) {
+    const token = getAuthToken();
+    const headers = new Headers(opts.headers || {});
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(url, { ...opts, headers });
+  }
+
   const BINARY_FILE_EXTS = new Set(["docx", "pptx", "xlsx", "pdf", "png", "jpg", "jpeg", "gif", "ico", "zip", "wasm", "bin"]);
   const FILE_ICONS = {
     docx: "📄", pptx: "📊", xlsx: "📈", pdf: "📕",
@@ -157,7 +211,9 @@
 
   function connect() {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${location.host}`);
+    const token = getAuthToken();
+    const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+    const ws = new WebSocket(`${protocol}//${location.host}/${qs}`);
     state.ws = ws;
 
     ws.addEventListener("open", () => setBusy(false));
@@ -1133,7 +1189,7 @@
 
   async function browseTo(targetPath) {
     try {
-      const res = await fetch(`/api/browse?path=${encodeURIComponent(targetPath || "")}`);
+      const res = await apiFetch(`/api/browse?path=${encodeURIComponent(targetPath || "")}`);
       const data = await res.json();
       if (data.error) {
         el.folderBrowserList.innerHTML = `<div class="folder-browser-empty">${escapeHtml(data.error)}</div>`;
@@ -1218,7 +1274,7 @@
       return;
     }
     try {
-      const res = await fetch("/api/browse/mkdir", {
+      const res = await apiFetch("/api/browse/mkdir", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parentPath: browseState.path, name }),
@@ -1268,7 +1324,7 @@
     pickerProvider = state.currentProvider;
 
     try {
-      const res = await fetch("/api/api-keys");
+      const res = await apiFetch("/api/api-keys");
       pickerKeyStatus = await res.json();
     } catch {
       pickerKeyStatus = {};
@@ -1307,7 +1363,7 @@
 
     el.modelList.innerHTML = `<div class="model-list-loading">Loading models…</div>`;
     try {
-      const res = await fetch(`/api/models?provider=${encodeURIComponent(pickerProvider)}`);
+      const res = await apiFetch(`/api/models?provider=${encodeURIComponent(pickerProvider)}`);
       const data = await res.json();
       const models = data.models || [];
       state.modelCache = { provider: pickerProvider, models };
@@ -1499,7 +1555,7 @@
     ensureApiKeyRows();
     let data = {};
     try {
-      const res = await fetch("/api/api-keys");
+      const res = await apiFetch("/api/api-keys");
       data = await res.json();
     } catch {
       data = {};
@@ -1518,18 +1574,24 @@
     el.phoneQrcode.innerHTML = "";
     el.phoneConnectUrl.textContent = "Loading…";
     try {
-      const res = await fetch("/api/lan-info");
+      const res = await apiFetch("/api/lan-info");
       const data = await res.json();
+      if (!data.lan) {
+        el.phoneConnectUrl.textContent = "LAN access is off. Restart Wrexlyn with --lan to allow phone/network access.";
+        return;
+      }
       if (!data.addresses || !data.addresses.length) {
         el.phoneConnectUrl.textContent = "No network address found — connect this computer to Wi-Fi first.";
         return;
       }
-      const url = `http://${data.addresses[0]}:${data.port}`;
-      el.phoneConnectUrl.textContent = url;
-      const img = document.createElement("img");
-      img.src = `/api/lan-qrcode?_=${Date.now()}`;
-      img.alt = "QR code to open Wrexlyn on your phone";
-      el.phoneQrcode.appendChild(img);
+      el.phoneConnectUrl.textContent = `Scan with your phone's camera — this link expires in 10 minutes and works once.`;
+      // Each fetch of the QR image mints a fresh single-use pairing token server-side, so this image itself is
+      // only ever fetched with the (already-authenticated) request below, not embedded as a bare <img src>.
+      const qrRes = await apiFetch(`/api/lan-qrcode?_=${Date.now()}`);
+      if (qrRes.ok) {
+        const svgText = await qrRes.text();
+        el.phoneQrcode.innerHTML = svgText;
+      }
     } catch {
       el.phoneConnectUrl.textContent = "Failed to look up this computer's network address.";
     }
@@ -1661,7 +1723,7 @@
     el.settingsOverlay.hidden = false;
 
     try {
-      const res = await fetch("/api/global-instructions");
+      const res = await apiFetch("/api/global-instructions");
       const data = await res.json();
       el.settingsInstructionsInput.value = data.text || "";
     } catch {
@@ -1669,7 +1731,7 @@
     }
 
     try {
-      const res = await fetch("/api/mcp-config");
+      const res = await apiFetch("/api/mcp-config");
       const data = await res.json();
       mcpServers = data.mcpServers || {};
     } catch {
@@ -1717,7 +1779,7 @@
 
     try {
       const buffer = await file.arrayBuffer();
-      const res = await fetch(`/api/upload?path=${encodeURIComponent(file.name)}`, {
+      const res = await apiFetch(`/api/upload?path=${encodeURIComponent(file.name)}`, {
         method: "POST",
         body: buffer,
       });
@@ -1776,7 +1838,7 @@
   async function loadTree(container, relPath) {
     container.innerHTML = "";
     try {
-      const res = await fetch(`/api/tree?path=${encodeURIComponent(relPath)}`);
+      const res = await apiFetch(`/api/tree?path=${encodeURIComponent(relPath)}`);
       const data = await res.json();
       if (!data.entries) return;
       for (const entry of data.entries) {
@@ -1837,7 +1899,7 @@
     el.codePanelTitle.title = relPath;
     el.codePanelContent.textContent = "Loading…";
     try {
-      const res = await fetch(`/api/file?path=${encodeURIComponent(relPath)}`);
+      const res = await apiFetch(`/api/file?path=${encodeURIComponent(relPath)}`);
       const data = await res.json();
       if (data.binary) {
         el.codePanelContent.textContent = "(binary file — use the download button instead of previewing)";
@@ -1855,13 +1917,27 @@
 
   // ---------- Created files (written/generated by the agent this chat) ----------
 
-  function downloadFile(relPath) {
-    const a = document.createElement("a");
-    a.href = `/api/download?path=${encodeURIComponent(relPath)}`;
-    a.download = relPath.split("/").pop();
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  async function downloadFile(relPath) {
+    // A plain <a href> can't carry the Authorization header the server now requires, so this fetches the file
+    // (authenticated) and downloads the resulting blob instead of navigating directly to the API URL.
+    try {
+      const res = await apiFetch(`/api/download?path=${encodeURIComponent(relPath)}`);
+      if (!res.ok) {
+        appendErrorMessage(`Download failed for ${relPath}: ${res.statusText}`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = relPath.split("/").pop();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      appendErrorMessage(`Download failed for ${relPath}.`);
+    }
   }
 
   function renderCreatedFiles(files) {
@@ -1930,5 +2006,5 @@
   }
 
   setBusy(false);
-  connect();
+  bootstrapAuthToken().then(connect);
 })();

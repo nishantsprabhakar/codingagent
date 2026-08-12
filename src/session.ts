@@ -6,6 +6,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { ChatMessage, TaskItem, HistoryItem } from "./types";
+import { assertValidId } from "./idValidation";
 
 export interface SessionMeta {
   id: string;
@@ -28,7 +29,10 @@ function sessionsDir(root: string): string {
   return path.join(root, ".coding-agent", "sessions");
 }
 
+/** The one choke point every session read/write/delete goes through — validating here means an unvalidated
+ *  id from a client message (see web/server.ts) can never reach fs.rmSync/writeFileSync with a "../" in it. */
 function sessionPath(root: string, id: string): string {
+  assertValidId(id, "session id");
   return path.join(sessionsDir(root), `${id}.json`);
 }
 

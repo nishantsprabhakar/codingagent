@@ -22,6 +22,9 @@ import { listSessions } from "../session";
 import type { ClientMessage, ServerMessage } from "./protocol";
 import { DEFAULT_MODEL } from "../types";
 import type { LlmConfig, LlmProvider } from "../types";
+import { WebAuth, extractBearerToken } from "../webAuth";
+import { applySecureHeaders, RateLimiter, isAllowedOrigin } from "./security";
+import { isValidId } from "../idValidation";
 
 const VALID_PROVIDERS: LlmProvider[] = ["pollinations", ...API_KEY_PROVIDERS];
 
@@ -30,6 +33,11 @@ const IGNORED_ENTRIES = new Set(["node_modules", ".git", "dist", "build"]);
 const MAX_TREE_ENTRIES = 500;
 const MAX_FILE_BYTES = 300_000;
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_MKDIR_BODY_BYTES = 4_096;
+/** Bounds a single WebSocket message — this app's largest legitimate messages are chat text and MCP config, both far under this. */
+const MAX_WS_MESSAGE_BYTES = 5 * 1024 * 1024;
+/** Routes that don't touch the project, secrets, or state — safe to serve without the auth token so the page can load far enough to learn it needs one. */
+const UNAUTHENTICATED_API_ROUTES = new Set(["/api/pair"]);
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -40,11 +48,6 @@ const MIME: Record<string, string> = {
   ".png": "image/png",
 };
 
-/**
- * Node's http server listens on all interfaces by default (no host passed to
- * .listen()), so this is purely about *telling* the user how to reach it from
- * another device on the same network — a phone can't use "localhost".
- */
 function getLanAddresses(): string[] {
   const results: string[] = [];
   for (const addrs of Object.values(os.networkInterfaces())) {
@@ -55,23 +58,82 @@ function getLanAddresses(): string[] {
   return results;
 }
 
-export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: boolean, port: number): void {
+/** Origins this server will accept a WebSocket upgrade or treat as same-app for CORS purposes from. Recomputed per check since LAN addresses can change (e.g. Wi-Fi reconnect) while the process keeps running. */
+function buildAllowedOrigins(port: number, lan: boolean): string[] {
+  const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`];
+  if (lan) for (const addr of getLanAddresses()) origins.push(`http://${addr}:${port}`);
+  return origins;
+}
+
+export interface WebServerHandle {
+  httpServer: http.Server;
+  wss: WebSocketServer;
+  /** The auth token this instance requires on every privileged route/connection — exposed for tests and for
+   *  a caller that wants to print/display it itself instead of relying on this function's own console output. */
+  authToken: string;
+}
+
+export function startWebServer(
+  initialRoot: string,
+  llmConfig: LlmConfig,
+  yolo: boolean,
+  port: number,
+  lan = false
+): WebServerHandle {
   let currentRoot = initialRoot;
   let currentProvider = llmConfig.provider;
   let currentModel = llmConfig.model;
   let currentApiKey = llmConfig.apiKey;
   addRecentFolder(currentRoot);
 
+  const auth = new WebAuth();
+  const bindHost = lan ? "0.0.0.0" : "127.0.0.1";
+  const httpRateLimiter = new RateLimiter(60, 2);
+
   const httpServer = http.createServer((req, res) => {
     try {
-      handleHttp(req, res, currentRoot, currentProvider, port);
+      applySecureHeaders(res);
+
+      const clientKey = req.socket.remoteAddress ?? "unknown";
+      if (!httpRateLimiter.tryConsume(clientKey)) {
+        res.writeHead(429, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "rate limited" }));
+        return;
+      }
+
+      const url = new URL(req.url ?? "/", "http://localhost");
+      if (url.pathname.startsWith("/api/") && !UNAUTHENTICATED_API_ROUTES.has(url.pathname)) {
+        const token = extractBearerToken(req.headers.authorization) ?? url.searchParams.get("token");
+        if (!auth.checkAuthToken(token)) {
+          res.writeHead(401, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "unauthorized" }));
+          return;
+        }
+      }
+
+      handleHttp(req, res, url, currentRoot, currentProvider, port, lan, auth);
     } catch (err: any) {
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end(`Internal error: ${err.message ?? err}`);
     }
   });
 
-  const wss = new WebSocketServer({ server: httpServer });
+  const wss = new WebSocketServer({
+    server: httpServer,
+    maxPayload: MAX_WS_MESSAGE_BYTES,
+    verifyClient: (info, callback) => {
+      const allowedOrigins = buildAllowedOrigins(port, lan);
+      if (!isAllowedOrigin(info.origin, allowedOrigins)) {
+        callback(false, 403, "origin not allowed");
+        return;
+      }
+      const reqUrl = new URL(info.req.url ?? "/", "http://localhost");
+      const token = extractBearerToken(info.req.headers.authorization) ?? reqUrl.searchParams.get("token");
+      if (!auth.checkAuthToken(token)) {
+        callback(false, 401, "unauthorized");
+        return;
+      }
+      callback(true);
+    },
+  });
 
   wss.on("connection", (ws) => {
     const send = (msg: ServerMessage) => {
@@ -174,11 +236,19 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
           sendSessions();
           agent.replayCurrentState();
         } else if (msg.type === "switch_session") {
+          if (!isValidId(msg.id)) {
+            reporter.error("Invalid session id.");
+            return;
+          }
           agent.switchSession(msg.id);
           sendInit();
           sendSessions();
           agent.replayCurrentState();
         } else if (msg.type === "delete_session") {
+          if (!isValidId(msg.id)) {
+            reporter.error("Invalid session id.");
+            return;
+          }
           const wasActive = msg.id === agent.getSessionId();
           agent.deleteSession(msg.id);
           if (wasActive) {
@@ -198,6 +268,10 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
           const toolCount = await agent.reloadMcp();
           send({ type: "mcp_reloaded", toolCount });
         } else if (msg.type === "rollback_request") {
+          if (!isValidId(msg.transactionId)) {
+            reporter.error("Invalid transaction id.");
+            return;
+          }
           const { ok, restored } = agent.rollbackTransaction(msg.transactionId);
           send({ type: "rollback_result", transactionId: msg.transactionId, ok, restored });
         } else if (msg.type === "update_api_key") {
@@ -236,10 +310,13 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
     });
   });
 
-  httpServer.listen(port, () => {
-    console.log(`\nWrexlyn web UI running at http://localhost:${port}`);
-    for (const addr of getLanAddresses()) {
-      console.log(`  also reachable on your network at: http://${addr}:${port}  (e.g. from a phone on the same Wi-Fi)`);
+  httpServer.listen(port, bindHost, () => {
+    console.log(`\nWrexlyn web UI running at http://127.0.0.1:${port}/?token=${auth.authToken}`);
+    if (lan) {
+      console.log(`  LAN-ACCESSIBLE: reachable from other devices on this network (started with --lan).`);
+      console.log(`  To connect a phone: open Settings > Phone access in the web UI for a time-limited pairing QR code.`);
+    } else {
+      console.log(`  Local-only: not reachable from any other device. Pass --lan to allow LAN/phone access.`);
     }
     console.log(`root: ${currentRoot}`);
     console.log(
@@ -249,11 +326,21 @@ export function startWebServer(initialRoot: string, llmConfig: LlmConfig, yolo: 
       console.log(`(no API key set for ${llmConfig.provider} yet — add one from Settings > API Keys in the web UI)\n`);
     }
   });
+
+  return { httpServer, wss, authToken: auth.authToken };
 }
 
-function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: string, provider: string, port: number): void {
-  const url = new URL(req.url ?? "/", "http://localhost");
-
+function handleHttp(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  url: URL,
+  root: string,
+  provider: string,
+  port: number,
+  lan: boolean,
+  auth: WebAuth
+): void {
+  if (url.pathname === "/api/pair") return handlePair(url, res, auth);
   if (url.pathname === "/api/tree") return handleTree(url, res, root);
   if (url.pathname === "/api/file") return handleFile(url, res, root);
   if (url.pathname === "/api/download") return handleDownload(url, res, root);
@@ -264,25 +351,44 @@ function handleHttp(req: http.IncomingMessage, res: http.ServerResponse, root: s
   if (url.pathname === "/api/global-instructions") return handleGlobalInstructions(res);
   if (url.pathname === "/api/mcp-config") return handleMcpConfig(res, root);
   if (url.pathname === "/api/api-keys") return handleApiKeys(res);
-  if (url.pathname === "/api/lan-info") return handleLanInfo(res, port);
-  if (url.pathname === "/api/lan-qrcode") return void handleLanQrCode(res, port);
+  if (url.pathname === "/api/lan-info") return handleLanInfo(res, port, lan);
+  if (url.pathname === "/api/lan-qrcode") return void handleLanQrCode(res, port, lan, auth);
 
   serveStatic(url.pathname, res);
 }
 
-function handleLanInfo(res: http.ServerResponse, port: number): void {
-  sendJson(res, 200, { port, addresses: getLanAddresses() });
+/** Exchanges a valid, unexpired, single-use pairing token for the real (long-lived) auth token. This is the only unauthenticated /api/ route — its own token is short-lived and consumed on first use, so it never becomes a standing credential. */
+function handlePair(url: URL, res: http.ServerResponse, auth: WebAuth): void {
+  const pairingToken = url.searchParams.get("token");
+  const authToken = auth.redeemPairingToken(pairingToken);
+  if (!authToken) return sendJson(res, 403, { error: "Pairing link is invalid or has expired — generate a new QR code." });
+  sendJson(res, 200, { authToken });
 }
 
-/** SVG QR code encoding this machine's LAN URL, for scan-to-connect from a phone on the same network. */
-async function handleLanQrCode(res: http.ServerResponse, port: number): Promise<void> {
+/** Deliberately does not mint a pairing token — /api/lan-qrcode is the single source of truth for the current
+ *  pairing link, so this route (used to show the LAN address as plain text) can't invalidate it by minting a
+ *  second, different one for the same "open the phone-pairing panel" moment. */
+function handleLanInfo(res: http.ServerResponse, port: number, lan: boolean): void {
+  if (!lan) return sendJson(res, 200, { lan: false, addresses: [] });
+  const addresses = getLanAddresses();
+  sendJson(res, 200, { lan: true, addresses, port });
+}
+
+/** SVG QR code encoding a short-lived pairing URL — never the long-lived auth token itself. */
+async function handleLanQrCode(res: http.ServerResponse, port: number, lan: boolean, auth: WebAuth): Promise<void> {
+  if (!lan) {
+    res.writeHead(404, { "Content-Type": "text/plain" }).end("LAN access is disabled — restart with --lan to enable it.");
+    return;
+  }
   const [address] = getLanAddresses();
   if (!address) {
     res.writeHead(404, { "Content-Type": "text/plain" }).end("No LAN address found");
     return;
   }
   try {
-    const svg = await QRCode.toString(`http://${address}:${port}`, { type: "svg", margin: 1, width: 220 });
+    const { token } = auth.issuePairingToken();
+    const pairingUrl = `http://${address}:${port}/?pair=${token}`;
+    const svg = await QRCode.toString(pairingUrl, { type: "svg", margin: 1, width: 220 });
     res.writeHead(200, { "Content-Type": "image/svg+xml", "Cache-Control": "no-cache" });
     res.end(svg);
   } catch (err: any) {
@@ -293,9 +399,11 @@ async function handleLanQrCode(res: http.ServerResponse, port: number): Promise<
 /**
  * Lists the subdirectories of `path` for the "choose a project folder"
  * browser — deliberately not sandboxed to any project root, since its whole
- * purpose is picking where a project root should be. An empty/missing path
- * means "show the top level": drive letters on Windows, the home directory
- * elsewhere.
+ * purpose is picking where a project root should be. Reachable only with a
+ * valid auth token (enforced by the caller in startWebServer), which is the
+ * boundary this route actually relies on now that the server isn't bound to
+ * every network interface by default. An empty/missing path means "show the
+ * top level": drive letters on Windows, the home directory elsewhere.
  */
 function handleBrowse(url: URL, res: http.ServerResponse): void {
   let target = url.searchParams.get("path") || "";
@@ -336,8 +444,18 @@ function handleBrowse(url: URL, res: http.ServerResponse): void {
 
 function handleMkdir(req: http.IncomingMessage, res: http.ServerResponse): void {
   let body = "";
-  req.on("data", (chunk) => (body += chunk));
+  let tooLarge = false;
+  req.on("data", (chunk) => {
+    if (tooLarge) return;
+    body += chunk;
+    if (body.length > MAX_MKDIR_BODY_BYTES) {
+      tooLarge = true;
+      sendJson(res, 413, { error: "Request body too large" });
+      req.destroy();
+    }
+  });
   req.on("end", () => {
+    if (tooLarge) return;
     let parentPath: string, name: string;
     try {
       const parsed = JSON.parse(body);
