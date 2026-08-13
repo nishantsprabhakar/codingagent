@@ -9,7 +9,7 @@ import { chatCompletion } from "./llm";
 import { TOOLS, TOOL_DEFINITIONS } from "./tools";
 import { UPDATE_TASKS_DEFINITION } from "./tools/tasks";
 import { REMEMBER_PREFERENCE_DEFINITION, applyRememberedPreference } from "./tools/preferences";
-import { SAVE_SKILL_DEFINITION, loadProjectSkills, saveProjectSkill, formatSkillsIndexForPrompt, type SkillRecord } from "./tools/skills";
+import { SAVE_SKILL_DEFINITION, loadProjectSkills, saveProjectSkill, formatSkillsIndexForPrompt, type SkillRecord, type SaveSkillInput } from "./tools/skills";
 import { RECORD_EVIDENCE_DEFINITION, findConflicts, appendEvidence, type EvidenceConflict } from "./tools/evidence";
 import { PermissionManager } from "./permissions";
 import { gatherProjectContext } from "./projectContext";
@@ -155,6 +155,9 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "  project (a deployment sequence, a report's structure, a recurring analysis), call save_skill so it doesn't",
     "  have to be re-derived from scratch next time. Saved skills for this project are listed by name below if any",
     "  exist yet — call recall_skill(name) to retrieve one's full steps when it's relevant to what you're doing.",
+    "  save_skill can optionally attach a reusable script (scriptContent/scriptFilename/scriptDescription/",
+    "  scriptArgs) — it's never run automatically; recall_skill will show you the exact command later, and running",
+    "  it always requires a separate run_shell_command call the user must approve, same as any other shell command.",
     "- record_evidence: when you state a specific labeled figure (a financial number, a count, a date, a status) in",
     "  a generated artifact that could plausibly recur in another artifact later in this same session, call it with",
     "  the label, value, and where it came from. If it disagrees with something you recorded earlier this session,",
@@ -1151,7 +1154,9 @@ export class Agent {
     return this.recordTool(id, "remember_preference", label, args, output, true);
   }
 
-  /** Persists a reusable skill and rebuilds the system prompt's skills index immediately — see tools/skills.ts. */
+  /** Persists a reusable skill (optionally with an attached script — see tools/skills.ts for the
+   *  execution-safety model: nothing here ever runs it, only run_shell_command can, later, with its
+   *  own permission prompt) and rebuilds the system prompt's skills index immediately. */
   private handleSaveSkill(id: string, args: any): string {
     const name = typeof args.name === "string" ? args.name.trim() : "";
     const description = typeof args.description === "string" ? args.description.trim() : "";
@@ -1163,8 +1168,20 @@ export class Agent {
       return this.recordTool(id, "save_skill", label, args, "name, description, and steps are all required to save a skill.", false);
     }
 
-    const skill: SkillRecord = { name, description, steps };
-    saveProjectSkill(this.ctx.root, skill);
+    const input: SaveSkillInput = {
+      name,
+      description,
+      steps,
+      scriptContent: typeof args.scriptContent === "string" ? args.scriptContent : undefined,
+      scriptFilename: typeof args.scriptFilename === "string" ? args.scriptFilename : undefined,
+      scriptDescription: typeof args.scriptDescription === "string" ? args.scriptDescription : undefined,
+      scriptArgs: typeof args.scriptArgs === "string" ? args.scriptArgs : undefined,
+      testFixture: "testFixture" in args ? args.testFixture : undefined,
+    };
+    const result = saveProjectSkill(this.ctx.root, input);
+    if (!result.ok) {
+      return this.recordTool(id, "save_skill", label, args, result.error ?? "Failed to save skill.", false);
+    }
     this.projectSkills = loadProjectSkills(this.ctx.root);
     this.rebuildSysMessage();
 

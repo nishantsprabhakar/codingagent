@@ -52,6 +52,13 @@ explicit user request.
 the Puppeteer-based PDF approach, and a real script-injection risk found and fixed via adversarial
 review before any code shipped. Done on explicit user request.
 
+**Update (2026-08-13, later again):** Phase 8 (below) is now DONE — see
+`2026-08-phase8-skills-platform.md` for the versioned skill-package format, the no-new-sandbox
+execution-safety decision (scripts only ever run via a model-initiated `run_shell_command` call,
+gated by the existing permission prompt), and a real path-traversal gap plus a real silent-delete
+regression found and fixed via adversarial review before any code shipped. Done on explicit user
+request.
+
 ## Immediately next (before any Phase 3+ feature work) — ALL DONE
 
 1. ~~**SSRF-hardened outbound web fetch**~~ — DONE. See
@@ -165,13 +172,24 @@ See `2026-08-phase7-artifact-engine.md` for the full design, the fix, and an hon
 confirmed live (the real tool registry, not a mock) versus what a flaky free-tier LLM prevented
 confirming end-to-end today.
 
-## Phase 8 — Skills platform
+## ~~Phase 8 — Skills platform~~ — DONE, see `2026-08-phase8-skills-platform.md`
 
 Versioned skill packages (`SKILL.md` + `manifest.json` + `scripts/` +
 `tests/` + `evals/`) replacing the current flat JSON skills
 (`src/tools/skills.ts`). "Never execute untrusted skill scripts
 automatically" needs a concrete sandboxing/permission-preview design before
 any code — don't build the package format first and bolt on safety later.
+
+**Update (2026-08-13):** DONE, after the user explicitly chose no new sandbox: a skill's script
+only ever runs when the model separately calls the existing `run_shell_command` tool with the exact
+command `recall_skill` previews, which still hits the existing risk-classified permission prompt.
+Nothing about execution is automatic, by construction. An adversarial review pass caught and fixed
+two real issues before any code shipped: a path-traversal gap in a naive script-filename field, and
+a silent-no-op regression `deleteProjectSkill` would otherwise have gained once skills migrated to
+the package format. See `2026-08-phase8-skills-platform.md` for the full design, the "Always allow"
+permission caveat stated honestly, and an honest note on live verification (OpenRouter's free tier
+rate-limited the web-UI attempt — the fourth such block this session — so confidence instead rests
+on direct invocation of the real registered tools).
 
 ## Phase 9 — MCP and connectors
 

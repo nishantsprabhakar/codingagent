@@ -1651,10 +1651,14 @@
     for (const skill of skills) {
       const item = document.createElement("div");
       item.className = "skill-item";
+      const badges = [];
+      if (skill.script) badges.push(`<span class="skill-item-badge" title="${escapeHtml(skill.script.description)}">📎 script attached</span>`);
+      if (skill.updatedAt) badges.push(`<span class="skill-item-badge">updated ${formatRelativeTime(skill.updatedAt)}</span>`);
       item.innerHTML = `
         <div class="skill-item-body">
           <div class="skill-item-name">${escapeHtml(skill.name)}</div>
           <div class="skill-item-desc">${escapeHtml(skill.description)}</div>
+          ${badges.length ? `<div class="skill-item-badges">${badges.join("")}</div>` : ""}
           <details class="skill-item-steps">
             <summary>Steps</summary>
             <pre>${escapeHtml(skill.steps)}</pre>

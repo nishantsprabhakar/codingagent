@@ -1991,6 +1991,16 @@ body::before {
   line-height: 1.4;
 }
 
+.skill-item-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.skill-item-badge {
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
 .skill-item-steps {
   margin-top: 6px;
   font-size: 12px;
