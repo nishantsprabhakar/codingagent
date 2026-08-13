@@ -9,8 +9,31 @@ import { glob } from "glob";
 import type { ToolSpec } from "../types";
 import { resolveInRoot } from "./paths";
 
-const DEFAULT_IGNORE = ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**"];
-const MAX_RESULTS = 200;
+// Kept intentionally short and JS/TS-biased plus a few common non-JS heavy directories — not a
+// substitute for real .gitignore parsing (out of scope: hand-rolling correct .gitignore glob
+// semantics is its own project). ".coding-agent" must stay in this list: it's Wrexlyn's own
+// per-project state directory (sessions, transactions, the code index below), and without this
+// exclusion glob_search/grep_search — and codeIndex.ts, which reuses this same list — would walk
+// into and surface Wrexlyn's own persisted data as search results.
+export const DEFAULT_IGNORE = [
+  "**/node_modules/**",
+  "**/.git/**",
+  "**/.coding-agent/**",
+  "**/dist/**",
+  "**/build/**",
+  "**/.venv/**",
+  "**/venv/**",
+  "**/__pycache__/**",
+  "**/target/**",
+  "**/.next/**",
+  "**/.nuxt/**",
+  "**/out/**",
+  "**/coverage/**",
+  "**/.cache/**",
+  "**/.gradle/**",
+  "**/.tox/**",
+];
+export const MAX_RESULTS = 200;
 
 export const globSearchTool: ToolSpec = {
   mutating: false,
@@ -37,6 +60,7 @@ export const globSearchTool: ToolSpec = {
       ignore: DEFAULT_IGNORE,
       nodir: true,
       dot: false,
+      posix: true, // forward-slash paths even on Windows, for consistent model-facing output
     });
     const limited = matches.slice(0, MAX_RESULTS);
     const suffix = matches.length > MAX_RESULTS ? `\n... (${matches.length - MAX_RESULTS} more not shown)` : "";
@@ -72,6 +96,7 @@ export const grepSearchTool: ToolSpec = {
       ignore: DEFAULT_IGNORE,
       nodir: true,
       dot: false,
+      posix: true, // forward-slash paths even on Windows, for consistent model-facing output
     });
 
     let regex: RegExp;

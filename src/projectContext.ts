@@ -5,10 +5,12 @@
  */
 import * as fs from "fs";
 import * as path from "path";
+import { getRecentActivity } from "./gitHistory";
 
 const IGNORED_ENTRIES = new Set(["node_modules", ".git", "dist", "build", ".coding-agent"]);
 const MAX_README_CHARS = 3000;
 const MAX_TOP_LEVEL_ENTRIES = 40;
+const MAX_RECENT_ACTIVITY_ENTRIES = 8;
 
 /**
  * Gives the model a running start on a new session: a shallow directory
@@ -29,7 +31,19 @@ export function gatherProjectContext(root: string): string {
   const readme = readReadme(root);
   if (readme) parts.push(readme);
 
+  const recentActivity = summarizeRecentActivity(root);
+  if (recentActivity) parts.push(recentActivity);
+
   return parts.join("\n\n");
+}
+
+/** Git-history signal (see gitHistory.ts) — silently omitted for a non-git project or on any git
+ *  failure, same pattern as the other three block functions in this file. */
+function summarizeRecentActivity(root: string): string | null {
+  const activity = getRecentActivity(root);
+  if (!activity || !activity.files.length) return null;
+  const files = activity.files.slice(0, MAX_RECENT_ACTIVITY_ENTRIES);
+  return `Recently changed files (most recent first, from git history):\n${files.join("\n")}`;
 }
 
 function listTopLevel(root: string): string[] {

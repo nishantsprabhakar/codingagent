@@ -12,6 +12,7 @@ import { webFetchTool } from "./web";
 import { readPdfTool } from "./pdf";
 import { redlineDocxTool } from "./redline";
 import { recallSkillTool } from "./skills";
+import { searchCodeTool, findSymbolTool } from "./codeSearch";
 
 export const TOOLS: Record<string, ToolSpec> = {
   read_file: readFileTool,
@@ -20,6 +21,8 @@ export const TOOLS: Record<string, ToolSpec> = {
   list_dir: listDirTool,
   glob_search: globSearchTool,
   grep_search: grepSearchTool,
+  search_code: searchCodeTool,
+  find_symbol: findSymbolTool,
   run_shell_command: runShellCommandTool,
   create_docx: createDocxTool,
   create_pptx: createPptxTool,

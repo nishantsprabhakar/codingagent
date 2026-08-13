@@ -36,6 +36,11 @@ originally-stated upgrade targets were stale — see that doc for the actual
 current state). This closes the "Immediately next" list in full; the
 original Phase 1/2 gate is now fully closed.
 
+**Update (2026-08-13, even later):** Phase 5 (below) is now DONE — see
+`2026-08-phase5-project-intelligence.md` for the lexical search engine, regex-based symbol index,
+and git-history signal, shipped with zero new dependencies after the user explicitly chose to skip
+semantic/embedding retrieval and tree-sitter for this phase. Done on explicit user request.
+
 ## Immediately next (before any Phase 3+ feature work) — ALL DONE
 
 1. ~~**SSRF-hardened outbound web fetch**~~ — DONE. See
@@ -92,7 +97,7 @@ create/delete/rename/permission-change tracking, and a real "don't overwrite
 unrelated user changes since the snapshot" check (currently unclear whether
 this is handled — needs auditing before design, not assumed).
 
-## Phase 5 — Project intelligence
+## ~~Phase 5 — Project intelligence~~ — DONE, see `2026-08-phase5-project-intelligence.md`
 
 Incremental file/symbol index, lexical+semantic retrieval, Git-history
 signal. This is the first phase that plausibly needs a new dependency
@@ -100,6 +105,15 @@ signal. This is the first phase that plausibly needs a new dependency
 committing to one, per the "stop and report" instruction, since it's a
 meaningful new architectural dependency for a project that's otherwise
 zero-external-service by design.
+
+**Update (2026-08-13):** DONE. The user was asked and explicitly chose to skip semantic/embedding
+retrieval entirely (no new ML dependency) and heuristic regex symbol extraction over tree-sitter
+(no new AST-parser dependency) — so this shipped with **zero new npm dependencies**: a lexical
+(ranked keyword) search engine, a regex-based symbol index, and a git-history recency signal, all
+live-verified through the actual web UI. See `2026-08-phase5-project-intelligence.md` for what was
+built, three real bugs found during implementation (a pre-existing `.coding-agent/` self-indexing
+gap in `grep_search`/`glob_search`, a symlink containment gap, and `glob@10` returning
+backslash-separated paths on Windows by default), and the explicit scope decisions/limitations.
 
 ## Phase 6 — Evidence graph and cross-artifact consistency
 
