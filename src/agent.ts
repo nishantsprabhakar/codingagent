@@ -23,6 +23,7 @@ import { critiqueStep } from "./critic";
 import { runDivergentRepairEnsemble, computeConvergenceScore, hasRecurredKnownFailure } from "./convergence";
 import { withIdleTimeout } from "./timeout";
 import { recordSessionStart, recordSessionEnd, recordToolUsage, recordModelUsage } from "./usageLedger";
+import { deriveOutcome } from "./verificationOutcome";
 import type {
   ChatMessage,
   ToolContext,
@@ -36,6 +37,8 @@ import type {
   TransactionRecord,
   TransactionOutcome,
   VerificationResult,
+  VerificationCheckEntry,
+  ToolQualityGateResult,
   ProjectMemory,
   ToolSpec,
 } from "./types";
@@ -463,10 +466,12 @@ export class Agent {
       intent: userText.length > 300 ? userText.slice(0, 300) + "…" : userText,
       gitStatusBefore: gitStatusPorcelain(this.ctx.root),
       actions: [],
+      contract: { checks: [] },
       repairAttempts: 0,
       criticCalls: 0,
       outcome: "no_changes",
       confidence: 100,
+      schemaVersion: 2,
     };
     this.needsVerification = false;
     this.lastRepairSignature = null;
@@ -518,7 +523,7 @@ export class Agent {
         if (this.needsVerification && shouldVerify(tx.actions)) {
           const touchedFiles = tx.actions.map((a) => a.fileSnapshot?.path).filter((p): p is string => !!p);
           verification = await runVerification(this.ctx.root, this.projectMemory, touchedFiles);
-          tx.verification = verification;
+          this.setDeterministicChecks(tx, verification);
           this.needsVerification = false;
 
           if (!verification.ok && verification.ranAny && tx.repairAttempts < MAX_REPAIR_ATTEMPTS) {
@@ -657,45 +662,9 @@ export class Agent {
     const mutatingHappened = tx.actions.length > 0;
     const allDenied = mutatingHappened && tx.actions.every((a) => !a.ok && /denied permission/i.test(a.output));
 
-    let outcome: TransactionOutcome;
-    let confidence: number;
-
-    if (forced && mutatingHappened) {
-      outcome = forced;
-      confidence = 40;
-    } else if (!mutatingHappened) {
-      outcome = "no_changes";
-      confidence = 100;
-    } else if (allDenied) {
-      outcome = "blocked";
-      confidence = 20;
-    } else if (tx.verification?.ranAny) {
-      if (tx.verification.ok) {
-        const ranTest = tx.verification.checks.some((c) => /^test/i.test(c.name));
-        outcome = "verified";
-        confidence = ranTest ? 100 : 80;
-      } else {
-        outcome = "failed";
-        confidence = 40;
-      }
-    } else {
-      // No code file/shell command needed build/test/lint verification (see shouldVerify/CODE_FILE_RE) —
-      // but if every successful action this turn was either low-risk or passed its own deterministic
-      // quality gate (create_docx/create_pptx/create_xlsx — see documentQuality.ts), that's genuinely
-      // verified, not just "changes were made, who knows if they're any good". A failed attempt doesn't
-      // count against this: the quality gate runs before the file is written, so a failed call left no
-      // artifact on disk to be uncertain about.
-      const successful = tx.actions.filter((a) => a.ok);
-      const allQualityBacked = successful.length > 0 && successful.every((a) => a.risk === "low" || a.qualityChecked);
-      const anyQualityChecked = successful.some((a) => a.qualityChecked);
-      if (allQualityBacked && anyQualityChecked) {
-        outcome = "verified";
-        confidence = 90;
-      } else {
-        outcome = "unverified_changes";
-        confidence = 60;
-      }
-    }
+    // deriveOutcome (verificationOutcome.ts) is the single source of truth for the six-state
+    // outcome model — see docs/architecture/2026-08-phase3-verification-engine.md for the design.
+    const { outcome, confidenceBase } = deriveOutcome(tx.contract, mutatingHappened, allDenied, forced);
 
     tx.endedAt = Date.now();
     tx.gitStatusAfter = gitStatusPorcelain(this.ctx.root);
@@ -703,12 +672,12 @@ export class Agent {
 
     // Nishant Convergence Protocol: refine the outcome-based score above with what actually
     // happened during repair, if anything did. On the common case (no repair rounds, NCP never
-    // invoked, no recurrence) this returns `confidence` completely unchanged — see convergence.ts.
+    // invoked, no recurrence) this returns `confidenceBase` completely unchanged — see convergence.ts.
     const failureLines = tx.actions
       .filter((a) => !a.ok && Agent.QUALITY_CHECKED_TOOLS.has(a.name))
       .flatMap((a) => a.output.split("\n").map((l) => l.trim()).filter(Boolean));
     tx.confidence = computeConvergenceScore({
-      outcomeBase: confidence,
+      outcomeBase: confidenceBase,
       repairRoundsUsed: tx.repairAttempts,
       ncpInvoked: tx.ncpInvoked ?? false,
       ncpMargin: tx.ncpMargin ?? "n/a",
@@ -717,13 +686,26 @@ export class Agent {
     appendTransaction(this.ctx.root, this.sessionId, tx);
 
     if (outcome !== "no_changes") {
+      // tx.confidence (not confidenceBase) — the NCP-adjusted score just computed above, so the
+      // live UI/history event always matches what's persisted to the transaction log.
       const rollbackAvailable = tx.actions.some((a) => a.ok && a.fileSnapshot);
-      this.reporter.transactionSummary(tx.id, confidence, outcome, rollbackAvailable);
-      this.historyLog.push({ type: "transaction_summary", transactionId: tx.id, confidence, outcome, rollbackAvailable });
+      this.reporter.transactionSummary(tx.id, tx.confidence, outcome, rollbackAvailable);
+      this.historyLog.push({ type: "transaction_summary", transactionId: tx.id, confidence: tx.confidence, outcome, rollbackAvailable });
     }
 
     this.learnFromActions(tx.actions);
     this.currentTransaction = null;
+  }
+
+  /** Replaces this transaction's deterministic (build/test/lint/typecheck) evidence wholesale — matches
+   *  runVerification()'s own semantics of returning a full project snapshot, not an incremental delta. */
+  private setDeterministicChecks(tx: TransactionRecord, verification: VerificationResult): void {
+    tx.contract.checks = tx.contract.checks.filter((c) => c.source !== "deterministic");
+    tx.contract.checks.push(
+      ...verification.checks.map(
+        (c): VerificationCheckEntry => ({ source: "deterministic", name: c.name, ok: c.ok, output: c.output })
+      )
+    );
   }
 
   /**
@@ -748,7 +730,7 @@ export class Agent {
     // since the critic's marginal value here (checking structural/formatting correctness) is exactly
     // what the quality gate already verified. Skip it only when *every* action in the round qualifies;
     // a round that mixes a quality-checked document with a plain code edit still gets critiqued.
-    if (roundActions.every((a) => a.qualityChecked)) return;
+    if (roundActions.every((a) => a.qualityGate?.ok === true)) return;
 
     const stepSummary = roundActions
       .map((a) => `- ${a.label}\n  result: ${a.output.slice(0, MAX_CRITIQUE_ACTION_CHARS)}`)
@@ -756,6 +738,12 @@ export class Agent {
 
     tx.criticCalls++;
     const critique = await critiqueStep(this.llmConfig, tx.intent, stepSummary);
+    tx.contract.checks.push({
+      source: "critic",
+      name: `independent review (round ${tx.criticCalls})`,
+      ok: critique.pass,
+      output: critique.reason,
+    });
 
     this.reporter.critique(critique.pass, critique.reason);
     if (critique.reason) this.historyLog.push({ type: "critique", pass: critique.pass, reason: critique.reason });
@@ -866,11 +854,21 @@ export class Agent {
     ok: boolean,
     risk: RiskLevel = "low",
     fileSnapshot?: FileSnapshot,
-    qualityChecked?: boolean
+    qualityGate?: ToolQualityGateResult
   ): string {
     this.reporter.toolResult(id, output, ok);
     this.historyLog.push({ type: "tool", id, name, label, args, output, ok });
     recordToolUsage(this.sessionId, name, ok, risk);
+    // Quality-gate evidence feeds the outcome contract regardless of risk tier — independent of the
+    // risk !== "low" gate below, which is a separate, unrelated audit-trail/rollback concern.
+    if (qualityGate && this.currentTransaction) {
+      const checks = this.currentTransaction.contract.checks;
+      const key = typeof (args as any)?.path === "string" ? (args as any).path : undefined;
+      const existingIndex = key ? checks.findIndex((c) => c.source === "quality_gate" && c.key === key) : -1;
+      const entry: VerificationCheckEntry = { source: "quality_gate", name: qualityGate.name, ok: qualityGate.ok, output: qualityGate.output, key };
+      if (existingIndex !== -1) checks[existingIndex] = entry;
+      else checks.push(entry);
+    }
     if (risk !== "low" && this.currentTransaction) {
       this.currentTransaction.actions.push({
         toolCallId: id,
@@ -882,7 +880,7 @@ export class Agent {
         output,
         timestamp: Date.now(),
         fileSnapshot,
-        qualityChecked,
+        qualityGate,
       });
       if (ok) this.needsVerification = true;
     }
@@ -1005,7 +1003,7 @@ export class Agent {
       if (result.ok && FILE_PRODUCING_TOOLS.has(name) && typeof args.path === "string") {
         this.trackFile(args.path);
       }
-      return this.recordTool(id, name, label, args, result.output, result.ok, risk, fileSnapshot, result.qualityChecked);
+      return this.recordTool(id, name, label, args, result.output, result.ok, risk, fileSnapshot, result.qualityGate);
     } catch (err: any) {
       const message = `Tool ${name} threw an error: ${err.message ?? err}`;
       return this.recordTool(id, name, label, args, message, false, risk, fileSnapshot);

@@ -82,11 +82,19 @@ export interface ToolExecResult {
   ok: boolean;
   output: string;
   /**
-   * True when this tool ran a deterministic, model-agnostic structural quality gate on its own
-   * output and it passed — lets finalizeTransaction() treat a clean document-generation turn as
-   * genuinely verified instead of always falling back to the flat "unverified_changes" outcome.
+   * Present when this tool ran a deterministic, model-agnostic structural quality gate on its own
+   * output (create_docx/pptx/xlsx — see documentQuality.ts) — on both the blocking-failure and the
+   * passing path, so a blocked generation is visible as real evidence to deriveOutcome(), not just
+   * a plain tool failure. See VerificationContract in this file for how it feeds the outcome model.
    */
-  qualityChecked?: boolean;
+  qualityGate?: ToolQualityGateResult;
+}
+
+/** Small structured result a quality-gated tool (create_docx/pptx/xlsx) attaches to its own ToolExecResult. */
+export interface ToolQualityGateResult {
+  name: string;
+  ok: boolean;
+  output: string;
 }
 
 /** How dangerous an action is judged to be — drives permission UX and whether "always allow" is offered. */
@@ -119,8 +127,20 @@ export interface TaskItem {
   status: TaskStatus;
 }
 
-/** The end-state of one V-Cycle transaction (one user turn's worth of mutating work). */
-export type TransactionOutcome = "verified" | "unverified_changes" | "failed" | "no_changes" | "blocked";
+/**
+ * The end-state of one V-Cycle transaction (one user turn's worth of mutating work).
+ * `no_changes` is a 7th, non-verification sentinel for the zero-action case — there was nothing to
+ * verify, distinct from any of the six real verification states. See deriveOutcome() in
+ * verificationOutcome.ts for exactly how a VerificationContract maps to one of these.
+ */
+export type TransactionOutcome =
+  | "verified"
+  | "reviewed"
+  | "partially_verified"
+  | "unverified"
+  | "failed"
+  | "blocked"
+  | "no_changes";
 
 /** One mutating (or attempted-mutating) action taken during a transaction, for the audit trail. */
 export interface ActionLogEntry {
@@ -134,8 +154,8 @@ export interface ActionLogEntry {
   timestamp: number;
   /** Present for file-mutating tools — the pre-change state, used for manual rollback. */
   fileSnapshot?: { path: string; existed: boolean; before: string | null };
-  /** Carried over from the tool's ToolExecResult — see ToolExecResult.qualityChecked. */
-  qualityChecked?: boolean;
+  /** Carried over from the tool's ToolExecResult — see ToolExecResult.qualityGate. */
+  qualityGate?: ToolQualityGateResult;
 }
 
 export interface VerificationCheck {
@@ -151,6 +171,39 @@ export interface VerificationResult {
   checks: VerificationCheck[];
 }
 
+/** Where one VerificationCheckEntry came from. */
+export type VerificationSource = "deterministic" | "quality_gate" | "critic";
+
+/**
+ * One evidence entry backing a transaction's outcome — a build/test/lint/typecheck run (source:
+ * "deterministic", from verification.ts), a generated document's structural quality gate (source:
+ * "quality_gate", from documentQuality.ts via ToolQualityGateResult), or one round of independent
+ * LLM critique (source: "critic", from critic.ts). deriveOutcome() (verificationOutcome.ts) is the
+ * single place that turns an accumulated list of these into a six-state outcome — nothing else
+ * should re-derive it.
+ */
+export interface VerificationCheckEntry {
+  source: VerificationSource;
+  /** Human-readable name for logs/audits — e.g. "test (npm test)", "docx quality gate", "independent review (round 2)". */
+  name: string;
+  ok: boolean;
+  /** Failure detail / critique reason; "" on a clean pass. */
+  output: string;
+  /**
+   * Dedup identity for a retryable target — used only by quality_gate entries (keyed by the file
+   * path being generated), so a create_docx call that failed its gate once and then succeeded on
+   * retry counts only its final attempt. Deterministic entries are wholesale-replaced on every
+   * verification.ts run instead; critic entries are never deduped — each round is an independent
+   * judgment of different work.
+   */
+  key?: string;
+}
+
+/** The accumulated evidence for one transaction — see VerificationCheckEntry for how each source is assembled/replaced. */
+export interface VerificationContract {
+  checks: VerificationCheckEntry[];
+}
+
 /** The full audit record for one user turn, persisted to .coding-agent/transactions/<sessionId>.jsonl. */
 export interface TransactionRecord {
   id: string;
@@ -161,7 +214,8 @@ export interface TransactionRecord {
   gitStatusBefore: string | null;
   gitStatusAfter?: string | null;
   actions: ActionLogEntry[];
-  verification?: VerificationResult;
+  /** The evidence outcome is derived from — replaces the old `verification?: VerificationResult` field. */
+  contract: VerificationContract;
   repairAttempts: number;
   /** Total number of independent per-step critique calls made this turn (pass or fail), bounded and cost-capped. */
   criticCalls: number;
@@ -170,6 +224,15 @@ export interface TransactionRecord {
   /** Nishant Convergence Protocol bookkeeping (see convergence.ts) — set only when its divergent-repair-ensemble path actually ran this turn (repair attempt 2+). */
   ncpInvoked?: boolean;
   ncpMargin?: "clear" | "close" | "n/a";
+  /**
+   * Schema version of this record, for readers written after this field existed. Always 2 on
+   * records written from Phase 3 onward; absent on pre-Phase-3 records (5-state outcome, numeric-
+   * only confidence, `verification` instead of `contract`). See
+   * docs/architecture/2026-08-phase3-verification-engine.md — no runtime migration exists because
+   * the one real consumer of loaded records (Agent.rollbackTransaction) never reads outcome,
+   * confidence, contract, or this field; a pre-Phase-3 record stays fully rollback-safe as-is.
+   */
+  schemaVersion?: 2;
 }
 
 /** Durable, per-project facts the agent has learned — never secrets. Persisted to .coding-agent/memory.json. */

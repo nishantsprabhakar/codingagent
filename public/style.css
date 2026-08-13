@@ -1675,13 +1675,14 @@ body::before {
   gap: 12px;
   font-size: 13.5px;
 }
-.transaction-confidence { font-family: var(--mono); font-weight: 700; }
-.transaction-confidence-value { font-size: 16px; }
-.transaction-confidence-max { color: var(--text-faint); font-size: 12px; }
-.transaction-outcome { color: var(--text-dim); flex: 1; }
-.transaction-summary.transaction-high .transaction-confidence-value { color: var(--success); }
-.transaction-summary.transaction-mid .transaction-confidence-value { color: #fbbf24; }
-.transaction-summary.transaction-low .transaction-confidence-value { color: var(--danger); }
+.transaction-outcome { font-weight: 700; flex: 1; }
+.transaction-confidence { font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); }
+.transaction-summary.outcome-verified .transaction-outcome { color: var(--success); }
+.transaction-summary.outcome-reviewed .transaction-outcome { color: var(--accent); }
+.transaction-summary.outcome-partial .transaction-outcome { color: var(--warn, #fbbf24); }
+.transaction-summary.outcome-unverified .transaction-outcome { color: var(--text-dim); }
+.transaction-summary.outcome-failed .transaction-outcome { color: var(--danger); }
+.transaction-summary.outcome-blocked .transaction-outcome { color: var(--text-faint); }
 .transaction-revert-btn { flex-shrink: 0; padding: 5px 12px; font-size: 12.5px; }
 .transaction-revert-btn.revert-failed { color: var(--danger); border-color: var(--danger); }
 

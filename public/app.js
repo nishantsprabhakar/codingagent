@@ -930,10 +930,22 @@
 
   const OUTCOME_LABELS = {
     verified: "Verified",
-    unverified_changes: "Changed — unverified",
+    reviewed: "Reviewed",
+    partially_verified: "Partially verified",
+    unverified: "Unverified",
     failed: "Verification failed",
     blocked: "Blocked",
     no_changes: "No changes",
+  };
+
+  const OUTCOME_CLASS = {
+    verified: "outcome-verified",
+    reviewed: "outcome-reviewed",
+    partially_verified: "outcome-partial",
+    unverified: "outcome-unverified",
+    failed: "outcome-failed",
+    blocked: "outcome-blocked",
+    no_changes: "outcome-none",
   };
 
   function renderVerificationResult(result) {
@@ -994,14 +1006,11 @@
   function renderTransactionSummary(transactionId, confidence, outcome, rollbackAvailable) {
     clearEmptyState();
     const row = document.createElement("div");
-    const band = confidence >= 80 ? "high" : confidence >= 50 ? "mid" : "low";
-    row.className = `transaction-summary transaction-${band}`;
+    row.className = `transaction-summary ${OUTCOME_CLASS[outcome] || "outcome-unverified"}`;
     row.dataset.transactionId = transactionId;
     row.innerHTML = `
-      <div class="transaction-confidence">
-        <span class="transaction-confidence-value">${confidence}</span><span class="transaction-confidence-max">/100</span>
-      </div>
       <div class="transaction-outcome">${escapeHtml(OUTCOME_LABELS[outcome] || outcome)}</div>
+      <div class="transaction-confidence" title="Internal confidence score (repair rounds + convergence adjustment)">conf ${confidence}</div>
       ${rollbackAvailable ? `<button class="btn btn-secondary transaction-revert-btn">Revert changes</button>` : ""}
     `;
     if (rollbackAvailable) {

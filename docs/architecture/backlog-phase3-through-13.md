@@ -1,16 +1,23 @@
 # Backlog — Phases 3 through 13, plus deferred Phase 1/2 items
 
-Date: 2026-08-12, updated 2026-08-12. This is the required written backlog.
+Date: 2026-08-12, updated 2026-08-13. This is the required written backlog.
 Ordered by what most directly protects users or unlocks the next layer of
 work — not by the phase numbers in the original spec, since e.g. some
 Phase 1 hardening is higher priority than most of Phase 3.
 
-**Update:** items 1 and 2 below (SSRF-hardened fetch, OS-backed secret
-storage) are now DONE — see `2026-08-ssrf-fetch-and-secret-storage.md` for
-what was implemented, tested, and verified (including live, on this
+**Update (2026-08-12):** items 1 and 2 below (SSRF-hardened fetch, OS-backed
+secret storage) are now DONE — see `2026-08-ssrf-fetch-and-secret-storage.md`
+for what was implemented, tested, and verified (including live, on this
 machine's real pre-existing configuration). Left here, struck through, so
 the history of what was originally flagged stays visible; the doc above is
 the authoritative record of what actually shipped.
+
+**Update (2026-08-13):** Phase 3 (below) is now DONE — see
+`2026-08-phase3-verification-engine.md` for the six-state outcome model,
+`VerificationContract` abstraction, and what was implemented, tested, and
+live-verified. Done on explicit user request, ahead of items 3-8 below
+("Immediately next"), which remain outstanding — see that doc's closing
+section for the explicit scope note.
 
 ## Immediately next (before any Phase 3+ feature work)
 
@@ -55,7 +62,7 @@ the authoritative record of what actually shipped.
    every PPTX/XLSX generation code path before merging, since both are
    semver-major bumps of directly-used document-generation libraries.
 
-## Phase 3 — Verification engine
+## ~~Phase 3 — Verification engine~~ — DONE, see `2026-08-phase3-verification-engine.md`
 
 Replace the current 0-100 confidence score with the six-state
 `verified/reviewed/partially_verified/unverified/failed/blocked` model and a

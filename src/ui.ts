@@ -118,7 +118,7 @@ export class ConsoleReporter implements Reporter {
 
   transactionSummary(_transactionId: string, confidence: number, outcome: TransactionOutcome, rollbackAvailable: boolean): void {
     if (outcome === "no_changes") return;
-    console.log(color.dim(`confidence: ${confidence}/100 (${outcome})${rollbackAvailable ? " — rollback available" : ""}`));
+    console.log(color.dim(`${outcome} (confidence ${confidence}/100)${rollbackAvailable ? " — rollback available" : ""}`));
   }
 
   critique(pass: boolean, reason: string): void {

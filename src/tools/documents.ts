@@ -282,7 +282,10 @@ export const createDocxTool: ToolSpec = {
     if (emptyCheck) return { ok: false, output: emptyCheck };
 
     const quality = checkDocxQuality(args.blocks ?? []);
-    if (!quality.ok) return { ok: false, output: quality.blocking.join("\n") };
+    if (!quality.ok) {
+      const output = quality.blocking.join("\n");
+      return { ok: false, output, qualityGate: { name: "docx quality gate", ok: false, output } };
+    }
 
     const customAccent = optionalHexColor(args.accentColor);
     const accent = customAccent ?? DEFAULT_ACCENT_HEX;
@@ -464,7 +467,7 @@ export const createDocxTool: ToolSpec = {
     return {
       ok: true,
       output: `Created ${args.path} (${(args.blocks ?? []).length} content blocks, ${buffer.length} bytes). ${structureSummary}${warningSuffix}`,
-      qualityChecked: true,
+      qualityGate: { name: "docx quality gate", ok: true, output: quality.warnings.join("\n") },
     };
   },
 };
@@ -641,7 +644,10 @@ export const createPptxTool: ToolSpec = {
     if (emptyCheck) return { ok: false, output: emptyCheck };
 
     const quality = checkPptxQuality(args.slides ?? []);
-    if (!quality.ok) return { ok: false, output: quality.blocking.join("\n") };
+    if (!quality.ok) {
+      const output = quality.blocking.join("\n");
+      return { ok: false, output, qualityGate: { name: "pptx quality gate", ok: false, output } };
+    }
 
     const accent = optionalHexColor(args.accentColor) ?? DEFAULT_ACCENT_HEX;
     const isDark = args.theme !== "light";
@@ -819,7 +825,7 @@ export const createPptxTool: ToolSpec = {
     return {
       ok: true,
       output: `Created ${args.path} (${(args.slides ?? []).length} slides, ${stat.size} bytes, ${isDark ? "dark" : "light"} theme). ${structureSummary}${warningSuffix}`,
-      qualityChecked: true,
+      qualityGate: { name: "pptx quality gate", ok: true, output: quality.warnings.join("\n") },
     };
   },
 };
@@ -946,7 +952,10 @@ export const createXlsxTool: ToolSpec = {
     if (emptyCheck) return { ok: false, output: emptyCheck };
 
     const quality = checkXlsxQuality(args.sheets ?? []);
-    if (!quality.ok) return { ok: false, output: quality.blocking.join("\n") };
+    if (!quality.ok) {
+      const output = quality.blocking.join("\n");
+      return { ok: false, output, qualityGate: { name: "xlsx quality gate", ok: false, output } };
+    }
 
     const customAccent = optionalHexColor(args.accentColor);
     const accent = customAccent ?? DEFAULT_ACCENT_HEX;
@@ -1043,7 +1052,7 @@ export const createXlsxTool: ToolSpec = {
     return {
       ok: true,
       output: `Created ${args.path} (${sheetSpecs.length} sheet(s), ${stat.size} bytes). ${structureSummary}${mergeSuffix}${qualitySuffix}`,
-      qualityChecked: true,
+      qualityGate: { name: "xlsx quality gate", ok: true, output: quality.warnings.join("\n") },
     };
   },
 };
