@@ -47,6 +47,11 @@ check, the scope decision (of three genuinely different interpretations offered,
 gave almost no concrete detail), and two real bugs found and fixed via live verification. Done on
 explicit user request.
 
+**Update (2026-08-13, yet later):** Phase 7 (below) is now DONE — see
+`2026-08-phase7-artifact-engine.md` for the shared flowing-document IR (DOCX/PDF/Markdown/HTML),
+the Puppeteer-based PDF approach, and a real script-injection risk found and fixed via adversarial
+review before any code shipped. Done on explicit user request.
+
 ## Immediately next (before any Phase 3+ feature work) — ALL DONE
 
 1. ~~**SSRF-hardened outbound web fetch**~~ — DONE. See
@@ -139,7 +144,7 @@ on which parts were live-reconfirmed after the fixes and which weren't (OpenRout
 rate-limiting blocked a final live re-check; confidence instead rests on `deriveOutcome()`'s own
 already-tested logic plus a direct code trace).
 
-## Phase 7 — Professional artifact engine
+## ~~Phase 7 — Professional artifact engine~~ — DONE, see `2026-08-phase7-artifact-engine.md`
 
 A shared structured document representation compiling to
 DOCX/PPTX/XLSX/PDF/Markdown/HTML is a significant rewrite of
@@ -148,6 +153,17 @@ generators). Recommend an additive approach — build the shared
 representation as a new layer that the existing three generators adopt one
 at a time — rather than a rewrite, to avoid a period where document
 generation is broken.
+
+**Update (2026-08-13):** DONE, scoped down after two decisions: the shared IR covers only the
+flowing-document formats (DOCX/PDF/Markdown/HTML) — PPTX/XLSX stay separate and untouched, since
+forcing slides/spreadsheets through document primitives is a known failure mode; and PDF ships via
+Puppeteer (headless Chromium), the explicitly accepted tradeoff being every install of the product
+now downloads a bundled browser. An adversarial review pass caught a real script-injection risk
+before any code shipped (unescaped model text interpolated into generated HTML that Puppeteer/a
+real browser would execute) and fixed it with escaping applied everywhere, not left as a follow-up.
+See `2026-08-phase7-artifact-engine.md` for the full design, the fix, and an honest note on what was
+confirmed live (the real tool registry, not a mock) versus what a flaky free-tier LLM prevented
+confirming end-to-end today.
 
 ## Phase 8 — Skills platform
 

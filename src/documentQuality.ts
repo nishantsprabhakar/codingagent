@@ -63,9 +63,12 @@ function result(blocking: string[], warnings: string[]): QualityCheckResult {
   return { ok: blocking.length === 0, blocking, warnings };
 }
 
-// ---------- docx ----------
+// ---------- flowing documents (docx/markdown/html/pdf — see documentIR.ts) ----------
 
-export function checkDocxQuality(blocks: any[]): QualityCheckResult {
+/** Purely structural checks over the shared block shape (placeholder text, table row/header
+ *  column-count mismatches, empty tables) — nothing docx-specific despite the historical name this
+ *  had before Phase 7, so it's equally correct when reused by create_markdown/create_html/create_pdf. */
+export function checkBlocksQuality(blocks: any[]): QualityCheckResult {
   const blocking: string[] = [];
   const warnings: string[] = [];
 

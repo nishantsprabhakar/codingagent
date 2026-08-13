@@ -8,6 +8,7 @@ import { readFileTool, writeFileTool, editFileTool, listDirTool } from "./fs";
 import { globSearchTool, grepSearchTool } from "./search";
 import { runShellCommandTool } from "./shell";
 import { createDocxTool, createPptxTool, createXlsxTool } from "./documents";
+import { createMarkdownTool, createHtmlTool, createPdfTool } from "./flowingDocuments";
 import { webFetchTool } from "./web";
 import { readPdfTool } from "./pdf";
 import { redlineDocxTool } from "./redline";
@@ -27,6 +28,9 @@ export const TOOLS: Record<string, ToolSpec> = {
   create_docx: createDocxTool,
   create_pptx: createPptxTool,
   create_xlsx: createXlsxTool,
+  create_markdown: createMarkdownTool,
+  create_html: createHtmlTool,
+  create_pdf: createPdfTool,
   web_fetch: webFetchTool,
   read_pdf: readPdfTool,
   redline_docx: redlineDocxTool,

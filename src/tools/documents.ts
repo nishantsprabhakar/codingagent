@@ -29,7 +29,27 @@ import type { ToolSpec } from "../types";
 import { resolveInRoot } from "./paths";
 import { parseInlineMarkup, stripInlineMarkup } from "./richText";
 import { loadImageFile, fitImageBox } from "./imageUtils";
-import { checkDocxQuality, checkPptxQuality, checkXlsxQuality } from "../documentQuality";
+import { checkBlocksQuality, checkPptxQuality, checkXlsxQuality } from "../documentQuality";
+import {
+  DEFAULT_ACCENT_HEX,
+  DEFAULT_ACCENT_DARK_HEX,
+  TEXT_HEX,
+  BODY_FONT,
+  MAX_IMAGE_BYTES,
+  darkenHex,
+  lightenHex,
+  headerBandColors,
+  optionalHexColor,
+  normalizeListItem,
+  mergeColonContinuations,
+  normalizeCell,
+  flattenCellMarkup,
+  checkBlocksHaveContent,
+  summarizeBlocks,
+  blocksPropertySchema,
+  accentColorPropertySchema,
+  type CellSpec,
+} from "../documentIR";
 
 const HEADING_LEVELS = [
   HeadingLevel.HEADING_1,
@@ -39,17 +59,6 @@ const HEADING_LEVELS = [
   HeadingLevel.HEADING_5,
   HeadingLevel.HEADING_6,
 ];
-
-/** Shared default accent used across docx/pptx/xlsx output when the caller doesn't supply its own accentColor. */
-const DEFAULT_ACCENT_HEX = "2563EB";
-const DEFAULT_ACCENT_DARK_HEX = "1E3A8A";
-const TEXT_HEX = "1F2937";
-const BODY_FONT = "Calibri";
-const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
-
-/** Default light-blue table-header/heading-band look for docx and xlsx, used when no custom accentColor is given. */
-const DOCX_HEADER_LIGHT_FILL = "DBEAFE";
-const DOCX_HEADER_LIGHT_TEXT = "1E3A8A";
 
 /** Default dark theme for pptx — slide background/text colors when theme !== "light". */
 const PPTX_DARK_BG = "0F172A";
@@ -85,91 +94,6 @@ const TABLE_BORDERS = {
   insideHorizontal: THIN_BORDER,
   insideVertical: THIN_BORDER,
 };
-
-/** Darkens a 6-digit hex color by `factor` (0-1) — used to derive a heading color from a custom accentColor. */
-function darkenHex(hex: string, factor = 0.35): string {
-  const channel = (offset: number) => {
-    const v = parseInt(hex.slice(offset, offset + 2), 16);
-    return Math.max(0, Math.round(v * (1 - factor)))
-      .toString(16)
-      .padStart(2, "0");
-  };
-  return (channel(0) + channel(2) + channel(4)).toUpperCase();
-}
-
-/** Lightens a 6-digit hex color toward white by `factor` (0-1) — used to derive a light header-band
- *  fill from a custom accentColor, mirroring darkenHex, so a custom brand color still gets a coherent
- *  light-tinted table header instead of always falling back to the hardcoded default blue tint. */
-function lightenHex(hex: string, factor = 0.82): string {
-  const channel = (offset: number) => {
-    const v = parseInt(hex.slice(offset, offset + 2), 16);
-    return Math.max(0, Math.min(255, Math.round(v + (255 - v) * factor)))
-      .toString(16)
-      .padStart(2, "0");
-  };
-  return (channel(0) + channel(2) + channel(4)).toUpperCase();
-}
-
-/** Derives the light-blue-style header fill + dark text pair for docx/xlsx table headers: the fixed
- *  default tint when no accentColor was given, or a tint derived from the custom accent so it stays
- *  visually coherent with the rest of the document. */
-function headerBandColors(customAccent: string | undefined, accentDark: string): { fill: string; text: string } {
-  return customAccent ? { fill: lightenHex(customAccent), text: accentDark } : { fill: DOCX_HEADER_LIGHT_FILL, text: DOCX_HEADER_LIGHT_TEXT };
-}
-
-function optionalHexColor(input: unknown): string | undefined {
-  if (typeof input !== "string" || !input) return undefined;
-  const cleaned = input.trim().replace(/^#/, "");
-  return /^[0-9a-fA-F]{6}$/.test(cleaned) ? cleaned.toUpperCase() : undefined;
-}
-
-/** A list item, table cell, or table header may be a plain string or an object carrying formatting hints. */
-function normalizeListItem(raw: any): { text: string; level: number } {
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    return { text: String(raw.text ?? ""), level: Math.max(0, Math.min(3, Number(raw.level ?? 0) || 0)) };
-  }
-  return { text: String(raw ?? ""), level: 0 };
-}
-
-/**
- * Repairs a common model mistake: writing a bold "label" and its ": description" as two separate list items
- * instead of one — e.g. `["**Accelerated Drug Discovery**", ": explores molecular spaces..."]` instead of
- * `["**Accelerated Drug Discovery**: explores molecular spaces..."]` — which renders as two disconnected
- * bullets (the second starting with a bare colon) instead of the intended single "**Label**: description"
- * line. Merges any item whose text starts with a bare colon into the previous item instead of giving it its
- * own bullet.
- */
-function mergeColonContinuations(items: Array<{ text: string; level: number }>): Array<{ text: string; level: number }> {
-  const result: Array<{ text: string; level: number }> = [];
-  for (const item of items) {
-    if (item.text.trimStart().startsWith(":") && result.length > 0) {
-      result[result.length - 1] = { ...result[result.length - 1], text: result[result.length - 1].text + item.text.trimStart() };
-    } else {
-      result.push(item);
-    }
-  }
-  return result;
-}
-
-interface CellSpec {
-  text: string;
-  align?: string;
-  bold?: boolean;
-}
-
-/** See the pptx table-cell comment at its call site — cells can't mix formatting within one string, so this
- *  strips markup delimiters to plain text and reports whether any span was meant to be bold. */
-function flattenCellMarkup(text: string): { text: string; anyBold: boolean } {
-  const spans = parseInlineMarkup(text);
-  return { text: spans.map((s) => s.text).join(""), anyBold: spans.some((s) => s.bold) };
-}
-
-function normalizeCell(raw: any): CellSpec {
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    return { text: String(raw.text ?? ""), align: typeof raw.align === "string" ? raw.align : undefined, bold: !!raw.bold };
-  }
-  return { text: String(raw ?? "") };
-}
 
 // ---------- Word (.docx) ----------
 
@@ -221,55 +145,8 @@ export const createDocxTool: ToolSpec = {
         properties: {
           path: { type: "string", description: "Output path relative to the working directory, ending in .docx" },
           title: { type: "string", description: "Document title, rendered as a large title heading at the top." },
-          accentColor: {
-            type: "string",
-            description:
-              "Optional brand hex color (e.g. 'C026D3' or '#C026D3'). By default, top-level headings and table " +
-              "header rows use a light-blue band (dark navy text on a pale blue fill); passing accentColor derives " +
-              "a matching light tint of your color instead, so the look stays coherent with a custom brand color.",
-          },
-          blocks: {
-            type: "array",
-            description: "Ordered content blocks making up the document body.",
-            items: {
-              type: "object",
-              properties: {
-                type: { type: "string", enum: ["heading", "paragraph", "bullets", "table", "image", "pagebreak", "toc"] },
-                level: { type: "number", description: "Heading level 1-6 (type=heading only)." },
-                text: {
-                  type: "string",
-                  description:
-                    "Text content, supports inline markup (type=heading or paragraph). For type=toc, an optional " +
-                    "title (defaults to 'Table of Contents').",
-                },
-                align: { type: "string", enum: ["left", "center", "right", "justify"], description: "Text alignment (type=heading or paragraph)." },
-                color: { type: "string", description: "Optional hex color override for this block's text (type=heading or paragraph)." },
-                ordered: { type: "boolean", description: "Render as a numbered list instead of bulleted (type=bullets)." },
-                items: {
-                  type: "array",
-                  description:
-                    "List items (type=bullets). Each item is either a plain string, or {text, level} where level " +
-                    "(0-3) nests the item for a sub-list.",
-                  items: {},
-                },
-                headers: {
-                  type: "array",
-                  description: "Table header row (type=table). Each header is a string or {text, align}.",
-                  items: {},
-                },
-                rows: {
-                  type: "array",
-                  items: { type: "array", items: {} },
-                  description: "Table body rows (type=table). Each cell is a string or {text, align, bold}.",
-                },
-                path: { type: "string", description: "Path to an image file, relative to the working directory (type=image)." },
-                width: { type: "number", description: "Image width in inches — height is derived from the image's real aspect ratio if omitted (type=image)." },
-                height: { type: "number", description: "Image height in inches, overriding the aspect-derived value (type=image)." },
-                caption: { type: "string", description: "Optional caption shown centered below the image (type=image)." },
-              },
-              required: ["type"],
-            },
-          },
+          accentColor: accentColorPropertySchema(),
+          blocks: blocksPropertySchema(),
         },
         required: ["path", "blocks"],
       },
@@ -278,10 +155,10 @@ export const createDocxTool: ToolSpec = {
   describe: (args) => `create ${args.path}`,
   preview: async (args) => summarizeBlocks(args.path, args.title, args.blocks),
   run: async (args, ctx) => {
-    const emptyCheck = checkDocxHasContent(args.blocks);
+    const emptyCheck = checkBlocksHaveContent(args.blocks);
     if (emptyCheck) return { ok: false, output: emptyCheck };
 
-    const quality = checkDocxQuality(args.blocks ?? []);
+    const quality = checkBlocksQuality(args.blocks ?? []);
     if (!quality.ok) {
       const output = quality.blocking.join("\n");
       return { ok: false, output, qualityGate: { name: "docx quality gate", ok: false, output } };
@@ -471,36 +348,6 @@ export const createDocxTool: ToolSpec = {
     };
   },
 };
-
-/** Returns an error message if `blocks` has no real content, or null if it's fine. */
-function checkDocxHasContent(blocks: any[] | undefined): string | null {
-  if (!Array.isArray(blocks) || blocks.length === 0) {
-    return "blocks is empty — this would create a near-blank document. Write out the actual content the user " +
-      "asked for as real blocks (headings, paragraphs, bullets, tables) before calling this tool.";
-  }
-  const hasContent = blocks.some((b) => {
-    if (b.type === "heading" || b.type === "paragraph") return typeof b.text === "string" && b.text.trim().length > 0;
-    if (b.type === "bullets") return Array.isArray(b.items) && b.items.some((i: any) => normalizeListItem(i).text.trim().length > 0);
-    if (b.type === "table") return (Array.isArray(b.headers) && b.headers.length > 0) || (Array.isArray(b.rows) && b.rows.length > 0);
-    if (b.type === "image") return typeof b.path === "string" && b.path.trim().length > 0;
-    if (b.type === "pagebreak" || b.type === "toc") return true;
-    return false;
-  });
-  if (!hasContent) {
-    return "Every block is empty (no text/items/rows/path) — this would create a near-blank document. Fill in the " +
-      "actual content the user asked for, then call this tool again.";
-  }
-  return null;
-}
-
-function summarizeBlocks(filePath: string, title: string | undefined, blocks: any[]): string {
-  const counts: Record<string, number> = {};
-  for (const b of blocks ?? []) counts[b.type] = (counts[b.type] ?? 0) + 1;
-  const summary = Object.entries(counts)
-    .map(([type, n]) => `${n} ${type}${n === 1 ? "" : "s"}`)
-    .join(", ");
-  return `New Word document: ${filePath}${title ? `\nTitle: ${title}` : ""}\nContent: ${summary || "(empty)"}`;
-}
 
 // ---------- PowerPoint (.pptx) ----------
 
