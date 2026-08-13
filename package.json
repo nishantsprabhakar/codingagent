@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "diff": "^5.2.0",
+    "diff": "^9.0.0",
     "docx": "^9.7.1",
     "exceljs": "^4.4.0",
     "glob": "^10.4.5",
