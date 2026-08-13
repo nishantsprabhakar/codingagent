@@ -19,6 +19,14 @@ live-verified. Done on explicit user request, ahead of items 3-8 below
 ("Immediately next"), which remain outstanding — see that doc's closing
 section for the explicit scope note.
 
+**Update (2026-08-13, later):** Phase 4 (below) is now DONE — see
+`2026-08-phase4-checkpoints.md` for the binary-safe/staleness-checked
+per-file snapshot upgrade, the new git-plumbing whole-workspace checkpoint
+for `run_shell_command`, and three real bugs found and fixed during live
+verification (including one where the naive implementation rewrote every
+tracked file's mtime in the repo on every rollback). Also done on explicit
+user request, ahead of items 3-8 below, which remain outstanding.
+
 ## Immediately next (before any Phase 3+ feature work)
 
 1. ~~**SSRF-hardened outbound web fetch**~~ — DONE. See
@@ -76,7 +84,7 @@ given how central `confidence`/`outcome` already are to the existing
 transaction log format (a format change here is a breaking change to
 historical transaction logs — needs a migration note).
 
-## Phase 4 — Complete checkpoints and auditability
+## ~~Phase 4 — Complete checkpoints and auditability~~ — DONE, see `2026-08-phase4-checkpoints.md`
 
 Upgrade rollback from the current per-file text snapshot
 (`src/workspaceSnapshot.ts`) to full workspace checkpoints, preferring

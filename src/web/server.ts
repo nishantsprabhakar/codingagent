@@ -288,8 +288,8 @@ export function startWebServer(
             reporter.error("Invalid transaction id.");
             return;
           }
-          const { ok, restored } = agent.rollbackTransaction(msg.transactionId);
-          send({ type: "rollback_result", transactionId: msg.transactionId, ok, restored });
+          const { ok, items } = agent.rollbackTransaction(msg.transactionId);
+          send({ type: "rollback_result", transactionId: msg.transactionId, ok, items });
         } else if (msg.type === "update_api_key") {
           const key = msg.apiKey?.trim();
           if (!key) {

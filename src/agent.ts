@@ -15,7 +15,9 @@ import { gatherProjectContext } from "./projectContext";
 import { loadSession, saveSession, deleteSession, createSessionId, deriveTitle, pickMostRecentSessionId } from "./session";
 import { McpManager } from "./mcp";
 import { loadGlobalInstructions, saveGlobalInstructions } from "./globalSettings";
-import { gitStatusPorcelain, snapshotFile, restoreSnapshot, type FileSnapshot } from "./workspaceSnapshot";
+import { gitStatusPorcelain, snapshotFile, captureAfterSnapshot, restoreSnapshot, type FileSnapshot, type FileRestoreResult } from "./workspaceSnapshot";
+import { isGitRepo, captureTree, restoreTree, protectTree } from "./gitCheckpoint";
+import { isReadOnlyIshShellCommand } from "./riskClassifier";
 import { appendTransaction, loadTransaction } from "./transactionLog";
 import { detectProjectMemory, updateProjectMemory, loadProjectMemory, formatProjectMemoryForPrompt } from "./projectMemory";
 import { runVerification } from "./verification";
@@ -56,9 +58,6 @@ const FILE_PRODUCING_TOOLS = new Set(["write_file", "edit_file", "create_docx", 
 
 /** Extensions worth an automatic verification pass; touching only a generated document shouldn't trigger a test run. */
 const CODE_FILE_RE = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|c|cpp|h|hpp|cs)$/i;
-
-/** Shell commands that just inspect state — running a build/test suite after one of these would be pure noise. */
-const READ_ONLY_ISH_SHELL = /^\s*(ls|dir|pwd|cat|type|echo|git\s+(status|log|diff|show|branch(\s|$)|remote)|node\s+-v|npm\s+-v|npx\s+--version|which|where)\b/i;
 
 function systemPrompt(root: string, projectContext: string, globalInstructions: string, projectMemoryBlock: string, skillsBlock: string): string {
   return [
@@ -263,7 +262,7 @@ function shouldVerify(actions: ActionLogEntry[]): boolean {
     if (!a.ok) return false;
     if (a.name === "run_shell_command") {
       const cmd = typeof (a.args as any)?.command === "string" ? ((a.args as any).command as string) : "";
-      return cmd.trim() !== "" && !READ_ONLY_ISH_SHELL.test(cmd);
+      return cmd.trim() !== "" && !isReadOnlyIshShellCommand(cmd);
     }
     const p = a.fileSnapshot?.path;
     return !!p && CODE_FILE_RE.test(p);
@@ -440,18 +439,43 @@ export class Agent {
     await this.mcpManager.closeAll();
   }
 
-  /** Reverts a past transaction's file changes using its stored pre-change snapshots. Never touches git. */
-  rollbackTransaction(transactionId: string): { ok: boolean; restored: string[] } {
+  /**
+   * Reverts a past transaction's file changes using its stored pre-change snapshots — both
+   * single-file snapshots (write_file/edit_file/documents/redline) and whole-tree checkpoints
+   * (run_shell_command, git repos only — see gitCheckpoint.ts). Skips (rather than clobbers) any
+   * file/tree that's changed since the transaction finished; see workspaceSnapshot.ts/gitCheckpoint.ts
+   * for the staleness check each restore path runs.
+   */
+  rollbackTransaction(transactionId: string): { ok: boolean; items: FileRestoreResult[] } {
     const tx = loadTransaction(this.ctx.root, this.sessionId, transactionId);
-    if (!tx) return { ok: false, restored: [] };
+    if (!tx) return { ok: false, items: [] };
 
-    const snapshots: FileSnapshot[] = tx.actions
-      .filter((a) => a.ok && a.fileSnapshot)
-      .map((a) => a.fileSnapshot as FileSnapshot);
-    if (!snapshots.length) return { ok: false, restored: [] };
+    const fileSnapshots: FileSnapshot[] = tx.actions.filter((a) => a.ok && a.fileSnapshot).map((a) => a.fileSnapshot as FileSnapshot);
+    const treeActions = tx.actions.filter((a) => a.ok && a.treeSnapshot);
+    if (!fileSnapshots.length && !treeActions.length) return { ok: false, items: [] };
 
-    const results = restoreSnapshot(this.ctx.root, snapshots);
-    return { ok: results.every((r) => r.ok), restored: results.filter((r) => r.ok).map((r) => r.path) };
+    const fileResults: FileRestoreResult[] = restoreSnapshot(this.ctx.root, fileSnapshots);
+
+    const treeResults: FileRestoreResult[] = treeActions.flatMap((a): FileRestoreResult[] => {
+      const { beforeTree, afterTree } = a.treeSnapshot!;
+      const r = restoreTree(this.ctx.root, beforeTree, afterTree);
+      if (!r.ok) {
+        const status: FileRestoreResult["status"] = r.conflict ? "skipped_conflict" : "failed";
+        return [{ path: a.label, status, reason: r.reason }];
+      }
+      const restored: FileRestoreResult[] = r.restoredPaths.map((p) => ({ path: p, status: "restored" }));
+      const deleted: FileRestoreResult[] = r.deletedPaths.map((p) => ({
+        path: p,
+        status: "restored",
+        reason: "created by this action — removed on rollback",
+      }));
+      return [...restored, ...deleted];
+    });
+
+    const items = [...fileResults, ...treeResults];
+    // "ok" means the rollback ran cleanly — a reported conflict on one item is expected behavior,
+    // not a failure of the whole operation; only an actual I/O error makes this false.
+    return { ok: items.length > 0 && items.every((r) => r.status !== "failed"), items };
   }
 
   async handleUserMessage(userText: string): Promise<void> {
@@ -688,7 +712,7 @@ export class Agent {
     if (outcome !== "no_changes") {
       // tx.confidence (not confidenceBase) — the NCP-adjusted score just computed above, so the
       // live UI/history event always matches what's persisted to the transaction log.
-      const rollbackAvailable = tx.actions.some((a) => a.ok && a.fileSnapshot);
+      const rollbackAvailable = tx.actions.some((a) => a.ok && (a.fileSnapshot || a.treeSnapshot));
       this.reporter.transactionSummary(tx.id, tx.confidence, outcome, rollbackAvailable);
       this.historyLog.push({ type: "transaction_summary", transactionId: tx.id, confidence: tx.confidence, outcome, rollbackAvailable });
     }
@@ -854,7 +878,8 @@ export class Agent {
     ok: boolean,
     risk: RiskLevel = "low",
     fileSnapshot?: FileSnapshot,
-    qualityGate?: ToolQualityGateResult
+    qualityGate?: ToolQualityGateResult,
+    treeSnapshot?: { beforeTree: string; afterTree: string }
   ): string {
     this.reporter.toolResult(id, output, ok);
     this.historyLog.push({ type: "tool", id, name, label, args, output, ok });
@@ -881,6 +906,7 @@ export class Agent {
         timestamp: Date.now(),
         fileSnapshot,
         qualityGate,
+        treeSnapshot,
       });
       if (ok) this.needsVerification = true;
     }
@@ -996,17 +1022,38 @@ export class Agent {
     }
 
     const target = tool.mutating ? fileTargetPath(args) : undefined;
-    const fileSnapshot = target ? snapshotFile(this.ctx.root, target) : undefined;
+    const fileSnapshotBefore = target ? snapshotFile(this.ctx.root, target) : undefined;
+
+    // run_shell_command has no single known target path — the only way to cover the files it
+    // creates/deletes/renames/chmods is a whole-workspace tree checkpoint (git repos only; see
+    // gitCheckpoint.ts). Skipped for read-only-ish commands (ls/cat/git status/...) where nothing
+    // filesystem-mutating is expected, same heuristic shouldVerify() already uses.
+    const shouldCheckpointTree =
+      name === "run_shell_command" && typeof args.command === "string" && !isReadOnlyIshShellCommand(args.command) && isGitRepo(this.ctx.root);
+    const beforeTree = shouldCheckpointTree ? captureTree(this.ctx.root) : null;
 
     try {
       const result = await tool.run(args, this.ctx);
       if (result.ok && FILE_PRODUCING_TOOLS.has(name) && typeof args.path === "string") {
         this.trackFile(args.path);
       }
-      return this.recordTool(id, name, label, args, result.output, result.ok, risk, fileSnapshot, result.qualityGate);
+
+      const fileSnapshot = fileSnapshotBefore && result.ok ? captureAfterSnapshot(this.ctx.root, fileSnapshotBefore) : fileSnapshotBefore;
+
+      let treeSnapshot: { beforeTree: string; afterTree: string } | undefined;
+      if (beforeTree && result.ok && this.currentTransaction) {
+        const afterTree = captureTree(this.ctx.root);
+        if (afterTree) {
+          treeSnapshot = { beforeTree, afterTree };
+          protectTree(this.ctx.root, `refs/wrexlyn/checkpoints/${this.currentTransaction.id}/before`, beforeTree);
+          protectTree(this.ctx.root, `refs/wrexlyn/checkpoints/${this.currentTransaction.id}/after`, afterTree);
+        }
+      }
+
+      return this.recordTool(id, name, label, args, result.output, result.ok, risk, fileSnapshot, result.qualityGate, treeSnapshot);
     } catch (err: any) {
       const message = `Tool ${name} threw an error: ${err.message ?? err}`;
-      return this.recordTool(id, name, label, args, message, false, risk, fileSnapshot);
+      return this.recordTool(id, name, label, args, message, false, risk, fileSnapshotBefore);
     }
   }
 

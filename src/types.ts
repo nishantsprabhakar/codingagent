@@ -3,6 +3,8 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
+import type { FileSnapshot } from "./workspaceSnapshot";
+
 export type ChatRole = "system" | "user" | "assistant" | "tool";
 
 export interface ToolCallRequest {
@@ -152,8 +154,14 @@ export interface ActionLogEntry {
   ok: boolean;
   output: string;
   timestamp: number;
-  /** Present for file-mutating tools — the pre-change state, used for manual rollback. */
-  fileSnapshot?: { path: string; existed: boolean; before: string | null };
+  /** Present for file-mutating tools that know their own single target path — the pre/post-change state, used for manual rollback. */
+  fileSnapshot?: FileSnapshot;
+  /**
+   * Present for run_shell_command actions in a git repo whose command isn't read-only-ish — a
+   * whole-workspace before/after tree pair (see gitCheckpoint.ts), since a shell command has no
+   * single known target path the way the other mutating tools do.
+   */
+  treeSnapshot?: { beforeTree: string; afterTree: string };
   /** Carried over from the tool's ToolExecResult — see ToolExecResult.qualityGate. */
   qualityGate?: ToolQualityGateResult;
 }

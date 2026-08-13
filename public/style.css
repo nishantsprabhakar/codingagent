@@ -1671,6 +1671,7 @@ body::before {
   border: 1px solid var(--border-soft);
   background: var(--bg-panel);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   font-size: 13.5px;
@@ -1685,6 +1686,17 @@ body::before {
 .transaction-summary.outcome-blocked .transaction-outcome { color: var(--text-faint); }
 .transaction-revert-btn { flex-shrink: 0; padding: 5px 12px; font-size: 12.5px; }
 .transaction-revert-btn.revert-failed { color: var(--danger); border-color: var(--danger); }
+.transaction-revert-btn.revert-partial { color: var(--warn, #fbbf24); border-color: var(--warn, #fbbf24); }
+.transaction-revert-detail {
+  flex-basis: 100%;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-faint);
+  font-size: 11.5px;
+  font-family: var(--mono);
+  white-space: pre-line;
+}
 
 /* ---------- Settings modal (global instructions + MCP servers) ---------- */
 

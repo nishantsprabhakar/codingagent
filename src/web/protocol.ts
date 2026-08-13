@@ -6,6 +6,7 @@
 import type { PermissionDecision } from "../permissions";
 import type { TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome } from "../types";
 import type { SessionMeta } from "../session";
+import type { FileRestoreResult } from "../workspaceSnapshot";
 
 export type ServerMessage =
   | { type: "init"; root: string; provider: string; model: string; yolo: boolean; recentFolders: string[]; sessionId: string; sessionTitle: string }
@@ -27,7 +28,7 @@ export type ServerMessage =
   | { type: "verification_result"; result: VerificationResult }
   | { type: "critique_result"; pass: boolean; reason: string }
   | { type: "transaction_summary"; transactionId: string; confidence: number; outcome: TransactionOutcome; rollbackAvailable: boolean }
-  | { type: "rollback_result"; transactionId: string; ok: boolean; restored: string[] }
+  | { type: "rollback_result"; transactionId: string; ok: boolean; items: FileRestoreResult[] }
   | { type: "skills_changed" };
 
 export type ClientMessage =

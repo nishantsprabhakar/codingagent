@@ -362,7 +362,7 @@
         renderTransactionSummary(msg.transactionId, msg.confidence, msg.outcome, msg.rollbackAvailable);
         break;
       case "rollback_result":
-        handleRollbackResult(msg.transactionId, msg.ok, msg.restored);
+        handleRollbackResult(msg.transactionId, msg.ok, msg.items);
         break;
       case "assistant_delta":
         appendAssistantDelta(msg.chunk);
@@ -1024,14 +1024,32 @@
     scrollToBottom();
   }
 
-  function handleRollbackResult(transactionId, ok, restored) {
+  function handleRollbackResult(transactionId, ok, items) {
     const row = el.chatLog.querySelector(`.transaction-summary[data-transaction-id="${CSS.escape(transactionId)}"]`);
     const btn = row ? row.querySelector(".transaction-revert-btn") : null;
+    const restored = items.filter((i) => i.status === "restored").length;
+    const conflicts = items.filter((i) => i.status === "skipped_conflict").length;
+
     if (btn) {
-      btn.textContent = ok ? `Reverted ${restored.length} file(s)` : "Revert failed";
+      btn.textContent = !ok
+        ? "Revert failed"
+        : conflicts
+          ? `Reverted ${restored} file(s), ${conflicts} skipped`
+          : `Reverted ${restored} file(s)`;
       btn.classList.toggle("revert-failed", !ok);
+      btn.classList.toggle("revert-partial", ok && conflicts > 0);
     }
-    pushFeedItem(ok ? "↩️" : "⚠️", ok ? `Reverted ${restored.length} file(s)` : "Revert failed", ok ? "tool-ok" : "tool-fail");
+
+    const problems = items.filter((i) => i.status !== "restored");
+    if (row && problems.length) {
+      const detail = document.createElement("div");
+      detail.className = "transaction-revert-detail";
+      detail.textContent = problems.map((i) => `${i.path}: ${i.reason || i.status}`).join("\n");
+      row.appendChild(detail);
+    }
+
+    const summaryText = !ok ? "Revert failed" : conflicts ? `Reverted ${restored}, skipped ${conflicts} (conflict)` : `Reverted ${restored} file(s)`;
+    pushFeedItem(ok && !conflicts ? "↩️" : "⚠️", summaryText, ok ? "tool-ok" : "tool-fail");
   }
 
   // ---------- Permission modal ----------
