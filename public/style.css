@@ -1609,6 +1609,8 @@ body::before {
 
 .permission-modal {
   width: min(560px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 14px;
