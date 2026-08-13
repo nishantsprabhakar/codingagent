@@ -12,6 +12,12 @@
       "command": "npx",
       "args": ["-y", "@some/mcp-server"],
       "env": { "SOME_API_KEY": "your-key-here" }
+    },
+    "example-with-passthrough": {
+      "command": "npx",
+      "args": ["-y", "@some/mcp-server"],
+      "_comment": "envPassthrough names parent-process env vars this server may see, pulled live at connect time -- nothing is passed through by default, and this app's own provider API keys (GROQ_API_KEY, OPENROUTER_API_KEY, etc.) are never forwarded unless explicitly listed here.",
+      "envPassthrough": ["SOME_API_KEY"]
     }
   }
 }

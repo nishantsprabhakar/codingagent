@@ -27,7 +27,16 @@ verification (including one where the naive implementation rewrote every
 tracked file's mtime in the repo on every rollback). Also done on explicit
 user request, ahead of items 3-8 below, which remain outstanding.
 
-## Immediately next (before any Phase 3+ feature work)
+**Update (2026-08-13, later still):** items 3-8 below are now DONE — see
+`2026-08-phase1-and-2-remaining-items.md` for the MCP env allowlist, the new
+GitHub Actions CI matrix + Dependabot, the shell-exec service-separation
+architecture (with live verification), the `WrexlynError` hierarchy +
+redaction, and the corrected dependency-audit findings (the backlog's
+originally-stated upgrade targets were stale — see that doc for the actual
+current state). This closes the "Immediately next" list in full; the
+original Phase 1/2 gate is now fully closed.
+
+## Immediately next (before any Phase 3+ feature work) — ALL DONE
 
 1. ~~**SSRF-hardened outbound web fetch**~~ — DONE. See
    `2026-08-ssrf-fetch-and-secret-storage.md` §1.
@@ -38,37 +47,26 @@ user request, ahead of items 3-8 below, which remain outstanding.
    See `2026-08-ssrf-fetch-and-secret-storage.md` §2 for the exact scope of
    what "verified" means here before relying on the macOS/Linux paths in
    production.
-3. **MCP environment scrubbing + explicit per-var allowlist** (deferred
-   Phase 1D). Audit whether `src/mcp.ts` spawns child processes with the
-   full parent environment; if so, require an explicit allowlist of env
-   vars a given MCP server config may see, and never forward the parent's
-   own API keys unless a server config explicitly asks for one.
-4. **CI pipeline** (deferred Phase 2). GitHub Actions (or equivalent)
-   running `npm run verify` on a Node version matrix, on both
-   `windows-latest` and `ubuntu-latest`. This project has zero CI today —
-   the acceptance criterion "clean Windows and Linux CI" is unmet until
-   this exists, regardless of how good the local test suite is.
-5. **Command-execution service separation** (deferred Phase 1E). Today the
-   shell-exec tool runs in the same process as the web server. Splitting it
-   into its own privileged-execution service (even just a separate child
-   process with a narrower IPC surface) reduces blast radius if the web
-   process is ever compromised through some other vector.
-6. **Structured error classes + safe structured logging with redaction**
-   (Phase 2). Right now most of the codebase uses `catch { /* best-effort
-   */ }` or `console.error` with the raw error. A small `WrexlynError`
-   hierarchy (e.g. `PermissionDeniedError`, `PathTraversalError`,
-   `ProviderError`) plus a logging helper that redacts anything matching an
-   API-key shape would make Phase 3's "actionable errors without leaking
-   secrets" acceptance criterion checkable rather than aspirational.
-7. **Dependency vulnerability scanning** (Phase 2). `npm audit` as a CI
-   step at minimum; Dependabot/Renovate for update PRs.
-8. **Two specific breaking-change dependency upgrades**, deferred from this
-   milestone's `npm audit` pass (see
-   `2026-08-phase1-security-fixes.md` §4 for detail): `pptxgenjs` → 1.1.5+
-   (fixes an `image-size` DoS advisory) and `exceljs` → 3.4.0+ (fixes a
-   `uuid` bounds-check advisory). Each needs a full regression pass against
-   every PPTX/XLSX generation code path before merging, since both are
-   semver-major bumps of directly-used document-generation libraries.
+3. ~~**MCP environment scrubbing + explicit per-var allowlist**~~ — DONE.
+   See `2026-08-phase1-and-2-remaining-items.md` §3.
+4. ~~**CI pipeline**~~ — DONE. See
+   `2026-08-phase1-and-2-remaining-items.md` §4.
+5. ~~**Command-execution service separation**~~ — DONE, with live
+   verification. See `2026-08-phase1-and-2-remaining-items.md` §5 for what
+   the isolation does and does not provide.
+6. ~~**Structured error classes + safe structured logging with
+   redaction**~~ — DONE. See `2026-08-phase1-and-2-remaining-items.md` §6.
+7. ~~**Dependency vulnerability scanning**~~ — DONE. See
+   `2026-08-phase1-and-2-remaining-items.md` §4/§7.
+8. ~~**Two specific dependency-upgrade audit findings**~~ — DONE, though the
+   resolution differs from what was originally stated here: the original
+   upgrade targets (`pptxgenjs` → 1.1.5+, `exceljs` → 3.4.0+) were stale
+   `npm audit` fix-suggestions, actually *lower* than the versions already
+   installed. The `uuid` finding is fixed via an `overrides` pin; the
+   `image-size` findings have no upstream fix available yet and are
+   documented + allowlisted in CI instead. See
+   `2026-08-phase1-and-2-remaining-items.md` §8 for the full reasoning and
+   what to revisit later.
 
 ## ~~Phase 3 — Verification engine~~ — DONE, see `2026-08-phase3-verification-engine.md`
 

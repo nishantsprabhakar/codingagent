@@ -36,13 +36,9 @@ import * as zlib from "zlib";
 import * as dns from "dns";
 import { Transform } from "stream";
 import { isBlockedAddress } from "./ipSafety";
+import { WrexlynError } from "../errors";
 
-export class SafeFetchError extends Error {
-  constructor(message: string, public readonly code: string) {
-    super(message);
-    this.name = "SafeFetchError";
-  }
-}
+export class SafeFetchError extends WrexlynError {}
 
 export interface ResolvedAddress {
   address: string;

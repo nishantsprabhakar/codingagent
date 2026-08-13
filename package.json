@@ -17,7 +17,8 @@
     "typecheck": "tsc -p . --noEmit",
     "test": "npm run build && node scripts/run-tests.js",
     "test:unit": "npm run test",
-    "verify": "npm run typecheck && npm run test"
+    "verify": "npm run typecheck && npm run test",
+    "audit": "audit-ci --config .audit-ci.json"
   },
   "engines": {
     "node": ">=18"
@@ -39,7 +40,11 @@
     "@types/node": "^20.14.0",
     "@types/qrcode": "^1.5.6",
     "@types/ws": "^8.5.10",
+    "audit-ci": "^7.1.0",
     "tsx": "^4.15.0",
     "typescript": "^5.5.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

@@ -1,0 +1,17 @@
+{
+  "high": true,
+  "allowlist": [
+    {
+      "GHSA-w3rx-r6r6-pgpr": {
+        "active": true,
+        "notes": "image-size ICNS-parser DoS, transitive via pptxgenjs (image-size@^1.2.1). No non-vulnerable image-size release exists yet (latest published is 2.0.2, still inside the advisory's vulnerable range <=2.0.2). See docs/architecture/2026-08-phase1-and-2-remaining-items.md. Revisit when a fix ships upstream."
+      }
+    },
+    {
+      "GHSA-5p2g-fcmc-qvqq": {
+        "active": true,
+        "notes": "image-size JXL/HEIF-parser DoS, same root cause and status as GHSA-w3rx-r6r6-pgpr above."
+      }
+    }
+  ]
+}

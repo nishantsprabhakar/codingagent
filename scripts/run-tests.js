@@ -30,5 +30,11 @@ if (!testFiles.length) {
   process.exit(1);
 }
 
-const result = spawnSync(process.execPath, ["--test", ...testFiles], { stdio: "inherit" });
+// --test-force-exit (Node >=18.18): shellService.test.ts legitimately forks a real child process
+// to exercise the shell-exec service's actual IPC mechanism (not a mock) — killing that child is
+// asynchronous, and depending on how `node --test` schedules test-file workers, the run can end up
+// waiting on the OS to fully reap it even after every test has already reported pass/fail. This
+// flag makes the runner exit the moment results are in, rather than after every spawned handle
+// happens to finish closing — the same escape hatch Node documents for exactly this situation.
+const result = spawnSync(process.execPath, ["--test", "--test-force-exit", ...testFiles], { stdio: "inherit" });
 process.exit(result.status ?? 1);

@@ -30,6 +30,7 @@ import { isValidId } from "../idValidation";
 import { loadProjectSkills, saveProjectSkill, deleteProjectSkill } from "../tools/skills";
 import { loadSkillLibrary } from "../skillLibrary";
 import { STARTER_SKILLS } from "../starterSkills";
+import { redact, logError } from "../errors";
 
 const VALID_PROVIDERS: LlmProvider[] = ["pollinations", ...API_KEY_PROVIDERS];
 
@@ -118,8 +119,9 @@ export function startWebServer(
 
       handleHttp(req, res, url, currentRoot, currentProvider, port, lan, auth, scriptNonce);
     } catch (err: any) {
+      logError("HTTP handler error", err, [currentApiKey]);
       res.writeHead(500, { "Content-Type": "text/plain" });
-      res.end(`Internal error: ${err.message ?? err}`);
+      res.end(`Internal error: ${redact(err.message ?? String(err), [currentApiKey])}`);
     }
   });
 
@@ -168,7 +170,7 @@ export function startWebServer(
     const confirmFn = createConfirmFn(send, pending);
     const permissions = new PermissionManager(yolo, confirmFn);
     let agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter);
-    agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
+    agent.connectMcp().catch((err) => logError("MCP connect error", err, [currentApiKey]));
 
     sendInit();
     sendSessions();
@@ -202,7 +204,7 @@ export function startWebServer(
           currentRoot = target;
           addRecentFolder(currentRoot);
           agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter);
-          agent.connectMcp().catch((err) => console.error("[coding-agent] MCP connect error:", err));
+          agent.connectMcp().catch((err) => logError("MCP connect error", err, [currentApiKey]));
           sendInit();
           sendSessions();
           agent.replayCurrentState();
@@ -353,9 +355,9 @@ export function startWebServer(
       } catch (err: any) {
         // A single bad request/response should never take the whole server
         // down — surface it to this client and keep the connection alive.
-        console.error("[coding-agent] error handling message:", err);
+        logError("error handling message", err, [currentApiKey]);
         reporter.thinking(false);
-        reporter.error(`Internal error: ${err.message ?? err}`);
+        reporter.error(`Internal error: ${redact(err.message ?? String(err), [currentApiKey])}`);
       }
     });
 

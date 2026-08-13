@@ -3,12 +3,9 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import { exec } from "child_process";
 import type { ToolSpec } from "../types";
 import { classifyShellCommand } from "../riskClassifier";
-
-const MAX_OUTPUT = 20_000;
-const DEFAULT_TIMEOUT_MS = 60_000;
+import { runInService } from "../shellServiceClient";
 
 export const runShellCommandTool: ToolSpec = {
   mutating: true,
@@ -31,31 +28,7 @@ export const runShellCommandTool: ToolSpec = {
     },
   },
   describe: (args) => `run: ${args.command}`,
-  run: async (args, ctx) => {
-    const timeout = args.timeout_ms && args.timeout_ms > 0 ? args.timeout_ms : DEFAULT_TIMEOUT_MS;
-
-    return new Promise((resolve) => {
-      exec(
-        args.command,
-        { cwd: ctx.root, timeout, maxBuffer: 10 * 1024 * 1024 },
-        (error, stdout, stderr) => {
-          const combined = `${stdout}${stderr}`.trim();
-          const truncated =
-            combined.length > MAX_OUTPUT
-              ? combined.slice(0, MAX_OUTPUT) + "\n... (output truncated)"
-              : combined;
-
-          if (error) {
-            const reason = error.killed ? "timed out" : `exited with code ${error.code}`;
-            resolve({
-              ok: false,
-              output: `Command ${reason}.\n${truncated || "(no output)"}`,
-            });
-            return;
-          }
-          resolve({ ok: true, output: truncated || "(no output)" });
-        }
-      );
-    });
-  },
+  // Runs in a dedicated shell-execution service process, not in-process with the web server —
+  // see shellService.ts's doc comment for exactly what that isolation does and doesn't provide.
+  run: async (args, ctx) => runInService(String(args.command ?? ""), ctx.root, args.timeout_ms),
 };

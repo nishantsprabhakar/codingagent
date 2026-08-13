@@ -6,6 +6,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { ToolDefinition, ToolExecResult } from "./types";
+import { redact } from "./errors";
 
 // The SDK's subpath exports (package.json "exports" map) aren't resolvable
 // under this project's CommonJS/"Node" moduleResolution without switching the
@@ -50,11 +51,40 @@ const { StdioClientTransport } = require("@modelcontextprotocol/sdk/client/stdio
 interface McpServerConfig {
   command: string;
   args?: string[];
+  /** Literal env vars for this server — values are used as-is, never interpolated from the parent process. */
   env?: Record<string, string>;
+  /**
+   * Names of parent-process env vars this server is explicitly allowed to receive (values pulled
+   * live from `process.env` at connect time, not hardcoded into mcp.json). Absent by default — a
+   * server config that names nothing here gets none of the app's own secrets (see
+   * buildMcpServerEnv() for the full rationale). The underlying SDK transport always adds its own
+   * small OS-appropriate base allowlist (PATH, etc.) on top of whatever this produces.
+   */
+  envPassthrough?: string[];
 }
 
 interface McpConfigFile {
   mcpServers?: Record<string, McpServerConfig>;
+}
+
+/**
+ * Computes the env object passed to an MCP server's child process — the one thing this module
+ * owns and can audit, rather than relying on the @modelcontextprotocol/sdk transport's own
+ * implicit default-env behavior (which is safe today but is a third-party dependency's internal
+ * choice, not something this codebase asserts or tests). Deliberately NOT `process.env` wholesale:
+ * a server gets literal `config.env` values plus, for each name in `config.envPassthrough`, that
+ * name's CURRENT value from `parentEnv` — nothing else, so a server config can't accidentally (or
+ * a compromised mcp.json can't silently) see e.g. GROQ_API_KEY unless it's explicitly named.
+ * Returns undefined (not {}) when there's truly nothing to add, so the transport's own default
+ * merge behavior is unchanged from before this existed.
+ */
+export function buildMcpServerEnv(config: McpServerConfig, parentEnv: NodeJS.ProcessEnv): Record<string, string> | undefined {
+  const result: Record<string, string> = { ...(config.env ?? {}) };
+  for (const name of config.envPassthrough ?? []) {
+    const value = parentEnv[name];
+    if (value !== undefined) result[name] = value;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 /** Tool names exposed to the model are namespaced mcp__<server>__<tool> to avoid colliding with built-ins. */
@@ -100,7 +130,11 @@ export class McpManager {
           const toolCount = await this.connectOne(serverName, serverConfig);
           log(`Connected MCP server "${serverName}" (${toolCount} tool${toolCount === 1 ? "" : "s"})`);
         } catch (err: any) {
-          log(`Failed to connect MCP server "${serverName}": ${err.message ?? err}`);
+          // A spawn/handshake failure can echo back the command/args/env it was given — redact
+          // this server's own configured secrets (its `env`/`envPassthrough` values) before ever
+          // surfacing the message, since those are exactly the kind of thing that could appear here.
+          const serverSecrets = Object.values(buildMcpServerEnv(serverConfig, process.env) ?? {});
+          log(`Failed to connect MCP server "${serverName}": ${redact(err.message ?? String(err), serverSecrets)}`);
         }
       })
     );
@@ -110,7 +144,7 @@ export class McpManager {
     const transport = new StdioClientTransport({
       command: config.command,
       args: config.args ?? [],
-      env: config.env,
+      env: buildMcpServerEnv(config, process.env),
     });
     const client = new Client({ name: "coding-agent", version: "0.1.0" });
     await client.connect(transport);
@@ -145,7 +179,7 @@ export class McpManager {
       const result = await server.client.callTool({ name: toolName, arguments: (args as Record<string, unknown>) ?? {} });
       return { ok: !result.isError, output: extractTextContent(result) };
     } catch (err: any) {
-      return { ok: false, output: `MCP tool call failed: ${err.message ?? err}` };
+      return { ok: false, output: `MCP tool call failed: ${redact(err.message ?? String(err))}` };
     }
   }
 
