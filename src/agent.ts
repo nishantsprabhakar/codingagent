@@ -10,6 +10,7 @@ import { TOOLS, TOOL_DEFINITIONS } from "./tools";
 import { UPDATE_TASKS_DEFINITION } from "./tools/tasks";
 import { REMEMBER_PREFERENCE_DEFINITION, applyRememberedPreference } from "./tools/preferences";
 import { SAVE_SKILL_DEFINITION, loadProjectSkills, saveProjectSkill, formatSkillsIndexForPrompt, type SkillRecord } from "./tools/skills";
+import { RECORD_EVIDENCE_DEFINITION, findConflicts, appendEvidence, type EvidenceConflict } from "./tools/evidence";
 import { PermissionManager } from "./permissions";
 import { gatherProjectContext } from "./projectContext";
 import { loadSession, saveSession, deleteSession, createSessionId, deriveTitle, pickMostRecentSessionId } from "./session";
@@ -154,6 +155,11 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "  project (a deployment sequence, a report's structure, a recurring analysis), call save_skill so it doesn't",
     "  have to be re-derived from scratch next time. Saved skills for this project are listed by name below if any",
     "  exist yet — call recall_skill(name) to retrieve one's full steps when it's relevant to what you're doing.",
+    "- record_evidence: when you state a specific labeled figure (a financial number, a count, a date, a status) in",
+    "  a generated artifact that could plausibly recur in another artifact later in this same session, call it with",
+    "  the label, value, and where it came from. If it disagrees with something you recorded earlier this session,",
+    "  you'll be told immediately in the tool result — reconcile it before moving on rather than leaving two",
+    "  artifacts stating different numbers for the same fact.",
     "",
     "Reliability discipline — this is what makes your output trustworthy no matter how capable the underlying model",
     "is. Treat every one of these as mandatory, not aspirational:",
@@ -297,6 +303,9 @@ export class Agent {
   private needsVerification = false;
   /** Content signature of touched files after the last repair attempt, to detect a repair loop making no progress. */
   private lastRepairSignature: string | null = null;
+  /** Same-session evidence conflicts (see tools/evidence.ts) found during the current transaction, flushed into
+   *  tx.contract.checks by finalizeTransaction and cleared at the start of every turn. */
+  private pendingEvidenceConflicts: EvidenceConflict[] = [];
 
   constructor(
     root: string,
@@ -501,6 +510,7 @@ export class Agent {
     };
     this.needsVerification = false;
     this.lastRepairSignature = null;
+    this.pendingEvidenceConflicts = [];
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       let result;
@@ -515,6 +525,7 @@ export class Agent {
                 UPDATE_TASKS_DEFINITION,
                 REMEMBER_PREFERENCE_DEFINITION,
                 SAVE_SKILL_DEFINITION,
+                RECORD_EVIDENCE_DEFINITION,
                 ...this.mcpManager.getToolDefinitions(),
               ],
               this.llmConfig,
@@ -685,8 +696,34 @@ export class Agent {
     const tx = this.currentTransaction;
     if (!tx) return;
 
-    const mutatingHappened = tx.actions.length > 0;
-    const allDenied = mutatingHappened && tx.actions.every((a) => !a.ok && /denied permission/i.test(a.output));
+    // Same-session evidence conflicts (see tools/evidence.ts) reuse the existing "critic" source —
+    // deriveOutcome() already treats it as advisory (partially_verified, not failed outright), the
+    // right severity for a heuristic, model-labeled check that can have false positives. Only pushed
+    // when a real conflict occurred this turn, never one trivial passing entry per recording.
+    const evidenceConflictFound = this.pendingEvidenceConflicts.length > 0;
+    if (evidenceConflictFound) {
+      tx.contract.checks.push({
+        source: "critic",
+        name: "evidence consistency check",
+        ok: false,
+        output: this.pendingEvidenceConflicts
+          .map((c) => `"${c.label}": disagrees with an earlier recording of "${c.priorValue}" (source: ${c.priorSource}, transaction ${c.priorTransactionId})`)
+          .join("\n"),
+      });
+    }
+    this.pendingEvidenceConflicts = [];
+
+    // record_evidence is deliberately low-risk (like remember_preference/save_skill), so it never
+    // reaches tx.actions (recordTool only logs risk!=="low" actions there) — without this OR, a
+    // turn whose only "mutation" was recording evidence would look identical to one where nothing
+    // happened at all, and a real conflict found in it would never reach deriveOutcome to begin
+    // with. A no-conflict evidence recording correctly still counts as no_changes.
+    const mutatingHappened = tx.actions.length > 0 || evidenceConflictFound;
+    // tx.actions.length > 0 is required here, not just mutatingHappened -- Array.prototype.every
+    // is vacuously true on an empty array, so without this an evidence-only conflict (mutatingHappened
+    // true, tx.actions still empty) would wrongly read as "every action was denied" and outcome
+    // "blocked", even though nothing was ever denied.
+    const allDenied = tx.actions.length > 0 && tx.actions.every((a) => !a.ok && /denied permission/i.test(a.output));
 
     // deriveOutcome (verificationOutcome.ts) is the single source of truth for the six-state
     // outcome model — see docs/architecture/2026-08-phase3-verification-engine.md for the design.
@@ -917,7 +954,7 @@ export class Agent {
 
   /** A call is safe to run concurrently with its neighbors if it can never hit a permission prompt. */
   private isReadOnlyCall(name: string): boolean {
-    if (name === "update_tasks" || name === "remember_preference" || name === "save_skill") return true;
+    if (name === "update_tasks" || name === "remember_preference" || name === "save_skill" || name === "record_evidence") return true;
     if (this.mcpManager.isMcpTool(name)) return false; // arbitrary third-party code — always confirmed, so always sequential
     const tool = TOOLS[name];
     return tool ? !tool.mutating : false;
@@ -983,6 +1020,9 @@ export class Agent {
     }
     if (name === "save_skill") {
       return this.handleSaveSkill(id, args);
+    }
+    if (name === "record_evidence") {
+      return this.handleRecordEvidence(id, args);
     }
 
     if (this.mcpManager.isMcpTool(name)) {
@@ -1129,6 +1169,32 @@ export class Agent {
     this.rebuildSysMessage();
 
     return this.recordTool(id, "save_skill", label, args, `Saved skill "${name}" for this project.`, true);
+  }
+
+  /** Records a labeled figure for same-session consistency checking and reports any conflict immediately —
+   *  see tools/evidence.ts. The durable, outcome-affecting record is flushed in finalizeTransaction. */
+  private handleRecordEvidence(id: string, args: any): string {
+    const label = typeof args.label === "string" ? args.label.trim() : "";
+    const value = typeof args.value === "string" ? args.value.trim() : "";
+    const source = typeof args.source === "string" ? args.source.trim() : "";
+    const toolLabel = `record evidence "${label || "(unnamed)"}"`;
+    this.reporter.toolCall(id, "record_evidence", toolLabel, args, "low");
+
+    if (!label || !value || !source) {
+      return this.recordTool(id, "record_evidence", toolLabel, args, "label, value, and source are all required.", false);
+    }
+
+    const transactionId = this.currentTransaction?.id ?? "no-transaction";
+    const conflicts = findConflicts(this.ctx.root, this.sessionId, label, value);
+    appendEvidence(this.ctx.root, this.sessionId, label, value, source, transactionId);
+    if (conflicts.length) this.pendingEvidenceConflicts.push(...conflicts);
+
+    const output = conflicts.length
+      ? `Recorded, but this disagrees with an earlier record in this session: ${conflicts
+          .map((c) => `"${c.label}" = "${c.priorValue}" (source: ${c.priorSource})`)
+          .join("; ")}`
+      : `Recorded "${label}" = "${value}".`;
+    return this.recordTool(id, "record_evidence", toolLabel, args, output, true);
   }
 }
 

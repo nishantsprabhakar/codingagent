@@ -41,6 +41,12 @@ original Phase 1/2 gate is now fully closed.
 and git-history signal, shipped with zero new dependencies after the user explicitly chose to skip
 semantic/embedding retrieval and tree-sitter for this phase. Done on explicit user request.
 
+**Update (2026-08-13, still later):** Phase 6 (below) is now DONE — see
+`2026-08-phase6-evidence-consistency.md` for the `record_evidence` tool and same-session consistency
+check, the scope decision (of three genuinely different interpretations offered, since the backlog
+gave almost no concrete detail), and two real bugs found and fixed via live verification. Done on
+explicit user request.
+
 ## Immediately next (before any Phase 3+ feature work) — ALL DONE
 
 1. ~~**SSRF-hardened outbound web fetch**~~ — DONE. See
@@ -115,10 +121,23 @@ built, three real bugs found during implementation (a pre-existing `.coding-agen
 gap in `grep_search`/`glob_search`, a symlink containment gap, and `glob@10` returning
 backslash-separated paths on Windows by default), and the explicit scope decisions/limitations.
 
-## Phase 6 — Evidence graph and cross-artifact consistency
+## ~~Phase 6 — Evidence graph and cross-artifact consistency~~ — DONE, see `2026-08-phase6-evidence-consistency.md`
 
 Depends on Phase 3 (verification contracts) and Phase 5 (stable IDs for
 retrieved content) existing first — sequence accordingly.
+
+**Update (2026-08-13):** DONE. This backlog entry was only two lines with no concrete deliverable
+anywhere in the repo — the user was given three genuinely different interpretations (a small
+citation/conflict-check system; a full auto-extracted evidence graph; a code-centric verification-
+coverage reinterpretation) and chose the first. Shipped as a `record_evidence` tool plus a
+same-session, label-matched, numeric-tolerant conflict check — zero new frontend code (reuses the
+existing `"critic"` outcome-severity tier). Two real integration bugs were found via live
+verification and fixed (a `mutatingHappened` short-circuit that made a real conflict invisible to
+the outcome model, and a vacuous-truth `Array.prototype.every` bug on an empty array that then
+misclassified the outcome as `blocked`) — see that doc for the full trace, including an honest note
+on which parts were live-reconfirmed after the fixes and which weren't (OpenRouter free-tier
+rate-limiting blocked a final live re-check; confidence instead rests on `deriveOutcome()`'s own
+already-tested logic plus a direct code trace).
 
 ## Phase 7 — Professional artifact engine
 
