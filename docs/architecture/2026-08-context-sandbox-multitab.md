@@ -1,5 +1,10 @@
 # 2026-08-14 — Symbol map, opt-in Docker sandbox, multi-tab session safety
 
+**Update (same day):** a follow-up product-quality review flagged the installer and the
+untested Docker sandbox path as remaining gaps. See "Installer packaging bug found and fixed"
+at the end of this doc for what was actually found and fixed, and an honest note on why the
+Docker gap could not be closed the same way.
+
 Three architectural gaps arrived as a single prescriptive request (specific file paths like
 `src/context/astIndex.ts`, `src/config.ts`, `src/session/`, `src/server/`, and specific
 libraries — `tree-sitter`, `proper-lockfile`). None of those paths exist in this codebase,
@@ -122,3 +127,60 @@ correctly pulled tab A's new message into tab B's view.
 Three separate commits, one per gap, matching this session's established convention:
 `get_symbol_map` tool, opt-in Docker sandbox, multi-tab session safety (atomic writes +
 cross-tab notice).
+
+## Installer packaging bug found and fixed
+
+A follow-up review asked to close two remaining gaps: the untested Docker sandbox path, and
+the installer. Investigating the installer first (rather than assuming what was broken)
+turned up a real, reproducible bug — not a hypothetical one.
+
+**What was found**: `install.sh`'s no-`rsync` fallback (the path Git Bash on Windows actually
+takes, since it doesn't ship `rsync`) does `find "$SOURCE_DIR" ... -exec cp -r`, copying every
+top-level entry in the working directory except a hand-maintained exclude list
+(`node_modules`, `dist`, `.git`, etc.). Running it against this repo's actual working copy
+copied a stray empty directory literally named `-p` into the installed output — leftover
+debris from some earlier command in this repo's history, invisible to `git status` because
+git doesn't track empty directories at all. The bug wasn't "docs are dry" — it's an installer
+that packages *whatever happens to be lying around*, not *what the project actually is*.
+`installer/windows/wrexlyn.iss` has the identical exposure: its `[Files]` section bundles
+`public\*`, `src\*`, `scripts\*` with `recursesubdirs`, which is just as blind to
+tracked-vs-stray as the old `install.sh` path was.
+
+**The fix**:
+- `install.sh` now copies exactly `git ls-files` (minus `installer/`, which is Windows-only
+  packaging) when the source is a git checkout, via `rsync --files-from`/`git ls-files -z` or
+  a `tar --null -T -` pipe when `rsync` isn't available — an allowlist of what's actually
+  committed, not a blocklist of what's guessed to be safe to exclude. The original
+  name-exclude path is kept only as a last-resort fallback for a non-git source tree.
+- `scripts/write-version.js` — already the one hook every documented build path runs right
+  before compiling `wrexlyn.iss` — now runs `git status --porcelain` scoped to
+  `public/`, `src/`, `scripts/` and **hard-fails** if it finds untracked files there (exactly
+  the class of bug just found), or **warns** (but proceeds) on modified-but-tracked files,
+  since building from an uncommitted work-in-progress is a legitimate thing to do
+  deliberately.
+- Verified by actually re-running `install.sh` against this repo (with an isolated fake
+  `$HOME` so the test never touched real user directories) before and after the fix: before,
+  the stray `-p` directory and a planted stray test file both leaked into the install; after,
+  neither did, and `installer/` was correctly excluded too.
+- `src/__tests__/writeVersion.test.ts` (new) exercises the actual current
+  `scripts/write-version.js` file (copied into a fixture git repo, since the script resolves
+  its root from its own file location) for: a clean tree succeeding, an untracked file
+  blocking the build with no `version.json` written, an untracked file *outside* the packaged
+  dirs being correctly ignored, and a modified tracked file warning without blocking.
+- `wrexlyn.iss` itself was **not** rewritten to consume a generated file manifest — Inno Setup
+  isn't installed in this environment, so a structural change to a `.iss` file that can't be
+  compile-tested here would be an unverified guess, not a fix. The write-version.js guard
+  catches the same bug class at the one point in the real build process that can be tested.
+
+**The Docker sandbox gap was not closed the same way.** There is no code-level bug to find and
+fix here — `isDockerAvailable()`/`runInDockerSandbox()` were already correct on inspection and
+covered by tests that pass without a live daemon. What's missing is proof against a real
+running container, and that requires either installing Docker Desktop in this environment
+(a genuine system-level change — enabling WSL2/Hyper-V, admin rights, likely a reboot — well
+outside what should happen without the user's explicit go-ahead) or the user testing it
+themselves somewhere Docker already runs. Neither happened in this pass; the honest state is
+unchanged from the original write-up above: code-reviewed and unit-tested, not live-verified.
+
+Tests: 275 total, 270 passing, 0 failing, 5 skipped (up from 271/266/0/5; +4 new tests, +0
+regressions). Committed separately from the three architectural-gap commits above, matching
+this session's one-logical-change-per-commit convention.

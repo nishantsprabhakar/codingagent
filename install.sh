@@ -28,17 +28,33 @@ fi
 
 mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$DESKTOP_DIR"
 
-# Copy everything except dev/runtime artifacts that get regenerated on first launch
-# (node_modules/dist) or are machine-specific (agent.config.json, .coding-agent sessions).
-EXCLUDES=(--exclude node_modules --exclude dist --exclude .git --exclude .coding-agent \
-          --exclude agent.config.json --exclude '*.log' --exclude installer)
-if command -v rsync >/dev/null 2>&1; then
-  rsync -a --delete "${EXCLUDES[@]}" "$SOURCE_DIR/" "$INSTALL_DIR/"
+if [ -d "$SOURCE_DIR/.git" ] && command -v git >/dev/null 2>&1; then
+  # Copy exactly what git tracks (respects .gitignore) rather than "everything except a
+  # hand-maintained blocklist" -- the old blocklist approach shipped any stray untracked
+  # file sitting in the working tree (a build artifact, a scratch file, anything) straight
+  # into every install. `installer/` is tracked but Windows-only packaging, so it's the one
+  # thing still excluded explicitly even from the tracked-files list.
+  if command -v rsync >/dev/null 2>&1; then
+    (cd "$SOURCE_DIR" && git ls-files -z -- . ':!installer') |
+      rsync -a --from0 --files-from=- "$SOURCE_DIR/" "$INSTALL_DIR/"
+  else
+    (cd "$SOURCE_DIR" && git ls-files -z -- . ':!installer') |
+      tar -C "$SOURCE_DIR" --null -T - -cf - | tar -C "$INSTALL_DIR" -xf -
+  fi
 else
-  find "$SOURCE_DIR" -mindepth 1 -maxdepth 1 \
-    ! -name node_modules ! -name dist ! -name .git ! -name .coding-agent \
-    ! -name agent.config.json ! -name '*.log' ! -name installer \
-    -exec cp -r {} "$INSTALL_DIR/" \;
+  echo "Warning: $SOURCE_DIR isn't a git checkout -- falling back to a name-based exclude" >&2
+  echo "list, which (unlike a git-tracked-files copy) can't tell source files from stray" >&2
+  echo "untracked ones that happen to be sitting in this directory." >&2
+  EXCLUDES=(--exclude node_modules --exclude dist --exclude .git --exclude .coding-agent \
+            --exclude agent.config.json --exclude '*.log' --exclude installer)
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete "${EXCLUDES[@]}" "$SOURCE_DIR/" "$INSTALL_DIR/"
+  else
+    find "$SOURCE_DIR" -mindepth 1 -maxdepth 1 \
+      ! -name node_modules ! -name dist ! -name .git ! -name .coding-agent \
+      ! -name agent.config.json ! -name '*.log' ! -name installer \
+      -exec cp -r {} "$INSTALL_DIR/" \;
+  fi
 fi
 
 chmod +x \
