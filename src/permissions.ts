@@ -24,6 +24,10 @@ export type ConfirmFn = (toolName: string, label: string, risk: RiskLevel, previ
  */
 export class PermissionManager {
   private alwaysAllowed = new Set<string>();
+  /** Subset of alwaysAllowed that came from config (mcp.json's `permissions.alwaysAllow`), not a
+   * live "always" click -- tracked separately so a config reload can revoke exactly these entries
+   * without touching anything the user granted interactively this session. */
+  private configSeeded = new Set<string>();
 
   constructor(private yolo: boolean, private confirmFn: ConfirmFn) {}
 
@@ -36,5 +40,28 @@ export class PermissionManager {
       return true;
     }
     return decision === "once" || (decision === "always" && risk === "high");
+  }
+
+  /**
+   * Pre-approves a tool name from config-driven trust (the user explicitly named it in mcp.json),
+   * never from the model or the server itself. Re-checks the high-risk invariant itself -- the
+   * "high risk can never become always" rule lives in exactly one place (here and in confirm()'s
+   * own branch), not re-implemented at every seeding call site.
+   */
+  preApprove(toolName: string, risk: RiskLevel): void {
+    if (risk === "high") return;
+    this.alwaysAllowed.add(toolName);
+    this.configSeeded.add(toolName);
+  }
+
+  /**
+   * Removes only the entries preApprove() added, leaving intact anything the user granted via a
+   * live "always" click this session. Call before re-seeding from a freshly reloaded config (e.g.
+   * mcp.json edited to remove a tool from `alwaysAllow`) -- without this, a revoked entry would
+   * silently keep auto-approving until the whole process restarted.
+   */
+  clearConfigSeeded(): void {
+    for (const name of this.configSeeded) this.alwaysAllowed.delete(name);
+    this.configSeeded.clear();
   }
 }

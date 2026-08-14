@@ -7,6 +7,7 @@ import type { PermissionDecision } from "../permissions";
 import type { TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome } from "../types";
 import type { SessionMeta } from "../session";
 import type { FileRestoreResult } from "../workspaceSnapshot";
+import type { McpServerStatus } from "../mcp";
 
 export type ServerMessage =
   | { type: "init"; root: string; provider: string; model: string; yolo: boolean; recentFolders: string[]; sessionId: string; sessionTitle: string }
@@ -25,6 +26,7 @@ export type ServerMessage =
   | { type: "sessions"; sessions: SessionMeta[]; activeId: string }
   | { type: "settings_saved"; which: "instructions" | "api_keys" | "custom_provider" }
   | { type: "mcp_reloaded"; toolCount: number }
+  | { type: "mcp_status"; servers: Record<string, McpServerStatus> }
   | { type: "verification_result"; result: VerificationResult }
   | { type: "critique_result"; pass: boolean; reason: string }
   | { type: "transaction_summary"; transactionId: string; confidence: number; outcome: TransactionOutcome; rollbackAvailable: boolean }
@@ -42,7 +44,20 @@ export type ClientMessage =
   | { type: "delete_session"; id: string }
   | { type: "list_sessions" }
   | { type: "update_global_instructions"; text: string }
-  | { type: "update_mcp_config"; mcpServers: Record<string, { command: string; args?: string[]; env?: Record<string, string> }> }
+  | {
+      type: "update_mcp_config";
+      mcpServers: Record<
+        string,
+        {
+          command?: string;
+          args?: string[];
+          env?: Record<string, string>;
+          url?: string;
+          permissions?: { defaultRisk?: RiskLevel; alwaysAllow?: string[] };
+        }
+      >;
+    }
+  | { type: "mcp_authorize"; server: string }
   | { type: "rollback_request"; transactionId: string }
   | { type: "update_api_key"; provider: "groq" | "openrouter" | "gemini" | "cerebras" | "mistral"; apiKey: string }
   | { type: "clear_api_key"; provider: "groq" | "openrouter" | "gemini" | "cerebras" | "mistral" | "custom" }

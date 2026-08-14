@@ -1831,6 +1831,45 @@ body::before {
   padding: 6px 10px;
 }
 
+/* .mcp-stdio-fields / .mcp-http-fields wrap alternate label+input pairs inside the
+   .mcp-server-fields grid -- display:contents lets their children participate directly in the
+   parent grid instead of each wrapper eating a whole grid cell. */
+.mcp-stdio-fields,
+.mcp-http-fields {
+  display: contents;
+}
+
+.mcp-server-row-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mcp-status-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.mcp-status-connected { color: var(--success, #4ade80); border-color: rgba(74, 222, 128, 0.35); }
+.mcp-status-needs-auth { color: var(--accent); border-color: var(--accent-soft); }
+.mcp-status-error { color: var(--danger); border-color: rgba(248, 113, 113, 0.35); cursor: help; }
+
+.mcp-signin-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-soft);
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mcp-signin-btn:hover { background: var(--accent); color: #06232a; }
+
 .mcp-empty {
   padding: 16px 8px;
   text-align: center;

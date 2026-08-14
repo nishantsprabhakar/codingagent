@@ -18,6 +18,16 @@
       "args": ["-y", "@some/mcp-server"],
       "_comment": "envPassthrough names parent-process env vars this server may see, pulled live at connect time -- nothing is passed through by default, and this app's own provider API keys (GROQ_API_KEY, OPENROUTER_API_KEY, etc.) are never forwarded unless explicitly listed here.",
       "envPassthrough": ["SOME_API_KEY"]
+    },
+    "example-remote-http": {
+      "_comment": "A `url` (instead of `command`/`args`) connects over Streamable HTTP instead of spawning a stdio subprocess. If the server requires OAuth, Wrexlyn handles it automatically -- Settings will show 'Needs sign-in' with a Sign-in button (or run `/mcp-auth example-remote-http` from the CLI); tokens are stored in the same OS-backed secret storage used for provider API keys, never in this file.",
+      "url": "https://example.com/mcp"
+    },
+    "example-with-permissions": {
+      "command": "npx",
+      "args": ["-y", "@some/mcp-server"],
+      "_comment": "permissions is optional, config-driven trust only -- never set by the model or the server itself. defaultRisk (low/medium/high, default medium) is the risk level used for every confirm() prompt against this server's tools; alwaysAllow lists unqualified tool names (within this server) to pre-approve without a prompt. A tool listed here can never be pre-approved if defaultRisk is 'high' -- high-risk actions are always confirmed individually, no matter what.",
+      "permissions": { "defaultRisk": "low", "alwaysAllow": ["safe_read_only_tool"] }
     }
   }
 }

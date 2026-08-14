@@ -164,13 +164,19 @@ export function startWebServer(
     const sendSessions = () => {
       send({ type: "sessions", sessions: listSessions(currentRoot), activeId: agent.getSessionId() });
     };
+    const sendMcpStatus = () => {
+      send({ type: "mcp_status", servers: agent.getMcpStatuses() });
+    };
 
     const pending = new Map<string, (decision: PermissionDecision) => void>();
     const reporter = new WebSocketReporter(send);
     const confirmFn = createConfirmFn(send, pending);
     const permissions = new PermissionManager(yolo, confirmFn);
     let agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter);
-    agent.connectMcp().catch((err) => logError("MCP connect error", err, [currentApiKey]));
+    agent
+      .connectMcp()
+      .then(sendMcpStatus)
+      .catch((err) => logError("MCP connect error", err, [currentApiKey]));
 
     sendInit();
     sendSessions();
@@ -204,7 +210,10 @@ export function startWebServer(
           currentRoot = target;
           addRecentFolder(currentRoot);
           agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter);
-          agent.connectMcp().catch((err) => logError("MCP connect error", err, [currentApiKey]));
+          agent
+            .connectMcp()
+            .then(sendMcpStatus)
+            .catch((err) => logError("MCP connect error", err, [currentApiKey]));
           sendInit();
           sendSessions();
           agent.replayCurrentState();
@@ -285,6 +294,11 @@ export function startWebServer(
           fs.writeFileSync(mcpPath, JSON.stringify({ mcpServers: msg.mcpServers }, null, 2), "utf-8");
           const toolCount = await agent.reloadMcp();
           send({ type: "mcp_reloaded", toolCount });
+          sendMcpStatus();
+        } else if (msg.type === "mcp_authorize") {
+          const result = await agent.authorizeMcpServer(msg.server, () => sendMcpStatus());
+          if (!result.ok) reporter.error(result.message);
+          sendMcpStatus();
         } else if (msg.type === "rollback_request") {
           if (!isValidId(msg.transactionId)) {
             reporter.error("Invalid transaction id.");

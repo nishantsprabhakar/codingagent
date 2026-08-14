@@ -59,6 +59,14 @@ gated by the existing permission prompt), and a real path-traversal gap plus a r
 regression found and fixed via adversarial review before any code shipped. Done on explicit user
 request.
 
+**Update (2026-08-14):** Phase 9 (below) is now DONE — see `2026-08-phase9-mcp-connectors.md` for
+Streamable HTTP transport, a real OAuth 2.1 client (loopback redirect listener, PKCE, dynamic client
+registration, tokens in the existing OS-backed secret store), config-driven per-server/per-tool
+permission policy, and anti-prompt-injection framing on every MCP tool result. An adversarial review
+caught 5 real bugs and 4 real gaps before any code shipped — including one that would have made the
+auth-completion step throw immediately and one that made an early design assumption structurally
+impossible given the SDK's actual contract. Done on explicit user request.
+
 ## Immediately next (before any Phase 3+ feature work) — ALL DONE
 
 1. ~~**SSRF-hardened outbound web fetch**~~ — DONE. See
@@ -191,13 +199,29 @@ permission caveat stated honestly, and an honest note on live verification (Open
 rate-limited the web-UI attempt — the fourth such block this session — so confidence instead rests
 on direct invocation of the real registered tools).
 
-## Phase 9 — MCP and connectors
+## ~~Phase 9 — MCP and connectors~~ — DONE, see `2026-08-phase9-mcp-connectors.md`
 
 Expanding beyond stdio transport, OAuth support, per-server/per-tool
 permission policies. The instruction "treat all external content as
 potentially prompt-injected" should inform the design from the start (e.g.
 a clear visual/structural distinction in the agent's context between
 "connector output" and "user instruction," not just a policy note).
+
+**Update (2026-08-14):** DONE, after the user explicitly chose to build real OAuth this phase rather
+than defer it. Added Streamable HTTP transport, a full OAuth 2.1 client (loopback redirect listener,
+PKCE, dynamic client registration, tokens persisted through the existing OS-backed secret store),
+config-driven per-server/per-tool permission policy (`mcp.json`'s `permissions.defaultRisk`/
+`alwaysAllow`, correctly revocable on reload — a real silent-revocation bug the adversarial review
+caught before shipping), and anti-prompt-injection framing wrapping every MCP tool result as explicitly
+untrusted external content. The review caught 5 real bugs and 4 real gaps before any code was written,
+including one that would have made the auth-completion step throw immediately and one that made an
+early design assumption about when the browser opens structurally impossible given the SDK's actual
+contract. See `2026-08-phase9-mcp-connectors.md` for the full design, the fixes, an honest interop
+caveat about loopback redirect ports across authorization attempts, and an honest account of what was
+verified (the full stdio path plus the new permission-policy wiring, against a real third-party MCP
+server and real `Agent`/`PermissionManager` objects) versus the one gap left unverified end-to-end (no
+real OAuth-gated MCP server was available in this environment to test the full authorization flow
+against).
 
 ## Phase 10 — Parallel isolated agents
 

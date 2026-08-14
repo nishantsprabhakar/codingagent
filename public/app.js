@@ -412,6 +412,10 @@
       case "mcp_reloaded":
         flashStatus(el.settingsMcpStatus, `Saved — ${msg.toolCount} tool${msg.toolCount === 1 ? "" : "s"} available.`);
         break;
+      case "mcp_status":
+        mcpServerStatuses = msg.servers || {};
+        renderMcpServerList();
+        break;
       case "skills_changed":
         if (!el.settingsPanelSkills.hidden) loadSkillsPanel();
         break;
@@ -1536,6 +1540,7 @@
   // ---------- Settings (global instructions + MCP servers / app connectors) ----------
 
   let mcpServers = {};
+  let mcpServerStatuses = {};
 
   function showSettingsTab(tab) {
     el.settingsTabInstructions.classList.toggle("active", tab === "instructions");
@@ -1759,22 +1764,59 @@
     setTimeout(() => statusEl.classList.remove("visible"), 2500);
   }
 
+  function mcpStatusChip(name) {
+    const status = mcpServerStatuses[name];
+    if (!status) return "";
+    if (status.status === "connected") {
+      return `<span class="mcp-status-chip mcp-status-connected">Connected · ${status.toolCount} tool${status.toolCount === 1 ? "" : "s"}</span>`;
+    }
+    if (status.status === "needs_auth") {
+      return `<span class="mcp-status-chip mcp-status-needs-auth">Needs sign-in</span><button class="mcp-signin-btn" data-server="${escapeHtml(name)}">Sign in</button>`;
+    }
+    return `<span class="mcp-status-chip mcp-status-error" title="${escapeHtml(status.message || "")}">Error</span>`;
+  }
+
   function buildMcpServerRow(name, config) {
     const row = document.createElement("div");
     row.className = "mcp-server-row";
+    const isHttp = !!config.url;
     row.innerHTML = `
       <div class="mcp-server-row-header">
         <input class="folder-input mcp-name-input" type="text" value="${escapeHtml(name)}" placeholder="Server name" />
+        <div class="mcp-server-row-status">${mcpStatusChip(name)}</div>
         <span class="mcp-server-remove" title="Remove server">&times;</span>
       </div>
       <div class="mcp-server-fields">
-        <label>Command</label>
-        <input class="folder-input mcp-command-input" type="text" value="${escapeHtml(config.command || "")}" placeholder="e.g. npx" />
-        <label>Args</label>
-        <input class="folder-input mcp-args-input" type="text" value="${escapeHtml((config.args || []).join(" "))}" placeholder="space-separated args" />
+        <label>Type</label>
+        <select class="folder-input mcp-type-select">
+          <option value="stdio" ${isHttp ? "" : "selected"}>Local command (stdio)</option>
+          <option value="http" ${isHttp ? "selected" : ""}>Remote URL (Streamable HTTP, OAuth if required)</option>
+        </select>
+        <div class="mcp-stdio-fields" ${isHttp ? 'style="display:none"' : ""}>
+          <label>Command</label>
+          <input class="folder-input mcp-command-input" type="text" value="${escapeHtml(config.command || "")}" placeholder="e.g. npx" />
+          <label>Args</label>
+          <input class="folder-input mcp-args-input" type="text" value="${escapeHtml((config.args || []).join(" "))}" placeholder="space-separated args" />
+        </div>
+        <div class="mcp-http-fields" ${isHttp ? "" : 'style="display:none"'}>
+          <label>URL</label>
+          <input class="folder-input mcp-url-input" type="text" value="${escapeHtml(config.url || "")}" placeholder="https://example.com/mcp" />
+        </div>
       </div>
     `;
     row.querySelector(".mcp-server-remove").addEventListener("click", () => row.remove());
+    const typeSelect = row.querySelector(".mcp-type-select");
+    const stdioFields = row.querySelector(".mcp-stdio-fields");
+    const httpFields = row.querySelector(".mcp-http-fields");
+    typeSelect.addEventListener("change", () => {
+      const http = typeSelect.value === "http";
+      stdioFields.style.display = http ? "none" : "";
+      httpFields.style.display = http ? "" : "none";
+    });
+    const signinBtn = row.querySelector(".mcp-signin-btn");
+    if (signinBtn) {
+      signinBtn.addEventListener("click", () => send({ type: "mcp_authorize", server: signinBtn.dataset.server }));
+    }
     return row;
   }
 
@@ -1864,10 +1906,21 @@
     const servers = {};
     for (const row of el.mcpServerList.querySelectorAll(".mcp-server-row")) {
       const name = row.querySelector(".mcp-name-input").value.trim();
-      const command = row.querySelector(".mcp-command-input").value.trim();
-      const args = row.querySelector(".mcp-args-input").value.trim();
-      if (!name || !command) continue;
-      servers[name] = { command, args: args ? args.split(/\s+/) : [] };
+      if (!name) continue;
+      // Preserve fields this form has no UI for (permissions, env/envPassthrough) instead of
+      // silently dropping them on save -- only the fields actually edited here are overwritten.
+      const existing = mcpServers[name] || {};
+      const isHttp = row.querySelector(".mcp-type-select").value === "http";
+      if (isHttp) {
+        const url = row.querySelector(".mcp-url-input").value.trim();
+        if (!url) continue;
+        servers[name] = { ...existing, url, command: undefined, args: undefined };
+      } else {
+        const command = row.querySelector(".mcp-command-input").value.trim();
+        const args = row.querySelector(".mcp-args-input").value.trim();
+        if (!command) continue;
+        servers[name] = { ...existing, command, args: args ? args.split(/\s+/) : [], url: undefined };
+      }
     }
     return servers;
   }

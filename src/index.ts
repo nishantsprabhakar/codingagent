@@ -251,6 +251,20 @@ async function runRepl(options: CliOptions): Promise<void> {
         promptLoop();
         return;
       }
+      if (line.startsWith("/mcp-auth")) {
+        const server = line.slice("/mcp-auth".length).trim();
+        if (!server) {
+          console.log("(usage: /mcp-auth <server-name> — see mcp.json for configured server names)\n");
+        } else {
+          console.log(`(connecting to "${server}" — if sign-in is needed, a browser window will open)`);
+          const result = await agent.authorizeMcpServer(server, (url) => {
+            console.log(`(if a browser didn't open automatically, sign in here: ${url})`);
+          });
+          console.log(`(${result.ok ? "" : "failed: "}${result.message})\n`);
+        }
+        promptLoop();
+        return;
+      }
       if (!line) {
         promptLoop();
         return;
