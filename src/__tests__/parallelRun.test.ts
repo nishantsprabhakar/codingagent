@@ -112,7 +112,7 @@ test("mergeParallelRunAttempt: fails cleanly when the attempt hasn't finished (n
 test("startParallelRun: refuses when the main root is not a git repository", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wrexlyn-parallelrun-nogit-"));
   await assert.rejects(
-    startParallelRun({ root: dir, task: "do something", n: 2, llmConfig: { provider: "pollinations", model: "openai" }, onEvent: () => {} }),
+    startParallelRun({ root: dir, task: "do something", n: 2, llmConfig: { provider: "kilo", model: "kilo-auto/free" }, onEvent: () => {} }),
     /git repository/
   );
 });
@@ -122,7 +122,7 @@ test("startParallelRun: refuses when the main root has uncommitted changes", asy
   fs.writeFileSync(path.join(root, "a.txt"), "dirty, uncommitted");
 
   await assert.rejects(
-    startParallelRun({ root, task: "do something", n: 2, llmConfig: { provider: "pollinations", model: "openai" }, onEvent: () => {} }),
+    startParallelRun({ root, task: "do something", n: 2, llmConfig: { provider: "kilo", model: "kilo-auto/free" }, onEvent: () => {} }),
     /[Cc]ommit or stash/
   );
 });

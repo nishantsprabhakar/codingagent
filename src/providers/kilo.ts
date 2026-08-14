@@ -2,20 +2,22 @@
  * Wrexlyn — Copyright (c) 2026 Nishant Prabhakar. All rights reserved.
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
+ *
+ * Zero-key default provider. Replaces Pollinations (src/providers/pollinations.ts, removed
+ * 2026-08-14): Pollinations dropped anonymous tool-calling entirely, returning a 402 Payment
+ * Required for any request that includes `tools` — confirmed live, not from stale docs — so it can
+ * no longer back an agent that can't function without tool calls. Kilo's gateway (https://kilo.ai)
+ * routes anonymous requests to a rotating set of free upstream models with no signup and no key;
+ * `kilo-auto/free` auto-picks "the best available free model" per session, confirmed live to return
+ * real OpenAI-shaped streamed tool_calls with no Authorization header at all. Anonymous access is
+ * capped at 200 requests/hour per IP (per Kilo's docs) — no key means no way to raise that.
  */
 import type { ChatMessage, ToolDefinition, ChatCompletionResult } from "../types";
 import { consumeSseStream } from "./sseStream";
 import { computeRetryDelayMs } from "./retryPolicy";
 
-const BASE_URL = "https://text.pollinations.ai/openai";
+const BASE_URL = "https://api.kilo.ai/api/gateway/chat/completions";
 
-/**
- * Anonymous Pollinations access is rate-limited (~1 req/15s) and occasionally
- * flaky, so retry with backoff on 429/5xx before giving up. It has also been
- * observed to truncate or return an empty message on longer replies without
- * an explicit max_tokens, and to sometimes put output in `reasoning` instead
- * of `content` — both are worked around below.
- */
 export async function chatCompletion(
   messages: ChatMessage[],
   tools: ToolDefinition[],
@@ -45,28 +47,14 @@ export async function chatCompletion(
 
       if (res.status === 429 || res.status >= 500) {
         const waitMs = computeRetryDelayMs(res.status, res.headers.get("retry-after"), attempt);
-        lastError = new Error(`Pollinations API returned ${res.status}`);
+        lastError = new Error(`Kilo API returned ${res.status}`);
         await sleep(waitMs);
         continue;
       }
 
-      if (res.status === 402) {
-        // Observed 2026-07-30: Pollinations now requires a funded/paid account
-        // specifically for tool/function-calling requests (plain chat without
-        // tools still works anonymously). This agent can't function without
-        // tool calls, and retrying won't help — it's a policy block, not a
-        // transient error.
-        throwFatal(
-          "Pollinations now requires a paid account for tool-calling requests, which this agent relies on for " +
-            "every action. Anonymous access no longer covers this. Switch providers instead: run 'Change Model " +
-            "Key.bat', or pass --provider groq --api-key <key> (free key, no credit card, at " +
-            "https://console.groq.com/keys)."
-        );
-      }
-
       if (!res.ok) {
         const text = await res.text().catch(() => "");
-        throwFatal(`Pollinations API error ${res.status}: ${text.slice(0, 800)}`);
+        throwFatal(`Kilo API error ${res.status}: ${text.slice(0, 800)}`);
       }
 
       const { content, reasoning, toolCalls, finishReason, usage } = await consumeSseStream(res, onDelta);
@@ -77,7 +65,7 @@ export async function chatCompletion(
       }
 
       if (!rawContent && toolCalls.length === 0 && attempt < maxRetries) {
-        lastError = new Error("Pollinations returned an empty response");
+        lastError = new Error("Kilo returned an empty response");
         await sleep(Math.min(1000 * 2 ** attempt, 10000));
         continue;
       }
@@ -92,10 +80,10 @@ export async function chatCompletion(
     }
   }
 
-  throw lastError ?? new Error("Pollinations API request failed");
+  throw lastError ?? new Error("Kilo API request failed");
 }
 
-/** Throws an error marked non-retryable — e.g. a policy rejection (402) that a backoff loop can't fix. */
+/** Throws an error marked non-retryable — a genuine policy rejection that a backoff loop can't fix. */
 function throwFatal(message: string): never {
   const err: any = new Error(message);
   err.fatal = true;

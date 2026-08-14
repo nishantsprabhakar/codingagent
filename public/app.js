@@ -1485,7 +1485,7 @@
   // ---------- Model picker ----------
 
   const PROVIDER_LABELS = {
-    pollinations: "Pollinations",
+    kilo: "Kilo",
     groq: "Groq",
     openrouter: "OpenRouter",
     gemini: "Google Gemini",
@@ -1517,8 +1517,8 @@
 
   function renderProviderChips() {
     el.modelProviderChips.innerHTML = "";
-    for (const provider of ["pollinations", ...API_KEY_PROVIDERS, "custom"]) {
-      const hasKey = provider === "pollinations" || !!pickerKeyStatus[provider]?.set;
+    for (const provider of ["kilo", ...API_KEY_PROVIDERS, "custom"]) {
+      const hasKey = provider === "kilo" || !!pickerKeyStatus[provider]?.set;
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = `provider-chip${provider === pickerProvider ? " active" : ""}${hasKey ? "" : " disabled"}`;
@@ -1556,7 +1556,7 @@
     }
   }
 
-  // Pollinations has no model list (no tool-calling model choice) — if that's also the already-active provider
+  // Kilo has no model list (it auto-routes to the best available free model) — if that's also the already-active provider
   // there's nothing to do here, but if the user is browsing it as a *switch target* they still need a way to
   // confirm the switch, so give them one explicit row instead of a dead end.
   function renderNoModels(note) {

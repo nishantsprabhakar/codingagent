@@ -28,7 +28,7 @@ process.on("uncaughtException", (err) => {
 });
 
 const API_KEY_ENV: Record<LlmProvider, string | null> = {
-  pollinations: null,
+  kilo: null,
   groq: "GROQ_API_KEY",
   openrouter: "OPENROUTER_API_KEY",
   gemini: "GEMINI_API_KEY",
@@ -47,7 +47,7 @@ interface CliOptions {
 }
 
 async function parseArgs(argv: string[]): Promise<CliOptions> {
-  let provider: LlmProvider = (process.env.AGENT_PROVIDER as LlmProvider) || "pollinations";
+  let provider: LlmProvider = (process.env.AGENT_PROVIDER as LlmProvider) || "kilo";
   let model: string | undefined = process.env.AGENT_MODEL;
   let apiKey: string | undefined;
   let baseUrl: string | undefined = process.env.AGENT_BASE_URL;
@@ -69,7 +69,7 @@ async function parseArgs(argv: string[]): Promise<CliOptions> {
       model = argv[++i];
     } else if (arg === "--provider") {
       const value = argv[++i];
-      if (value === "pollinations" || API_KEY_PROVIDERS.includes(value as ApiKeyProvider)) provider = value as LlmProvider;
+      if (value === "kilo" || API_KEY_PROVIDERS.includes(value as ApiKeyProvider)) provider = value as LlmProvider;
     } else if (arg === "--api-key") {
       apiKey = argv[++i];
     } else if (arg === "--base-url") {
@@ -111,7 +111,7 @@ Usage: agent [options]
 
 Options:
   --cwd <path>      Working directory the agent may read/write (default: current directory)
-  --provider <name> "pollinations" (default, free, no key, but tool-calling requires a paid account as of 2026-07),
+  --provider <name> "kilo" (default, free, no key — anonymous gateway capped at 200 req/hour per IP),
                     "groq", "openrouter", "gemini", "cerebras", "mistral" (all free tier, need an API key), or
                     "custom" (any OpenAI-compatible chat-completions API — a provider not listed here, or a local
                     model server like Ollama/LM Studio/llama.cpp; needs --base-url, --api-key is optional)

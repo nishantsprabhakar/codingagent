@@ -13,7 +13,7 @@ export interface TokenUsage {
 
 export interface StreamAccumulated {
   content: string | null;
-  /** Some providers (e.g. Pollinations) occasionally stream output as `delta.reasoning` instead of `delta.content`. */
+  /** Some providers (e.g. Kilo) occasionally stream output as `delta.reasoning` instead of `delta.content`. */
   reasoning: string | null;
   toolCalls: ToolCallRequest[];
   finishReason: string | null;
@@ -23,7 +23,7 @@ export interface StreamAccumulated {
 
 /**
  * Consumes an OpenAI-compatible `text/event-stream` response body (used by
- * Groq, OpenRouter, and Pollinations alike), calling `onDelta` with each
+ * Groq, OpenRouter, and Kilo alike), calling `onDelta` with each
  * piece of assistant text as it arrives and returning the fully accumulated
  * content/tool-calls once the stream ends — the same shape a non-streaming
  * call would have returned, so callers don't need to know the difference.

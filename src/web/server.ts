@@ -34,7 +34,7 @@ import { redact, logError } from "../errors";
 import { listTransactions } from "../transactionLog";
 import { listEvidenceWithConflicts } from "../tools/evidence";
 
-const VALID_PROVIDERS: LlmProvider[] = ["pollinations", ...API_KEY_PROVIDERS];
+const VALID_PROVIDERS: LlmProvider[] = ["kilo", ...API_KEY_PROVIDERS];
 
 const PUBLIC_DIR = path.join(__dirname, "..", "..", "public");
 const IGNORED_ENTRIES = new Set(["node_modules", ".git", "dist", "build"]);
@@ -244,7 +244,7 @@ export function startWebServer(
               return;
             }
             apiKey = (await loadApiKey("custom")) ?? undefined; // optional — many local model servers need none
-          } else if (provider !== "pollinations") {
+          } else if (provider !== "kilo") {
             apiKey = (await loadApiKey(provider as ApiKeyProvider)) ?? undefined;
             if (!apiKey) {
               reporter.error(`No API key saved for ${provider} yet — add one from Settings > API Keys first.`);
@@ -668,7 +668,7 @@ async function handleModels(res: http.ServerResponse, provider: string): Promise
     }
     return sendJson(res, 200, {
       models: [],
-      note: "Pollinations doesn't support model selection for tool-calling.",
+      note: "Kilo auto-routes to the best available free model — no model selection needed.",
     });
   } catch (err: any) {
     sendJson(res, 502, { error: `Failed to fetch model list: ${err.message ?? err}` });

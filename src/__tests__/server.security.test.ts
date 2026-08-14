@@ -39,7 +39,7 @@ function pickPort(): number {
 async function withServer(fn: (handle: WebServerHandle, port: number) => Promise<void>, lan = false): Promise<void> {
   const root = mkTempRoot();
   const port = pickPort();
-  const handle = startWebServer(root, { provider: "pollinations", model: "openai" }, false, port, lan);
+  const handle = startWebServer(root, { provider: "kilo", model: "kilo-auto/free" }, false, port, lan);
   // startWebServer's httpServer.listen() is asynchronous — wait for the real "listening" event (or the
   // already-listening case, if this ever races the other way) before handing the server to the test.
   await new Promise<void>((resolve) => {

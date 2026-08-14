@@ -4,7 +4,7 @@
  * See LICENSE for details.
  */
 import type { ChatMessage, ToolDefinition, ChatCompletionResult, LlmConfig, LlmProvider } from "./types";
-import * as pollinations from "./providers/pollinations";
+import * as kilo from "./providers/kilo";
 import * as groq from "./providers/groq";
 import * as openrouter from "./providers/openrouter";
 import * as gemini from "./providers/gemini";
@@ -62,7 +62,7 @@ function sanitizeMessagesForProvider(messages: ChatMessage[], provider: LlmProvi
  *  growing if-chain. "custom" is handled separately below: its baseUrl is only known at runtime, and its key is
  *  optional (many local model servers need none), so it doesn't fit this table's contract. */
 const KEYED_PROVIDERS: Record<
-  Exclude<LlmProvider, "pollinations" | "custom">,
+  Exclude<LlmProvider, "kilo" | "custom">,
   { chatCompletion: typeof groq.chatCompletion; envHint: string }
 > = {
   groq: { chatCompletion: groq.chatCompletion, envHint: "GROQ_API_KEY" },
@@ -80,8 +80,8 @@ export async function chatCompletion(
 ): Promise<ChatCompletionResult> {
   const safeMessages = sanitizeMessagesForProvider(messages, config.provider);
 
-  if (config.provider === "pollinations") {
-    return pollinations.chatCompletion(safeMessages, tools, config.model, undefined, onDelta, config.temperature);
+  if (config.provider === "kilo") {
+    return kilo.chatCompletion(safeMessages, tools, config.model, undefined, onDelta, config.temperature);
   }
 
   if (config.provider === "custom") {

@@ -50,7 +50,7 @@ if [ -n "${APIKEY:-}" ] && [ -n "${PROVIDER:-}" ]; then
   echo "Model: $PROVIDER (upgraded)"
   ARGS=(--web --cwd "$FOLDER" --port "$PORT" --provider "$PROVIDER" --api-key "$APIKEY")
 else
-  echo "Model: Pollinations / openai (default free model - tool-calling may not work, see README)"
+  echo "Model: Kilo / kilo-auto/free (default free model, no key needed - capped at 200 req/hour)"
   ARGS=(--web --cwd "$FOLDER" --port "$PORT")
 fi
 

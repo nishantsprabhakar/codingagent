@@ -4,7 +4,7 @@
  * See LICENSE for details.
  *
  * Machine-wide API key storage for providers that need one (Groq,
- * OpenRouter, etc. — Pollinations needs none). Lets the web UI's Settings
+ * OpenRouter, etc. — Kilo needs none). Lets the web UI's Settings
  * modal set a key once instead of requiring --api-key or an env var on
  * every launch.
  *

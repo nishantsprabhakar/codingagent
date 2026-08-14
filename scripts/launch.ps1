@@ -113,12 +113,12 @@ $config.folder = $folder
 if ($null -eq $config.apiKey) {
     Add-Type -AssemblyName Microsoft.VisualBasic
     $key = [Microsoft.VisualBasic.Interaction]::InputBox(
-        "Optional upgrade: the default free model (Pollinations) is small, and as of mid-2026 no longer supports " +
-        "the tool-calling this agent depends on for free. Paste a free API key below from either:`n`n" +
+        "Optional upgrade: the default free model (Kilo's auto-routed free tier) is capped at 200 requests/hour " +
+        "and can be slow under load. Paste a free API key below for a faster, higher-limit provider:`n`n" +
         "  - Groq: https://console.groq.com/keys`n" +
         "  - OpenRouter: https://openrouter.ai/keys`n`n" +
-        "Leave this blank and click OK to skip (the agent will still run, but won't be able to take real actions " +
-        "until you add a key here or via 'Change Model Key.bat').",
+        "Leave this blank and click OK to skip (the agent will still run on the free default, or add a key later " +
+        "via 'Change Model Key.bat').",
         "Wrexlyn - model key",
         ""
     )
@@ -138,7 +138,7 @@ if ($config.apiKey -and $config.provider) {
     $nodeArgs += @("--provider", $config.provider, "--api-key", $config.apiKey)
     Write-Host "Model: $($config.provider) (upgraded)" -ForegroundColor DarkGray
 } else {
-    Write-Host "Model: Pollinations / openai (default free model - tool-calling may not work, see README)" -ForegroundColor DarkGray
+    Write-Host "Model: Kilo / kilo-auto/free (default free model, no key needed - capped at 200 req/hour)" -ForegroundColor DarkGray
 }
 
 Write-Host "Starting server and opening your browser..." -ForegroundColor DarkGray

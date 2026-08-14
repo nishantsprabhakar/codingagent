@@ -5,9 +5,9 @@
 A minimal coding agent — it takes a
 natural-language prompt, decides which tools to call, and edits files or runs
 commands in a working directory with your permission. It uses a pluggable
-model backend: [Pollinations AI](https://pollinations.ai) is free and keyless
-but, as of 2026-07-30, no longer supports the tool-calling this agent depends
-on — so in practice you need a free key from [Groq](https://console.groq.com/keys)
+model backend: [Kilo](https://kilo.ai)'s anonymous gateway is free and keyless
+and works out of the box, capped at 200 requests/hour per IP. For higher
+limits or a stronger model, add a free key from [Groq](https://console.groq.com/keys)
 or [OpenRouter](https://openrouter.ai/keys) instead (both still $0 for typical
 use). Comes with both a terminal REPL and a web UI.
 
@@ -19,12 +19,12 @@ use). Comes with both a terminal REPL and a web UI.
    Agent.bat`** inside this folder).
 3. The first time, a folder picker will pop up — choose the project you want
    the agent to work on.
-4. Next, you'll be asked for a free API key from Groq or OpenRouter (paste
-   either — the launcher detects which one from its format). Get one in under
-   a minute: [console.groq.com/keys](https://console.groq.com/keys) or
-   [openrouter.ai/keys](https://openrouter.ai/keys), no credit card needed.
-   You can skip this, but the agent won't be able to take real actions until
-   you add one (see Known limitations below).
+4. Next, you'll be offered an optional free API key from Groq or OpenRouter
+   (paste either — the launcher detects which one from its format). Get one
+   in under a minute: [console.groq.com/keys](https://console.groq.com/keys)
+   or [openrouter.ai/keys](https://openrouter.ai/keys), no credit card
+   needed. You can skip this — the agent runs on the free, keyless Kilo
+   default either way, just capped at 200 requests/hour.
 5. A browser window opens automatically at `http://localhost:4390` with the
    chat UI.
 6. To close it later, just close the console window that opened alongside the
@@ -116,8 +116,8 @@ agent [options]
 
 Options:
   --cwd <path>      Working directory the agent may read/write (default: current directory)
-  --provider <name> "pollinations" (default, free, no key), "groq", or "openrouter" (both free tier, need a key)
-  --model <name>    Model to use (default: "openai" for pollinations, "llama-3.3-70b-versatile" for groq,
+  --provider <name> "kilo" (default, free, no key), "groq", or "openrouter" (both free tier, need a key)
+  --model <name>    Model to use (default: "kilo-auto/free" for kilo, "llama-3.3-70b-versatile" for groq,
                     "openai/gpt-oss-20b:free" for openrouter)
   --api-key <key>   API key for --provider groq/openrouter (or set GROQ_API_KEY / OPENROUTER_API_KEY)
   --yolo            Auto-approve all file writes / edits / shell commands (dangerous)
@@ -162,12 +162,13 @@ rather than re-resolving at connect time. The same check runs again on every
 redirect hop, so a redirect can't be used to reach something the original
 URL wouldn't have been allowed to.
 
-### Using Groq or OpenRouter instead of Pollinations
+### Using Groq or OpenRouter instead of Kilo
 
-**As of 2026-07-30, Pollinations requires a paid account for tool-calling
-requests** — which is everything this agent does (reading files, writing
-code, running commands). Anonymous Pollinations access is effectively
-unusable for this agent now; you need a key from one of these instead:
+The default provider, [Kilo](https://kilo.ai), works with no signup and no
+key, but its anonymous gateway is capped at 200 requests/hour per IP and can
+be slower under load (it auto-routes to whichever free upstream model is
+available). For higher limits or a faster model, use a key from one of these
+instead:
 
 - [Groq](https://console.groq.com/keys) — free tier, no credit card,
   `llama-3.3-70b-versatile` by default (or `openai/gpt-oss-120b` via `--model`).
@@ -224,9 +225,9 @@ REPL commands:
 
 ## How it works
 
-- **Model**: pluggable provider (`src/providers/`) — Pollinations (default,
-  keyless, but no longer usable for tool-calling — see Known limitations),
-  Groq, or OpenRouter, all OpenAI-compatible chat completions endpoints. Each
+- **Model**: pluggable provider (`src/providers/`) — Kilo (default, keyless,
+  rate-limited — see Known limitations), Groq, or OpenRouter, all
+  OpenAI-compatible chat completions endpoints. Each
   provider retries on 429/5xx and fails fast (no pointless retrying) on
   permanent errors like 401/402/404.
 - **Tools**: `read_file`, `write_file`, `edit_file`, `list_dir`, `glob_search`,
@@ -343,11 +344,10 @@ REPL commands:
 
 ## Known limitations
 
-- **Pollinations (the default, keyless provider) can no longer run this agent
-  at all**, as of 2026-07-30 — it now requires a paid account for tool-calling
-  requests specifically, which is everything this agent does. You need a
-  `--provider groq` or `--provider openrouter` key (see above); plain chat
-  without tools is the only thing that still works anonymously on Pollinations.
+- **Kilo (the default, keyless provider) caps anonymous access at 200
+  requests/hour per IP** and auto-routes to whichever free upstream model is
+  available, so response quality and speed vary run to run. For heavier use,
+  add a `--provider groq` or `--provider openrouter` key (see above).
 - Free-tier model lineups on Groq/OpenRouter shift over time — if a model
   stops working, check current model lists (linked above) and update
   `--model`.

@@ -82,8 +82,8 @@ async function main() {
   if (config.apiKey === undefined) {
     console.error("");
     console.error(
-      "Optional upgrade: the default free model (Pollinations) is small, and as of mid-2026 no longer " +
-        "supports the tool-calling this agent depends on for free. Paste a free API key below from either:"
+      "Optional upgrade: the default free model (Kilo's auto-routed free tier) is capped at 200 requests/hour " +
+        "and can be slow under load. Paste a free API key below for a faster, higher-limit provider:"
     );
     console.error("  Groq: https://console.groq.com/keys");
     console.error("  OpenRouter: https://openrouter.ai/keys");
