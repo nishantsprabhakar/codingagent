@@ -70,6 +70,7 @@ const MAX_SYMBOLS_PER_FILE = 300;
 const TOKEN_MIN_LEN = 2;
 const DEFAULT_SEARCH_LIMIT = 15;
 const DEFAULT_SYMBOL_LIMIT = 50;
+const DEFAULT_SYMBOL_MAP_FILE_LIMIT = 150;
 
 const states = new Map<string, IndexState>();
 
@@ -508,6 +509,40 @@ export function findSymbol(root: string, name: string, opts?: { exact?: boolean;
     matches: [...exact, ...substring].slice(0, limit),
     capped: state.filesCapped || state.tokenCapped || undefined,
   };
+}
+
+export interface SymbolMapFile {
+  file: string;
+  symbols: SymbolEntry[];
+}
+
+export interface SymbolMapResult {
+  files: SymbolMapFile[];
+  capped?: boolean;
+}
+
+/**
+ * A whole-project map of the symbols extractSymbols already found — grouped by file rather than
+ * find_symbol's flat match list, since the point here is letting the model see repo structure at a
+ * glance (get_symbol_map) instead of looking up one name. Reuses the exact same per-file symbol
+ * data findSymbol/searchCode already read; no new extraction, no new dependency. `capped` covers
+ * both the underlying index's own caps (filesCapped/tokenCapped) AND this call truncating the file
+ * list to `limit` — either way, a whole monorepo shouldn't blow the model's context on one call, so
+ * the caller is told when it's seeing a partial view rather than assuming completeness.
+ */
+export function getSymbolMap(root: string, opts?: { path?: string; limit?: number }): SymbolMapResult {
+  const state = getOrLoadState(root);
+  const pathFilter = opts?.path ? normalizePrefix(opts.path) : null;
+  const limit = opts?.limit && opts.limit > 0 ? opts.limit : DEFAULT_SYMBOL_MAP_FILE_LIMIT;
+
+  const withSymbols = Object.entries(state.data.perFile)
+    .filter(([file, entry]) => entry.symbols.length > 0 && (!pathFilter || file === pathFilter || file.startsWith(pathFilter + "/")))
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  const files = withSymbols.slice(0, limit).map(([file, entry]) => ({ file, symbols: entry.symbols }));
+  const capped = state.filesCapped || state.tokenCapped || withSymbols.length > limit || undefined;
+
+  return { files, capped };
 }
 
 /** Test-only seam — clears all in-memory index state so a test can force a cold reload from disk. */

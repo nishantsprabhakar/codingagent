@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { ensureIndex, searchCode, findSymbol, _resetCodeIndexCacheForTesting } from "../codeIndex";
+import { ensureIndex, searchCode, findSymbol, getSymbolMap, _resetCodeIndexCacheForTesting } from "../codeIndex";
 
 function mkRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "wrexlyn-codeidx-test-"));
@@ -152,6 +152,58 @@ test("ensureIndex: concurrent calls for the same root share one in-flight walk",
   assert.strictEqual(p1, p2, "a second call before the first resolves must reuse the same in-flight promise");
   await Promise.all([p1, p2]);
   assert.equal(findSymbol(root, "concurrentFn", { exact: true }).matches.length, 1);
+});
+
+test("getSymbolMap: groups symbols by file, sorted, excluding files with no symbols", async () => {
+  _resetCodeIndexCacheForTesting();
+  const root = mkRoot();
+  write(root, "z.ts", "export function zFn() {}\n");
+  write(root, "a.ts", "export class AThing {}\nexport function aFn() {}\n");
+  write(root, "no-symbols.txt", "just plain text, nothing to extract\n");
+  await ensureIndex(root);
+
+  const map = getSymbolMap(root);
+  assert.deepEqual(map.files.map((f) => f.file), ["a.ts", "z.ts"], "sorted by file path, not walk order");
+  assert.ok(!map.files.some((f) => f.file === "no-symbols.txt"), "a file with zero extracted symbols must be excluded");
+
+  const aEntry = map.files.find((f) => f.file === "a.ts")!;
+  assert.deepEqual(
+    aEntry.symbols.map((s) => s.name),
+    ["AThing", "aFn"]
+  );
+});
+
+test("getSymbolMap: path filter restricts to a subtree, same convention as searchCode", async () => {
+  _resetCodeIndexCacheForTesting();
+  const root = mkRoot();
+  write(root, "src/inside.ts", "export function insideFn() {}\n");
+  write(root, "other/outside.ts", "export function outsideFn() {}\n");
+  await ensureIndex(root);
+
+  const map = getSymbolMap(root, { path: "src" });
+  assert.deepEqual(map.files.map((f) => f.file), ["src/inside.ts"]);
+});
+
+test("getSymbolMap: a small limit truncates the file list and reports capped, not silently", async () => {
+  _resetCodeIndexCacheForTesting();
+  const root = mkRoot();
+  write(root, "a.ts", "export function aFn() {}\n");
+  write(root, "b.ts", "export function bFn() {}\n");
+  write(root, "c.ts", "export function cFn() {}\n");
+  await ensureIndex(root);
+
+  const map = getSymbolMap(root, { limit: 2 });
+  assert.equal(map.files.length, 2);
+  assert.equal(map.capped, true, "truncating the file list must be surfaced as capped, same as the underlying index's own caps");
+});
+
+test("getSymbolMap: an empty project returns no files, not capped, without throwing", async () => {
+  _resetCodeIndexCacheForTesting();
+  const root = mkRoot();
+  await ensureIndex(root);
+  const map = getSymbolMap(root);
+  assert.deepEqual(map.files, []);
+  assert.equal(map.capped, undefined);
 });
 
 test("ensureIndex: an empty project returns empty results without throwing", async () => {
