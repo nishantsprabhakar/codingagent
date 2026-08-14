@@ -149,6 +149,26 @@ test("restoreTree: executable bit round-trips via tree restore", { skip: process
   assert.equal(fs.statSync(path.join(root, "script.sh")).mode & 0o777, 0o644);
 });
 
+// Regression test for a real bug: checkoutPaths used to build one shell-quoted string of all
+// restore paths and hand it to execSync, which invokes a real shell (cmd.exe on Windows). cmd.exe
+// expands %VAR% sequences even inside double-quoted arguments, so a path legitimately containing a
+// literal "%...%" (valid on NTFS) would be silently rewritten before git ever saw it, failing that
+// file's restore and aborting the whole rollback. Fixed by passing paths as real argv entries
+// (execFileSync, no shell involved) instead of a shell-parsed string.
+test("restoreTree: a filename containing a literal %VAR%-style token restores correctly (regression)", () => {
+  const root = initRepo();
+  const trickyName = "file-%NOT_A_REAL_VAR%-name.txt";
+  write(root, trickyName, "original content");
+  const beforeTree = captureTree(root)!;
+
+  fs.writeFileSync(path.join(root, trickyName), "modified content");
+  const afterTree = captureTree(root)!;
+
+  const result = restoreTree(root, beforeTree, afterTree);
+  assert.equal(result.ok, true);
+  assert.equal(fs.readFileSync(path.join(root, trickyName), "utf-8"), "original content");
+});
+
 test("non-git fallback: captureTree/isGitRepo never throw on a plain directory", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wrexlyn-nogit2-test-"));
   assert.equal(isGitRepo(dir), false);

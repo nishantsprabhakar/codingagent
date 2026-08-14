@@ -12,7 +12,7 @@
  * or writes the object database and a throwaway scratch index — the user's real staging area
  * (`.git/index`) is never touched.
  */
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
@@ -33,6 +33,24 @@ function runGit(root: string, args: string[], env: NodeJS.ProcessEnv): string | 
       .trim();
   } catch {
     return null;
+  }
+}
+
+/**
+ * Like runGit, but for calls that pass file paths as real argv entries instead of one shell-parsed
+ * string — required for checkoutPaths below, since routing paths through execSync's `cmd.exe`/`sh`
+ * shell means the shell itself gets a chance to interpret them first. On Windows specifically,
+ * cmd.exe expands `%VAR%` sequences even *inside* double-quoted arguments, so a path legitimately
+ * containing a literal `%...%` (valid on NTFS) would silently be rewritten before git ever saw it,
+ * failing that file's restore. execFileSync bypasses the shell entirely — argv is passed straight
+ * through to process creation, so no quoting or escaping is needed (or possible to get wrong).
+ */
+function runGitArgv(root: string, args: string[], env: NodeJS.ProcessEnv): boolean {
+  try {
+    execFileSync("git", args, { cwd: root, timeout: GIT_TIMEOUT_MS, stdio: ["ignore", "pipe", "ignore"], env });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -113,8 +131,9 @@ function diffTrees(root: string, beforeTree: string, afterTree: string): TreeDif
  * Checks out only `relPaths` from `treeSha` — never the whole-tree `checkout-index -a`, which would
  * rewrite every tracked file in the repository (touching its mtime, even when content is unchanged)
  * on every single rollback, no matter how small the original action was. `relPaths` always come from
- * `git diff --name-status` output, never external/attacker-controlled input, but are still quoted
- * defensively since a path could contain a space.
+ * `git diff --name-status` output, never external/attacker-controlled input, but are passed as real
+ * argv entries via runGitArgv (not shell-quoted and joined into one string) so a path is carried
+ * through exactly as-is regardless of spaces or characters a shell would otherwise interpret.
  */
 function checkoutPaths(root: string, treeSha: string, relPaths: string[]): boolean {
   if (relPaths.length === 0) return true;
@@ -122,9 +141,7 @@ function checkoutPaths(root: string, treeSha: string, relPaths: string[]): boole
   const env = { ...process.env, GIT_INDEX_FILE: scratchIndex };
   try {
     if (runGit(root, ["read-tree", treeSha], env) === null) return false;
-    const pathArgs = relPaths.map((p) => `"${p.replace(/"/g, '\\"')}"`).join(" ");
-    if (runGit(root, ["checkout-index", "-f", "--", pathArgs], env) === null) return false;
-    return true;
+    return runGitArgv(root, ["checkout-index", "-f", "--", ...relPaths], env);
   } finally {
     fs.rmSync(scratchIndex, { force: true });
   }

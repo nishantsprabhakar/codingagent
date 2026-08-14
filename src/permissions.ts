@@ -17,7 +17,12 @@ export type ConfirmFn = (toolName: string, label: string, risk: RiskLevel, previ
  *
  * High-risk actions (rm -rf, force push, DROP TABLE, ...) can never become
  * an "always" — every single one is confirmed individually, no matter what
- * the client sends, so a risky action can never silently auto-approve.
+ * the client sends, so a risky action can never silently auto-approve. This
+ * holds even for a tool that already has a live "always" on file from an
+ * earlier, lower-risk call: `alwaysAllowed` is keyed by tool name, but
+ * run_shell_command's risk is recomputed per call (classifyShellCommand), so
+ * confirm() re-checks the CURRENT call's risk on every invocation, not just
+ * whether this tool name was ever granted "always" before.
  *
  * The confirmFn is UI-agnostic: the CLI maps a y/a/n keystroke onto it, the
  * web UI maps a button click.
@@ -32,7 +37,13 @@ export class PermissionManager {
   constructor(private yolo: boolean, private confirmFn: ConfirmFn) {}
 
   async confirm(toolName: string, label: string, risk: RiskLevel, preview?: string): Promise<boolean> {
-    if (this.yolo || this.alwaysAllowed.has(toolName)) return true;
+    if (this.yolo) return true;
+    // `alwaysAllowed` is keyed by tool name only, but a tool like run_shell_command has its risk
+    // recomputed per call (classifyShellCommand) -- without this risk check, a user clicking
+    // "Always allow" on one medium-risk command (e.g. "npm test") would silently auto-approve
+    // every later call to the same tool regardless of ITS risk, including a high-risk one (e.g.
+    // "rm -rf /"). High-risk must always re-confirm even after an earlier "always" for this tool.
+    if (risk !== "high" && this.alwaysAllowed.has(toolName)) return true;
 
     const decision = await this.confirmFn(toolName, label, risk, preview);
     if (decision === "always" && risk !== "high") {
