@@ -1784,6 +1784,14 @@ body::before {
   padding: 1px 5px;
   border-radius: 4px;
 }
+.settings-legal-footer {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+.settings-legal-footer a {
+  color: var(--accent, #6ea8fe);
+}
 
 .settings-textarea {
   width: 100%;

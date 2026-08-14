@@ -1,6 +1,8 @@
 # Wrexlyn
 
-&copy; 2026 Nishant Prabhakar. All rights reserved. See [LICENSE](LICENSE).
+&copy; 2026 Nishant Prabhakar. All rights reserved. See [LICENSE](LICENSE) and the
+[Terms of Service](TERMS_OF_SERVICE.md) — this agent edits files and runs shell commands at your
+direction; by using it you accept the risk that entails.
 
 A minimal coding agent — it takes a
 natural-language prompt, decides which tools to call, and edits files or runs

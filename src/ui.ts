@@ -36,6 +36,11 @@ export function printBanner(root: string, model: string): void {
   console.log(color.bold(color.cyan("\nWrexlyn")) + color.dim(" — free AI coding agent, created by Nishant Prabhakar"));
   console.log(color.dim(`root: ${root}`));
   console.log(color.dim(`model: ${model}`));
+  console.log(
+    color.dim(
+      "This agent edits files and runs shell commands at your direction and assumes the risk that entails is yours — see TERMS_OF_SERVICE.md."
+    )
+  );
   console.log(color.dim("commands: /new  /sessions  /switch <id>  /cwd <path>  /exit\n"));
 }
 

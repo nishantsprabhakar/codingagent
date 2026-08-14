@@ -37,6 +37,10 @@ import { listEvidenceWithConflicts } from "../tools/evidence";
 const VALID_PROVIDERS: LlmProvider[] = ["kilo", ...API_KEY_PROVIDERS];
 
 const PUBLIC_DIR = path.join(__dirname, "..", "..", "public");
+// Served read-only at fixed routes below (not the whole repo root) so the web UI's Settings modal
+// can link straight to the legal docs without needing a terminal.
+const LICENSE_PATH = path.join(__dirname, "..", "..", "LICENSE");
+const TERMS_PATH = path.join(__dirname, "..", "..", "TERMS_OF_SERVICE.md");
 const IGNORED_ENTRIES = new Set(["node_modules", ".git", "dist", "build"]);
 const MAX_TREE_ENTRIES = 500;
 const MAX_FILE_BYTES = 300_000;
@@ -425,7 +429,8 @@ export function startWebServer(
     }
     console.log(`root: ${currentRoot}`);
     console.log(`model: ${llmConfig.provider} · ${currentModel}${yolo ? "  (yolo mode: all actions auto-approved)" : ""}`);
-    console.log(`API key storage: ${await describeActiveBackend()}\n`);
+    console.log(`API key storage: ${await describeActiveBackend()}`);
+    console.log(`This agent edits files and runs shell commands at your direction — see TERMS_OF_SERVICE.md.\n`);
     if (llmConfig.provider === "custom" && !llmConfig.baseUrl) {
       console.log(`(custom provider selected but no base URL configured — add one from Settings > API Keys > Custom / Local Model)\n`);
     } else if (llmConfig.provider !== "custom" && API_KEY_PROVIDERS.includes(llmConfig.provider as ApiKeyProvider) && !llmConfig.apiKey) {
@@ -465,6 +470,8 @@ function handleHttp(
   if (url.pathname === "/api/starter-skills") return sendJson(res, 200, { skills: STARTER_SKILLS });
   if (url.pathname === "/api/transactions") return handleTransactions(url, res, root);
   if (url.pathname === "/api/evidence") return handleEvidence(url, res, root);
+  if (url.pathname === "/LICENSE") return serveLegalFile(LICENSE_PATH, res);
+  if (url.pathname === "/TERMS_OF_SERVICE.md") return serveLegalFile(TERMS_PATH, res);
 
   serveStatic(url.pathname, res, scriptNonce);
 }
@@ -834,6 +841,16 @@ function serveStatic(pathname: string, res: http.ServerResponse, scriptNonce: st
     return;
   }
 
+  fs.createReadStream(filePath).pipe(res);
+}
+
+/** Serves one of the two fixed legal-doc files (never user-supplied paths, so no traversal surface). */
+function serveLegalFile(filePath: string, res: http.ServerResponse): void {
+  if (!fs.existsSync(filePath)) {
+    res.writeHead(404, { "Content-Type": "text/plain" }).end("not found");
+    return;
+  }
+  res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
   fs.createReadStream(filePath).pipe(res);
 }
 
