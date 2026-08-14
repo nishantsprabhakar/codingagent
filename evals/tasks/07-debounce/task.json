@@ -1,0 +1,7 @@
+{
+  "id": "07-debounce",
+  "title": "Implement debounce(fn, wait)",
+  "prompt": "In debounce.js, implement the exported function debounce(fn, wait) that returns a debounced version of fn: calling the returned function repeatedly within `wait` milliseconds should only invoke fn once, after `wait` ms have passed since the LAST call, with the arguments of that last call. Do not change test.js.",
+  "difficulty": "medium",
+  "tags": ["async", "timers"]
+}

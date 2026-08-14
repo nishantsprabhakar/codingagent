@@ -1,0 +1,7 @@
+{
+  "id": "08-deep-equal",
+  "title": "Deep equality for plain objects and arrays",
+  "prompt": "In deepEqual.js, implement the exported function deepEqual(a, b) that returns true if a and b are deeply equal: primitives compared with ===, arrays compared element-by-element recursively (same length, same order), and plain objects compared by having the same set of keys with recursively equal values (key order does not matter). Do not change test.js.",
+  "difficulty": "medium",
+  "tags": ["objects", "recursion"]
+}

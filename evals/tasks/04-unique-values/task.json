@@ -1,0 +1,7 @@
+{
+  "id": "04-unique-values",
+  "title": "Remove duplicates preserving order",
+  "prompt": "In unique.js, implement the exported function unique(arr) that returns a new array containing only the first occurrence of each value in arr, preserving the original order. Works for numbers and strings. Do not change test.js.",
+  "difficulty": "easy",
+  "tags": ["arrays"]
+}

@@ -1,0 +1,1 @@
+{"name": "06-csv-parse", "private": true, "scripts": {"test": "node test.js"}}

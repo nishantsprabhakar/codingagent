@@ -1,0 +1,7 @@
+{
+  "id": "06-csv-parse",
+  "title": "Parse simple CSV text into objects",
+  "prompt": "In csv.js, implement the exported function parseCsv(text) that parses simple comma-separated text (no quoted fields, no embedded commas) into an array of plain objects, using the first line as the header row for field names. Lines are separated by \n. Trim whitespace from each field. Skip any trailing blank lines. Do not change test.js.",
+  "difficulty": "medium",
+  "tags": ["parsing"]
+}

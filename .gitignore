@@ -7,3 +7,4 @@ mcp.json
 .coding-agent/
 installer/windows/output/
 version.json
+evals/results/

@@ -1,0 +1,1 @@
+{"name": "09-lru-cache", "private": true, "scripts": {"test": "node test.js"}}

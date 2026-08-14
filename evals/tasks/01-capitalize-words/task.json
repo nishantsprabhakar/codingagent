@@ -1,0 +1,7 @@
+{
+  "id": "01-capitalize-words",
+  "title": "Capitalize each word",
+  "prompt": "In strings.js, implement the exported function capitalizeWords(str) so it returns the string with the first letter of every word capitalized and the rest of each word unchanged (e.g. \"hello world\" -> \"Hello World\"). Do not change test.js.",
+  "difficulty": "easy",
+  "tags": ["strings"]
+}

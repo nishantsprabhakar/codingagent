@@ -1,0 +1,1 @@
+{"name": "03-validate-email", "private": true, "scripts": {"test": "node test.js"}}

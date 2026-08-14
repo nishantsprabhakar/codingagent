@@ -14,6 +14,7 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "web": "tsx src/index.ts --web",
+    "eval": "tsx src/eval/cli.ts",
     "typecheck": "tsc -p . --noEmit",
     "test": "npm run build && node scripts/run-tests.js",
     "test:unit": "npm run test",

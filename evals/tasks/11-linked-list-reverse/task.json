@@ -1,0 +1,7 @@
+{
+  "id": "11-linked-list-reverse",
+  "title": "Reverse a singly linked list",
+  "prompt": "In list.js, implement the exported function reverse(head) that reverses a singly linked list and returns the new head. Each node is a plain object shaped { value, next }, where next is null for the last node. Do not mutate node identities in a way that loses values -- reuse the existing nodes, just relink them. The helper functions fromArray/toArray in list.js already work and are used by test.js -- do not change them or test.js.",
+  "difficulty": "hard",
+  "tags": ["data-structures", "linked-list"]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "03-validate-email",
+  "title": "Basic email validation",
+  "prompt": "In validate.js, implement the exported function isValidEmail(str) that returns true for a plausible email address (has exactly one @ with at least one character before it, and the part after @ has at least one '.' with at least one character before and after that final dot, and no whitespace anywhere) and false otherwise. Do not change test.js.",
+  "difficulty": "easy",
+  "tags": ["strings", "validation"]
+}

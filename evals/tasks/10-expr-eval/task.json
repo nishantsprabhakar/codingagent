@@ -1,0 +1,7 @@
+{
+  "id": "10-expr-eval",
+  "title": "Evaluate a numeric expression string",
+  "prompt": "In evaluate.js, implement the exported function evaluate(expr) that evaluates a string arithmetic expression containing non-negative integers, +, -, *, /, parentheses, and spaces, respecting standard operator precedence (* and / bind tighter than + and -) and parentheses for grouping. Division should be regular (floating point) division. Examples: evaluate(\"2 + 3 * 4\") === 14, evaluate(\"(2 + 3) * 4\") === 20. Do not change test.js.",
+  "difficulty": "hard",
+  "tags": ["parsing", "recursion"]
+}

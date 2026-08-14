@@ -1,0 +1,7 @@
+{
+  "id": "02-sum-range-inclusive",
+  "title": "Fix off-by-one bug in sumRange",
+  "prompt": "In range.js, sumRange(arr, start, end) should sum the elements of arr from index start to index end INCLUSIVE of both ends. It currently has an off-by-one bug that excludes the element at index end. Fix it so the tests in test.js pass, without changing test.js.",
+  "difficulty": "easy",
+  "tags": ["bugfix", "arrays"]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "12-sequential-map",
+  "title": "Run async tasks strictly one at a time, in order",
+  "prompt": "In sequentialMap.js, implement the exported async function sequentialMap(items, asyncFn) that calls asyncFn on each item of items ONE AT A TIME, only starting the next call after the previous one's promise has resolved (never running two calls concurrently), and returns a promise resolving to an array of the results in the same order as items. A naive implementation using items.map(asyncFn) plus Promise.all runs all calls concurrently and will fail the concurrency check in test.js. Do not change test.js.",
+  "difficulty": "hard",
+  "tags": ["async", "concurrency"]
+}

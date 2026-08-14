@@ -301,7 +301,7 @@ built this round; this update records the resolved direction and rewords the pha
 implementation pass (policy/config distribution, audit-log rollup, license/seat management, all
 per-install rather than centralized) starts from an agreed scope instead of the original framing.
 
-## Phase 13 — Product evaluation
+## ~~Phase 13 — Product evaluation~~ — pilot harness DONE, see `2026-08-phase13-eval-harness.md`
 
 A 200-task reproducible benchmark. Cheapest to build *after* Phase 3
 (verification contracts) exist, since "required-check pass rate" and
@@ -309,6 +309,18 @@ A 200-task reproducible benchmark. Cheapest to build *after* Phase 3
 measure against — building the benchmark first against the current ad-hoc
 confidence score would mean rebuilding the benchmark's grading logic once
 Phase 3 lands anyway.
+
+**Update (2026-08-14):** DONE for a 12-task pilot corpus (not the full 200 — see the linked
+doc for why, and for how to grow it later without harness changes). The harness
+(`src/eval/`) reuses Phase 3's verification-outcome model directly, as designed, and paid
+for itself immediately: its first live run found a real bug (the critic rendering its
+verdict before deterministic verification ever ran, capping 11/12 genuinely-passing tasks
+below "verified" — see `2026-08-critic-verification-ordering-fix.md`), which was fixed and
+then re-measured with the same harness, closing the loop from discovery to fix to proof.
+The pilot run also surfaced that Pollinations (the provider assumed available when this
+phase was scoped) had dropped anonymous tool-calling entirely, which led to replacing it
+with Kilo as the default keyless provider (`2026-08-kilo-provider-swap.md`) before the
+benchmark could even run.
 
 ## Note on sequencing
 

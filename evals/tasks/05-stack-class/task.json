@@ -1,0 +1,7 @@
+{
+  "id": "05-stack-class",
+  "title": "Implement a Stack class",
+  "prompt": "In stack.js, implement the exported Stack class with methods push(value), pop() (removes and returns the top value, or undefined if empty), peek() (returns the top value without removing it, or undefined if empty), isEmpty() (returns boolean), and size() (returns the current count). Do not change test.js.",
+  "difficulty": "medium",
+  "tags": ["data-structures"]
+}
