@@ -281,15 +281,25 @@ seeded transaction/evidence data. The VS Code extension itself remains open for 
 main open design fork (embed the existing web UI in a webview vs. drive the WS protocol with native
 VS Code UI) was never resolved.
 
-## Phase 12 — Enterprise readiness
+## ~~Phase 12 — Enterprise readiness~~ — DONE (product direction resolved), see below
 
-Org workspaces, RBAC, SSO/SCIM, SOC 2 readiness. This is the largest
-positioning question in the whole roadmap — Wrexlyn is currently explicitly
-local-first/single-user by design (see the product positioning statement).
-Recommend treating this as a genuinely separate product-decision
-conversation with the user before any implementation, not a phase to
-execute autonomously — it may imply a hosted/multi-tenant component that
-changes the trust model this milestone's Phase 1 work was built around.
+~~Org workspaces, RBAC, SSO/SCIM, SOC 2 readiness.~~ Reworded per the resolved direction below:
+**local-first enterprise readiness** — making many individual, single-user local installs manageable
+at organizational scale (centralized config/policy distribution, aggregated audit-log rollup,
+license/seat management) without ever centralizing user data or introducing multi-tenancy. This was
+the largest positioning question in the whole roadmap — Wrexlyn is explicitly local-first/single-user
+by design — and per the backlog's own original framing, needed a product-decision conversation before
+any implementation, not autonomous execution.
+
+**Update (2026-08-14):** RESOLVED. The user was asked and explicitly chose to keep the local-first
+model intact — no hosted/multi-tenant component, no server-side user data, no change to the trust
+model Phase 1's hardening was built around. "Enterprise readiness" is redefined above accordingly,
+replacing the original SaaS-flavored "Org workspaces/RBAC/SSO/SCIM/SOC 2" framing, which was never the
+intended direction. Also confirmed: this isn't driven by a specific prospective customer or deal right
+now — it's general roadmap planning, so no urgent implementation is scoped or scheduled. Nothing was
+built this round; this update records the resolved direction and rewords the phase so a future
+implementation pass (policy/config distribution, audit-log rollup, license/seat management, all
+per-install rather than centralized) starts from an agreed scope instead of the original framing.
 
 ## Phase 13 — Product evaluation
 
@@ -303,8 +313,10 @@ Phase 3 lands anyway.
 ## Note on sequencing
 
 Phases 3 → 4 → 5/6 → 7/8/9 → 10 → 11 → 13 is the dependency-respecting order
-above; Phase 12 is flagged as a product decision rather than slotted into
-the sequence. Phase 1's remaining items (SSRF fetch, secret storage, MCP env
+above; Phase 12's product-decision gate is now closed (resolved local-first,
+not hosted/multi-tenant — see its own section above), but it still has no
+concrete engineering task list, so it remains unscheduled rather than
+slotted into the numbered sequence. Phase 1's remaining items (SSRF fetch, secret storage, MCP env
 scrubbing, command-service separation) and Phase 2's CI/logging/scanning
 items should land before Phase 3 starts, per the original instructions'
 own gate ("do not begin later phases until security remediation, test
