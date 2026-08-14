@@ -67,6 +67,15 @@ caught 5 real bugs and 4 real gaps before any code shipped — including one tha
 auth-completion step throw immediately and one that made an early design assumption structurally
 impossible given the SDK's actual contract. Done on explicit user request.
 
+**Update (2026-08-14, later):** Phase 10 (below) is now DONE — see
+`2026-08-phase10-parallel-agents.md` for "Best-of-N": the same task run N ways in parallel in real
+isolated git worktrees, with the user picking one result to merge back into the real project as a
+normal, reversible transaction. An adversarial review caught two severe issues before any code was
+written (a merge-back call whose arguments were backwards and could never have succeeded, and fresh
+worktrees having no installed dependencies), and a further real bug — a missing `.gitignore` that
+would have made the feature's own clean-tree precondition reject nearly every freshly-opened project
+— was found and fixed during live verification itself. Done on explicit user request.
+
 ## Immediately next (before any Phase 3+ feature work) — ALL DONE
 
 1. ~~**SSRF-hardened outbound web fetch**~~ — DONE. See
@@ -223,10 +232,25 @@ server and real `Agent`/`PermissionManager` objects) versus the one gap left unv
 real OAuth-gated MCP server was available in this environment to test the full authorization flow
 against).
 
-## Phase 10 — Parallel isolated agents
+## ~~Phase 10 — Parallel isolated agents~~ — DONE, see `2026-08-phase10-parallel-agents.md`
 
 Depends on Phase 4's Git-worktree-based checkpoints existing first (isolated
 coding agents need the same isolation mechanism).
+
+**Update (2026-08-14):** DONE, as "Best-of-N": the same task run N ways in parallel, each in a real,
+isolated `git worktree`, with the user picking one result to merge back. The stated Phase 4 dependency
+was factually wrong — Phase 4 deliberately avoided worktrees, so this phase built real worktree
+isolation from scratch, not reused. An adversarial review (which reproduced the design against a real
+repo, not just read it) caught two severe issues before any code was written: the originally-planned
+merge-back call had its arguments backwards and could never have actually merged anything, and fresh
+worktrees have no installed dependencies, which would have made automatic verification spuriously fail
+for every attempt. Both fixed before implementation. A further real bug was found and fixed during live
+verification itself: `.coding-agent/memory.json` had no `.gitignore` covering it, so simply opening a
+freshly-committed project would make Best-of-N's own clean-tree precondition reject it. See
+`2026-08-phase10-parallel-agents.md` for the full design, the fixes, and an honest account of what was
+verified live (real worktree creation/teardown, live per-attempt streaming, merge, and cleanup) versus
+the one gap (a free-tier model making no actual file edits during the live run, closed instead by
+direct byte-for-byte verification of the merge logic against a real repo).
 
 ## Phase 11 — Product UX / VS Code extension
 

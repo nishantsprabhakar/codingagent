@@ -265,6 +265,55 @@ async function runRepl(options: CliOptions): Promise<void> {
         promptLoop();
         return;
       }
+      if (line.startsWith("/parallel")) {
+        const rest = line.slice("/parallel".length).trim();
+        const match = rest.match(/^(\d+)\s+([\s\S]+)$/);
+        if (!match) {
+          console.log("(usage: /parallel <n> <task text> — n must be 2-4)\n");
+          promptLoop();
+          return;
+        }
+        const n = Math.max(2, Math.min(4, parseInt(match[1], 10)));
+        const task = match[2];
+        console.log(`(starting ${n} isolated attempts — each auto-approves its own actions in its own worktree)\n`);
+        try {
+          await agent.startParallelRun(task, n, (attemptIndex, event) => {
+            if (event.type === "tool_call") {
+              console.log(color.dim(`  [attempt ${attemptIndex + 1}] ${event.label || event.name}`));
+            } else if (event.type === "transaction_summary") {
+              console.log(color.dim(`  [attempt ${attemptIndex + 1}] outcome: ${event.outcome} (confidence ${event.confidence})`));
+            }
+          });
+          const status = agent.getParallelRunStatus();
+          if (!status || !status.attempts.length) {
+            console.log("(no attempts to show)\n");
+          } else {
+            console.log("\nResults:");
+            for (const a of status.attempts) {
+              const detail =
+                a.status === "done"
+                  ? `outcome: ${a.outcome}, confidence: ${a.confidence}, ${a.changedFileCount ?? 0} file(s) changed`
+                  : a.status === "error"
+                    ? `error: ${a.errorMessage}`
+                    : "still running";
+              console.log(`  ${a.index + 1}. ${a.steeringNote} — ${detail}`);
+            }
+            const pick = (await ask("\nType 1-N to merge that attempt, or 'skip' to discard all: ")).trim();
+            const idx = parseInt(pick, 10) - 1;
+            if (!isNaN(idx) && status.attempts.some((a) => a.index === idx)) {
+              const result = await agent.pickParallelRunAttempt(idx);
+              console.log(`(${result.ok ? "" : "failed: "}${result.message})\n`);
+            } else {
+              await agent.cancelParallelRun();
+              console.log("(discarded all attempts)\n");
+            }
+          }
+        } catch (err: any) {
+          console.log(`(${err.message ?? err})\n`);
+        }
+        promptLoop();
+        return;
+      }
       if (!line) {
         promptLoop();
         return;

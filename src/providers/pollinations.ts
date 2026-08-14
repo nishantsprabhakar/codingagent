@@ -21,7 +21,8 @@ export async function chatCompletion(
   tools: ToolDefinition[],
   model: string,
   maxRetries = 5,
-  onDelta?: (chunk: string) => void
+  onDelta?: (chunk: string) => void,
+  temperature?: number
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
@@ -35,7 +36,7 @@ export async function chatCompletion(
           messages,
           tools: tools.length ? tools : undefined,
           tool_choice: tools.length ? "auto" : undefined,
-          temperature: 0.15,
+          temperature: temperature ?? 0.15,
           max_tokens: 8000,
           stream: true,
           stream_options: { include_usage: true },

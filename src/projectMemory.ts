@@ -44,6 +44,12 @@ export function saveProjectMemory(root: string, memory: ProjectMemory): void {
   try {
     const filePath = memoryPath(root);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    // Whatever project this is, our own memory file shouldn't end up in its git history (and,
+    // since Phase 10, shouldn't make a perfectly clean project look "dirty" to Best-of-N's
+    // clean-working-tree precondition) -- a nested .gitignore covers that regardless of the target
+    // project's own .gitignore contents. Same pattern already used by session.ts/codeIndex.ts/evidence.ts.
+    const gitignorePath = path.join(root, ".coding-agent", ".gitignore");
+    if (!fs.existsSync(gitignorePath)) fs.writeFileSync(gitignorePath, "*\n", "utf-8");
     fs.writeFileSync(filePath, JSON.stringify(memory, null, 2), "utf-8");
   } catch (err: any) {
     console.error("[coding-agent] warning: failed to save project memory:", err.message ?? err);

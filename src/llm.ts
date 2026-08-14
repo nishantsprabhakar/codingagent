@@ -81,19 +81,19 @@ export async function chatCompletion(
   const safeMessages = sanitizeMessagesForProvider(messages, config.provider);
 
   if (config.provider === "pollinations") {
-    return pollinations.chatCompletion(safeMessages, tools, config.model, undefined, onDelta);
+    return pollinations.chatCompletion(safeMessages, tools, config.model, undefined, onDelta, config.temperature);
   }
 
   if (config.provider === "custom") {
     if (!config.baseUrl) {
       throw new Error(`custom provider selected but no base URL was configured (--base-url, or Settings > API Keys > Custom / Local Model).`);
     }
-    return custom.chatCompletion(safeMessages, tools, config.model, config.apiKey ?? "", config.baseUrl, undefined, onDelta);
+    return custom.chatCompletion(safeMessages, tools, config.model, config.apiKey ?? "", config.baseUrl, undefined, onDelta, config.temperature);
   }
 
   const entry = KEYED_PROVIDERS[config.provider];
   if (!config.apiKey) {
     throw new Error(`${config.provider} provider selected but no API key was supplied (--api-key or ${entry.envHint}).`);
   }
-  return entry.chatCompletion(safeMessages, tools, config.model, config.apiKey, undefined, onDelta);
+  return entry.chatCompletion(safeMessages, tools, config.model, config.apiKey, undefined, onDelta, config.temperature);
 }

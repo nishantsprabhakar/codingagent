@@ -32,7 +32,7 @@
   rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
 />
-<link rel="stylesheet" href="style.css?v=14" />
+<link rel="stylesheet" href="style.css?v=15" />
 </head>
 <body>
 <canvas id="bg-canvas" aria-hidden="true"></canvas>
@@ -109,6 +109,7 @@
         placeholder="Ask the agent to build, fix, or explain something…"
         rows="1"
       ></textarea>
+      <button id="parallel-btn" class="icon-btn" title="Run N ways in parallel (Best-of-N)">&#128257;</button>
       <button id="send-btn" class="send-btn" title="Send">&#x2191;</button>
     </div>
   </main>
@@ -367,7 +368,38 @@
   </div>
 </div>
 
+<div id="parallel-overlay" class="overlay" hidden>
+  <div class="permission-modal permission-modal-wide">
+    <div class="permission-header">
+      <span class="permission-icon">&#128257;</span>
+      <div>
+        <div class="permission-title">Best-of-N</div>
+        <div class="permission-tool">Run the same task N ways in parallel, each in its own isolated git worktree, then pick the best result.</div>
+      </div>
+    </div>
+
+    <div id="parallel-setup" class="parallel-setup">
+      <p class="settings-hint">
+        Requires a clean git repository — commit or stash your changes first. Each attempt auto-approves its own
+        actions inside its isolated worktree; nothing touches your real project until you pick a winner below.
+      </p>
+      <label for="parallel-n-input" class="parallel-n-label">Number of attempts</label>
+      <input id="parallel-n-input" type="number" min="2" max="4" value="3" class="folder-input parallel-n-input" />
+      <div class="permission-actions">
+        <button id="parallel-cancel-setup" class="btn btn-secondary">Cancel</button>
+        <button id="parallel-start-btn" class="btn btn-primary">Start</button>
+      </div>
+    </div>
+
+    <div id="parallel-results" class="parallel-results" hidden></div>
+
+    <div id="parallel-results-actions" class="permission-actions" hidden>
+      <button id="parallel-discard-btn" class="btn btn-secondary">Discard all</button>
+    </div>
+  </div>
+</div>
+
 <script src="background.js?v=10"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

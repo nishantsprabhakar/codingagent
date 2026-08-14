@@ -43,6 +43,9 @@ export interface LlmConfig {
   /** Full chat-completions endpoint URL — "custom" only. Lets any OpenAI-compatible API (a provider not built in, or a
    *  locally-running model server like Ollama/LM Studio/llama.cpp) be used without a code change. */
   baseUrl?: string;
+  /** Overrides each provider's hardcoded default (0.15) — used by Best-of-N to spread attempts across
+   *  different sampling temperatures for genuine solution diversity. Unset for ordinary single-turn chat. */
+  temperature?: number;
 }
 
 /** Fallback model when switching to a provider with no explicit model chosen yet. Shared by the CLI and the web server's live provider switch. */

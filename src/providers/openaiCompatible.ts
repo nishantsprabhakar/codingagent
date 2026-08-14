@@ -39,8 +39,10 @@ export function createOpenAiCompatibleProvider(config: OpenAiCompatibleConfig) {
     model: string,
     apiKey: string,
     maxRetries = 5,
-    onDelta?: (chunk: string) => void
-  ): Promise<ChatCompletionResult> => runOpenAiCompatibleChatCompletion(config, messages, tools, model, apiKey, maxRetries, onDelta);
+    onDelta?: (chunk: string) => void,
+    temperature?: number
+  ): Promise<ChatCompletionResult> =>
+    runOpenAiCompatibleChatCompletion(config, messages, tools, model, apiKey, maxRetries, onDelta, temperature);
 }
 
 /**
@@ -55,7 +57,8 @@ export async function runOpenAiCompatibleChatCompletion(
   model: string,
   apiKey: string,
   maxRetries = 5,
-  onDelta?: (chunk: string) => void
+  onDelta?: (chunk: string) => void,
+  temperature?: number
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
@@ -72,7 +75,7 @@ export async function runOpenAiCompatibleChatCompletion(
           messages,
           tools: tools.length ? tools : undefined,
           tool_choice: tools.length ? "auto" : undefined,
-          temperature: 0.15,
+          temperature: temperature ?? 0.15,
           max_tokens: 8000,
           stream: true,
           // Opt-in flag for the OpenAI-compatible streaming shape: without it, most providers never send

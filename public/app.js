@@ -90,6 +90,15 @@
     starterSkillsList: document.getElementById("starter-skills-list"),
     skillLibrarySection: document.getElementById("skill-library-section"),
     skillLibraryList: document.getElementById("skill-library-list"),
+    parallelBtn: document.getElementById("parallel-btn"),
+    parallelOverlay: document.getElementById("parallel-overlay"),
+    parallelSetup: document.getElementById("parallel-setup"),
+    parallelNInput: document.getElementById("parallel-n-input"),
+    parallelCancelSetup: document.getElementById("parallel-cancel-setup"),
+    parallelStartBtn: document.getElementById("parallel-start-btn"),
+    parallelResults: document.getElementById("parallel-results"),
+    parallelResultsActions: document.getElementById("parallel-results-actions"),
+    parallelDiscardBtn: document.getElementById("parallel-discard-btn"),
   };
 
   const TOOL_ICONS = {
@@ -418,6 +427,15 @@
         break;
       case "skills_changed":
         if (!el.settingsPanelSkills.hidden) loadSkillsPanel();
+        break;
+      case "parallel_attempt_event":
+        handleParallelAttemptEvent(msg.attemptIndex, msg.event);
+        break;
+      case "parallel_run_complete":
+        handleParallelRunComplete(msg.attempts);
+        break;
+      case "parallel_run_merged":
+        handleParallelRunMerged(msg.ok, msg.message);
         break;
     }
   }
@@ -1055,6 +1073,119 @@
     const summaryText = !ok ? "Revert failed" : conflicts ? `Reverted ${restored}, skipped ${conflicts} (conflict)` : `Reverted ${restored} file(s)`;
     pushFeedItem(ok && !conflicts ? "↩️" : "⚠️", summaryText, ok ? "tool-ok" : "tool-fail");
   }
+
+  // ---------- Best-of-N (parallel isolated agents) ----------
+
+  let parallelAttempts = {}; // index -> {steeringNote, status, lastActivity, outcome, confidence, changedFileCount}
+
+  function openParallelOverlay() {
+    const task = el.composerInput.value.trim();
+    if (!task) {
+      el.composerInput.focus();
+      return;
+    }
+    parallelAttempts = {};
+    el.parallelSetup.hidden = false;
+    el.parallelResults.hidden = true;
+    el.parallelResultsActions.hidden = true;
+    el.parallelResults.innerHTML = "";
+    el.parallelOverlay.hidden = false;
+  }
+
+  function closeParallelOverlay() {
+    el.parallelOverlay.hidden = true;
+  }
+
+  function parallelAttemptCardHtml(index, attempt) {
+    const statusText =
+      attempt.status === "done"
+        ? OUTCOME_LABELS[attempt.outcome] || "Done"
+        : attempt.status === "error"
+          ? `Error: ${escapeHtml(attempt.errorMessage || "unknown")}`
+          : attempt.lastActivity || "Running…";
+    const statusClass = attempt.status === "done" ? OUTCOME_CLASS[attempt.outcome] || "outcome-unverified" : attempt.status === "error" ? "outcome-failed" : "outcome-unverified";
+    const canUse = attempt.status === "done";
+    return `
+      <div class="parallel-attempt-card ${statusClass}" data-attempt-index="${index}">
+        <div class="parallel-attempt-header">
+          <span class="parallel-attempt-title">Attempt ${index + 1}</span>
+          ${attempt.status === "done" && typeof attempt.confidence === "number" ? `<span class="transaction-confidence">conf ${attempt.confidence}</span>` : ""}
+        </div>
+        <div class="parallel-attempt-note">${escapeHtml(attempt.steeringNote || "")}</div>
+        <div class="parallel-attempt-status">${statusText}</div>
+        ${typeof attempt.changedFileCount === "number" ? `<div class="parallel-attempt-files">${attempt.changedFileCount} file(s) changed</div>` : ""}
+        <button class="btn btn-primary parallel-use-btn" ${canUse ? "" : "disabled"}>Use this one</button>
+      </div>`;
+  }
+
+  function renderParallelResults() {
+    el.parallelResults.innerHTML = Object.keys(parallelAttempts)
+      .sort((a, b) => Number(a) - Number(b))
+      .map((i) => parallelAttemptCardHtml(Number(i), parallelAttempts[i]))
+      .join("");
+    el.parallelResults.querySelectorAll(".parallel-use-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const card = btn.closest(".parallel-attempt-card");
+        const index = Number(card.dataset.attemptIndex);
+        el.parallelResults.querySelectorAll(".parallel-use-btn").forEach((b) => (b.disabled = true));
+        btn.textContent = "Merging…";
+        send({ type: "parallel_run_pick", attemptIndex: index });
+      });
+    });
+  }
+
+  function handleParallelAttemptEvent(index, event) {
+    const attempt = parallelAttempts[index] || (parallelAttempts[index] = { status: "running" });
+    if (event.type === "tool_call") {
+      attempt.lastActivity = `Running ${event.label || event.name}…`;
+    } else if (event.type === "thinking" && event.value) {
+      attempt.lastActivity = "Thinking…";
+    } else if (event.type === "transaction_summary") {
+      attempt.outcome = event.outcome;
+      attempt.confidence = event.confidence;
+    }
+    if (!el.parallelResults.hidden) renderParallelResults();
+  }
+
+  function handleParallelRunComplete(attempts) {
+    el.parallelSetup.hidden = true;
+    el.parallelResults.hidden = false;
+    el.parallelResultsActions.hidden = false;
+    for (const a of attempts) {
+      parallelAttempts[a.index] = {
+        steeringNote: a.steeringNote,
+        status: a.status,
+        outcome: a.outcome,
+        confidence: a.confidence,
+        changedFileCount: a.changedFileCount,
+        errorMessage: a.errorMessage,
+      };
+    }
+    renderParallelResults();
+  }
+
+  function handleParallelRunMerged(ok, message) {
+    closeParallelOverlay();
+    pushFeedItem(ok ? "✅" : "⚠️", message, ok ? "tool-ok" : "tool-fail");
+    if (ok) el.composerInput.value = "";
+  }
+
+  el.parallelBtn.addEventListener("click", openParallelOverlay);
+  el.parallelCancelSetup.addEventListener("click", closeParallelOverlay);
+  el.parallelStartBtn.addEventListener("click", () => {
+    const task = el.composerInput.value.trim();
+    const n = Math.max(2, Math.min(4, Number(el.parallelNInput.value) || 3));
+    if (!task) return;
+    el.parallelSetup.hidden = true;
+    el.parallelResults.hidden = false;
+    el.parallelResultsActions.hidden = false;
+    el.parallelResults.innerHTML = `<p class="settings-hint">Starting ${n} attempts…</p>`;
+    send({ type: "start_parallel_run", task, n });
+  });
+  el.parallelDiscardBtn.addEventListener("click", () => {
+    send({ type: "parallel_run_cancel" });
+    closeParallelOverlay();
+  });
 
   // ---------- Permission modal ----------
 

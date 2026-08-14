@@ -8,6 +8,7 @@ import type { TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionO
 import type { SessionMeta } from "../session";
 import type { FileRestoreResult } from "../workspaceSnapshot";
 import type { McpServerStatus } from "../mcp";
+import type { ParallelAttemptEvent, ParallelAttemptResult } from "../parallelRun";
 
 export type ServerMessage =
   | { type: "init"; root: string; provider: string; model: string; yolo: boolean; recentFolders: string[]; sessionId: string; sessionTitle: string }
@@ -31,7 +32,10 @@ export type ServerMessage =
   | { type: "critique_result"; pass: boolean; reason: string }
   | { type: "transaction_summary"; transactionId: string; confidence: number; outcome: TransactionOutcome; rollbackAvailable: boolean }
   | { type: "rollback_result"; transactionId: string; ok: boolean; items: FileRestoreResult[] }
-  | { type: "skills_changed" };
+  | { type: "skills_changed" }
+  | { type: "parallel_attempt_event"; attemptIndex: number; event: ParallelAttemptEvent }
+  | { type: "parallel_run_complete"; runId: string; attempts: ParallelAttemptResult[] }
+  | { type: "parallel_run_merged"; ok: boolean; message: string };
 
 export type ClientMessage =
   | { type: "user_message"; text: string }
@@ -63,4 +67,7 @@ export type ClientMessage =
   | { type: "clear_api_key"; provider: "groq" | "openrouter" | "gemini" | "cerebras" | "mistral" | "custom" }
   | { type: "update_custom_provider"; baseUrl: string; model: string; apiKey: string }
   | { type: "delete_skill"; name: string }
-  | { type: "add_starter_skill"; name: string };
+  | { type: "add_starter_skill"; name: string }
+  | { type: "start_parallel_run"; task: string; n: number }
+  | { type: "parallel_run_pick"; attemptIndex: number }
+  | { type: "parallel_run_cancel" };

@@ -18,7 +18,8 @@ export function chatCompletion(
   apiKey: string,
   baseUrl: string,
   maxRetries = 5,
-  onDelta?: (chunk: string) => void
+  onDelta?: (chunk: string) => void,
+  temperature?: number
 ): Promise<ChatCompletionResult> {
   return runOpenAiCompatibleChatCompletion(
     { baseUrl, label: "Custom provider", apiKeyEnvHint: "the Base URL/API key set in Settings > API Keys > Custom / Local Model" },
@@ -27,6 +28,7 @@ export function chatCompletion(
     model,
     apiKey,
     maxRetries,
-    onDelta
+    onDelta,
+    temperature
   );
 }

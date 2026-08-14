@@ -299,6 +299,19 @@ export function startWebServer(
           const result = await agent.authorizeMcpServer(msg.server, () => sendMcpStatus());
           if (!result.ok) reporter.error(result.message);
           sendMcpStatus();
+        } else if (msg.type === "start_parallel_run") {
+          try {
+            await agent.startParallelRun(msg.task, msg.n, (attemptIndex, event) => send({ type: "parallel_attempt_event", attemptIndex, event }));
+            const status = agent.getParallelRunStatus();
+            send({ type: "parallel_run_complete", runId: status?.runId ?? "", attempts: status?.attempts ?? [] });
+          } catch (err: any) {
+            reporter.error(err.message ?? String(err));
+          }
+        } else if (msg.type === "parallel_run_pick") {
+          const result = await agent.pickParallelRunAttempt(msg.attemptIndex);
+          send({ type: "parallel_run_merged", ok: result.ok, message: result.message });
+        } else if (msg.type === "parallel_run_cancel") {
+          await agent.cancelParallelRun();
         } else if (msg.type === "rollback_request") {
           if (!isValidId(msg.transactionId)) {
             reporter.error("Invalid transaction id.");

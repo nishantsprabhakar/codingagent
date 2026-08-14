@@ -27,6 +27,15 @@ import { runDivergentRepairEnsemble, computeConvergenceScore, hasRecurredKnownFa
 import { withIdleTimeout } from "./timeout";
 import { recordSessionStart, recordSessionEnd, recordToolUsage, recordModelUsage } from "./usageLedger";
 import { deriveOutcome } from "./verificationOutcome";
+import {
+  startParallelRun,
+  mergeParallelRunAttempt,
+  cleanupParallelRun,
+  PARALLEL_RUN_DEFAULT_N,
+  type ParallelRunState,
+  type ParallelAttemptEvent,
+  type ParallelAttemptResult,
+} from "./parallelRun";
 import type {
   ChatMessage,
   ToolContext,
@@ -311,6 +320,9 @@ export class Agent {
   /** Same-session evidence conflicts (see tools/evidence.ts) found during the current transaction, flushed into
    *  tx.contract.checks by finalizeTransaction and cleared at the start of every turn. */
   private pendingEvidenceConflicts: EvidenceConflict[] = [];
+  /** The currently active Best-of-N run (Phase 10), if any — one at a time per Agent, matching how
+   *  everything else in this class is already single-transaction-at-a-time. */
+  private activeParallelRun: ParallelRunState | null = null;
 
   constructor(
     root: string,
@@ -520,6 +532,98 @@ export class Agent {
     // "ok" means the rollback ran cleanly — a reported conflict on one item is expected behavior,
     // not a failure of the whole operation; only an actual I/O error makes this false.
     return { ok: items.length > 0 && items.every((r) => r.status !== "failed"), items };
+  }
+
+  /**
+   * Starts a Best-of-N run: the same task attempted N ways in parallel, each in its own isolated git
+   * worktree (see parallelRun.ts/worktree.ts). Waits up to 5 minutes for attempts to settle before
+   * returning, so ordinary tasks complete within one call — but never force-kills a slower attempt
+   * (no cancellation primitive exists anywhere in this codebase); it keeps running in the background
+   * and its own transaction_summary event (via onEvent) updates the caller whenever it does finish.
+   * Throws with a user-facing message if the precondition (clean git repo) isn't met.
+   */
+  async startParallelRun(task: string, n: number, onEvent: (attemptIndex: number, event: ParallelAttemptEvent) => void): Promise<void> {
+    if (this.activeParallelRun) throw new Error("A Best-of-N run is already active — finish or cancel it first.");
+    this.activeParallelRun = await startParallelRun({ root: this.ctx.root, task, n: n || PARALLEL_RUN_DEFAULT_N, llmConfig: this.llmConfig, onEvent });
+
+    const PRESENTATION_WAIT_MS = 5 * 60_000;
+    await Promise.race([
+      Promise.all(this.activeParallelRun.attempts.map((a) => a.settled)),
+      new Promise((resolve) => setTimeout(resolve, PRESENTATION_WAIT_MS)),
+    ]);
+  }
+
+  /** Snapshot of the active Best-of-N run's attempts, or null if none is active. */
+  getParallelRunStatus(): { runId: string; attempts: ParallelAttemptResult[] } | null {
+    if (!this.activeParallelRun) return null;
+    return { runId: this.activeParallelRun.runId, attempts: this.activeParallelRun.attempts.map((a) => a.result) };
+  }
+
+  /**
+   * Merges the chosen attempt's changes into the real project, records it as a normal (reversible)
+   * transaction in this session's own log — reusing the existing rollback machinery verbatim, zero
+   * new rollback code — and cleans up every worktree from this run.
+   */
+  async pickParallelRunAttempt(attemptIndex: number): Promise<{ ok: boolean; message: string }> {
+    const run = this.activeParallelRun;
+    if (!run) return { ok: false, message: "No Best-of-N run is active." };
+
+    const merge = mergeParallelRunAttempt(run, attemptIndex);
+    if (!merge.ok || !merge.treeSnapshot) {
+      return { ok: false, message: merge.reason ?? "Merge failed." };
+    }
+
+    const attempt = run.attempts.find((a) => a.index === attemptIndex)!;
+    const now = Date.now();
+    const record: TransactionRecord = {
+      id: createTransactionId(),
+      sessionId: this.sessionId,
+      startedAt: now,
+      endedAt: now,
+      intent: `Best-of-N: merged attempt ${attemptIndex + 1} of ${run.attempts.length} (${attempt.result.steeringNote})`,
+      gitStatusBefore: "",
+      gitStatusAfter: "",
+      actions: [
+        {
+          toolCallId: `parallel-merge-${run.runId}-${attemptIndex}`,
+          name: "merge_parallel_attempt",
+          label: `Merged Best-of-N attempt ${attemptIndex + 1}`,
+          args: { attemptIndex, steeringNote: attempt.result.steeringNote },
+          risk: "medium",
+          ok: true,
+          output: `Merged attempt ${attemptIndex + 1} (${attempt.result.steeringNote}) into the project.`,
+          timestamp: now,
+          treeSnapshot: merge.treeSnapshot,
+        },
+      ],
+      contract: {
+        checks: [
+          {
+            source: "deterministic",
+            name: "Best-of-N selection",
+            ok: true,
+            output: `Selected attempt ${attemptIndex + 1} of ${run.attempts.length} (outcome: ${attempt.result.outcome ?? "n/a"}).`,
+          },
+        ],
+      },
+      repairAttempts: 0,
+      criticCalls: 0,
+      outcome: attempt.result.outcome ?? "unverified",
+      confidence: attempt.result.confidence ?? 0,
+    };
+    appendTransaction(this.ctx.root, this.sessionId, record);
+
+    await cleanupParallelRun(run, (worktreePath) => this.reporter.error(`Could not clean up a Best-of-N worktree: ${worktreePath}`));
+    this.activeParallelRun = null;
+    return { ok: true, message: `Merged attempt ${attemptIndex + 1} — you can revert this like any other change.` };
+  }
+
+  /** Discards every attempt from the active Best-of-N run without merging anything. */
+  async cancelParallelRun(): Promise<void> {
+    if (!this.activeParallelRun) return;
+    const run = this.activeParallelRun;
+    this.activeParallelRun = null;
+    await cleanupParallelRun(run, (worktreePath) => this.reporter.error(`Could not clean up a Best-of-N worktree: ${worktreePath}`));
   }
 
   async handleUserMessage(userText: string): Promise<void> {

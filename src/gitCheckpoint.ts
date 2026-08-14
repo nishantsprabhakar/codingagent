@@ -130,6 +130,13 @@ function checkoutPaths(root: string, treeSha: string, relPaths: string[]): boole
   }
 }
 
+/** Count of changed paths between two tree SHAs -- used by Best-of-N (parallelRun.ts) to summarize an
+ * attempt's changes without needing gitCheckpoint's internal diff-entry shape. Null on any git failure. */
+export function countChangedPaths(root: string, beforeTree: string, afterTree: string): number | null {
+  const diff = diffTrees(root, beforeTree, afterTree);
+  return diff === null ? null : diff.length;
+}
+
 export interface TreeRestoreResult {
   ok: boolean;
   /** True only when the workspace changed since this action's recorded "after" tree — nothing was touched. */
