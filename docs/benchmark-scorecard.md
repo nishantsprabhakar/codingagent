@@ -16,7 +16,7 @@ Wrexlyn scores **81/100** on the weighted peer-capability framework. That places
 | Claude Code | 78 | Excellent coding and terminal agent with mature permissions, hooks and MCP |
 | Aider | 62 | Efficient, model-portable terminal workflow with a narrower governance and orchestration layer |
 
-Scores are analyst assessments based on publicly documented product capabilities and inspection of the Wrexlyn Phase 1–11 implementation. A one-point difference is not statistically meaningful; the ranking should be read by category, not as a claim of measured task accuracy.
+Scores are analyst assessments based on publicly documented product capabilities and inspection of the current Wrexlyn implementation. A one-point difference is not statistically meaningful; the ranking should be read by category, not as a claim of measured task accuracy. Roadmap completion and external benchmark completion are tracked separately: no unexecuted benchmark is counted as performance evidence.
 
 ## Weighted scoring model
 
@@ -63,7 +63,7 @@ Best-of-N execution uses real Git worktrees. Candidate agents do not share inter
 3. **Limited production proof.** There are no disclosed active users, retention cohorts, enterprise deployments or large-repository case studies.
 4. **Enterprise deployment is intentionally local-first.** Phase 12 preserves customer custody rather than adding a mandatory Wrexlyn-hosted control plane. Buyers requiring centralized SaaS administration must evaluate customer-hosted or opt-in coordination against their own identity and compliance requirements.
 5. **UX breadth trails mature platforms.** Cursor, Codex and Copilot have stronger collaboration, IDE integration, remote execution and ecosystem distribution.
-6. **Implementation provenance should be packaged for diligence.** All 13 phases are represented as complete in the current product baseline; an acquisition or enterprise diligence room should map each phase to its commit, tests, architecture note and reproducible demonstration.
+6. **Implementation provenance should be packaged for diligence.** Product capabilities should be mapped to commits, tests, architecture notes and reproducible demonstrations. Phase labels alone are not accepted as evidence, and the external evaluation phase remains unproven until its dataset, runner, pinned configuration, traces and results are published.
 
 ## External benchmark plan
 

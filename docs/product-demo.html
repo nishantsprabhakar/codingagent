@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="Explore how Wrexlyn turns a mission into verified code and professional deliverables inside a customer-controlled workspace.">
+  <meta name="author" content="Nishant Prabhakar">
+  <title>Wrexlyn — Interactive Product Tour</title>
+  <link rel="icon" href="icon-512.png">
+  <link rel="stylesheet" href="product-demo.css">
+</head>
+<body>
+  <div class="grid" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="index.html"><span>W</span><b>WREXLYN</b><small>BY NISHANT PRABHAKAR</small></a>
+    <nav aria-label="Product tour navigation"><a href="#workflow">How it works</a><a href="#capabilities">Capabilities</a><a href="#proof">Verification</a><a href="documentation.html">Documentation</a></nav>
+    <a class="ghost" href="demo.html">Open chat demo ↗</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="kicker"><i></i> INTERACTIVE PRODUCT TOUR // FULL SYSTEM</p>
+        <h1>GIVE IT A MISSION.<br><span>GET BACK THE PROOF.</span></h1>
+        <p>See how Wrexlyn plans, executes and verifies high-stakes work across code, research, spreadsheets, reports and presentations—using the model you choose, inside the environment you control.</p>
+        <div class="actions"><a class="primary" href="#workflow">Run the walkthrough <span>↓</span></a><a class="secondary" href="pitch.html">View commercial pitch →</a></div>
+        <div class="hero-facts"><span><b>13</b> completed product phases</span><span><b>6</b> verification states</span><span><b>0</b> mandatory clouds</span></div>
+      </div>
+      <div class="system-orbit" aria-label="Wrexlyn system map">
+        <div class="orbit o1"></div><div class="orbit o2"></div><div class="orbit o3"></div>
+        <div class="core"><b>W</b><span>EXECUTION<br>CORE</span></div>
+        <span class="node n1">PLAN</span><span class="node n2">ACT</span><span class="node n3">VERIFY</span><span class="node n4">DELIVER</span>
+        <div class="signal s1"></div><div class="signal s2"></div>
+      </div>
+    </section>
+
+    <section class="tour" id="workflow">
+      <div class="section-head"><div><p class="kicker">THE OPERATING MODEL</p><h2>FROM INTENT TO<br><span>VERIFIED OUTCOME.</span></h2></div><p>Select a mission to see the workspace, algorithmic pipeline and evidence Wrexlyn assembles.</p></div>
+      <div class="mission-tabs" role="tablist" aria-label="Choose a demonstration mission">
+        <button class="active" data-mission="engineering" role="tab" aria-selected="true"><small>01</small><b>ENGINEERING</b><span>Ship a verified code change</span></button>
+        <button data-mission="diligence" role="tab" aria-selected="false"><small>02</small><b>DILIGENCE</b><span>Build an evidence-backed IC case</span></button>
+        <button data-mission="artifacts" role="tab" aria-selected="false"><small>03</small><b>EXECUTIVE OUTPUTS</b><span>Create consistent files at scale</span></button>
+      </div>
+
+      <div class="workstation">
+        <div class="chrome"><span class="dots">● ● ●</span><span>WREXLYN // CUSTOMER-CONTROLLED SESSION</span><b><i></i> SYSTEM READY</b></div>
+        <aside>
+          <p>MISSION CONTROL</p>
+          <div class="project"><span>◆</span><div><small>ACTIVE WORKSPACE</small><b id="project-name">PAYMENTS SERVICE</b></div></div>
+          <div class="side-nav"><button class="active">⌁ Mission</button><button>▦ Files <em id="file-count">28</em></button><button>◎ Evidence <em id="evidence-count">42</em></button><button>↶ History</button></div>
+          <div class="boundary"><small>TRUST BOUNDARY</small><b>YOUR MACHINE</b><span>Files remain customer-controlled</span></div>
+        </aside>
+        <div class="mission-panel">
+          <div class="mission-head"><div><small id="mission-label">MISSION / ENGINEERING</small><h3 id="mission-title">Refactor the payment service and prove nothing broke.</h3><p id="mission-prompt">“Replace the legacy retry logic, preserve API behaviour, run the full test suite and return a review-ready patch.”</p></div><span class="status"><i></i> EXECUTING</span></div>
+          <div class="algorithm">
+            <div class="algo active"><span>01</span><div><b>CONTEXT MAP</b><small id="algo-1">Repository graph + dependency scan</small></div><em>DONE</em></div>
+            <div class="algo active"><span>02</span><div><b>PLAN &amp; PERMISSION</b><small id="algo-2">Bounded actions + mutation approval</small></div><em>DONE</em></div>
+            <div class="algo running"><span>03</span><div><b>BEST-OF-N EXECUTION</b><small id="algo-3">Parallel isolated candidates scored</small><div class="bar"><i></i></div></div><em>72%</em></div>
+            <div class="algo"><span>04</span><div><b>VERIFICATION LOOP</b><small id="algo-4">Test · lint · build · repair</small></div><em>QUEUED</em></div>
+            <div class="algo"><span>05</span><div><b>EVIDENCE DELIVERY</b><small id="algo-5">Diff + checks + rollback point</small></div><em>QUEUED</em></div>
+          </div>
+          <div class="result-strip"><div><small>EXPECTED OUTPUT</small><b id="result-output">Review-ready patch</b></div><div><small>SUCCESS CONTRACT</small><b id="result-contract">Tests + lint + build pass</b></div><div><small>DELIVERY EVIDENCE</small><b id="result-evidence">Diff · logs · rollback</b></div></div>
+        </div>
+      </div>
+      <p class="demo-note">This guided simulation explains the full local product. The separate <a href="demo.html">browser chat demo</a> remains available for live model conversation.</p>
+    </section>
+
+    <section class="capabilities" id="capabilities">
+      <div class="section-head"><div><p class="kicker">CAPABILITY SYSTEM</p><h2>ONE WORKSPACE.<br><span>DEEP SKILLS.</span></h2></div><p>Wrexlyn coordinates specialist capabilities under one permission, execution and verification model.</p></div>
+      <div class="cap-grid">
+        <article><small>01 // SOFTWARE ENGINEERING</small><h3>Repository-scale execution</h3><p>Understand architecture, edit multiple files, run commands, debug failures and deliver tested changes.</p><ul><li>Context and dependency mapping</li><li>Isolated parallel worktrees</li><li>Test, lint and build repair loops</li></ul></article>
+        <article><small>02 // PROFESSIONAL ARTIFACTS</small><h3>Native business deliverables</h3><p>Create finished Word, Excel and PowerPoint outputs—not markdown pretending to be a document.</p><ul><li>Formula-bearing financial models</li><li>Structured reports and redlines</li><li>Executive-ready presentation decks</li></ul></article>
+        <article><small>03 // RESEARCH &amp; EVIDENCE</small><h3>Traceable conclusions</h3><p>Extract claims, connect them to sources and preserve the evidence behind every material output.</p><ul><li>Source-to-claim lineage</li><li>Cross-file consistency checks</li><li>Conflict and omission detection</li></ul></article>
+        <article><small>04 // MODEL ROUTING</small><h3>Intelligence without lock-in</h3><p>Connect any supported hosted endpoint or local model and route work according to cost, speed and quality.</p><ul><li>URL-based provider connection</li><li>Local model support</li><li>Task-aware model economics</li></ul></article>
+        <article><small>05 // GOVERNANCE</small><h3>Autonomy with boundaries</h3><p>Control mutations, inspect every action and recover confidently when an autonomous path is wrong.</p><ul><li>Explicit action permissions</li><li>Transaction history and rollback</li><li>Customer-controlled secret custody</li></ul></article>
+        <article><small>06 // EVALUATION</small><h3>Measure the system, not the demo</h3><p>Run reproducible tasks and separate orchestration value from the underlying model’s raw capability.</p><ul><li>Task contracts and graders</li><li>Cost, latency and pass-rate traces</li><li>Regression-ready scorecards</li></ul></article>
+      </div>
+    </section>
+
+    <section class="proof" id="proof">
+      <div class="proof-copy"><p class="kicker">THE ALGORITHMIC ADVANTAGE</p><h2>NOT ANOTHER<br><span>CHAT WRAPPER.</span></h2><p>The differentiator is the control system around the model: Wrexlyn converts probabilistic generation into inspectable, repeatable execution.</p><a href="benchmark-scorecard.md">Inspect the benchmark framework →</a></div>
+      <div class="proof-stack">
+        <div><span>01</span><b>Context selection</b><p>Maps the workspace and retrieves the minimum evidence required for the mission.</p></div>
+        <div><span>02</span><b>Best-of-N search</b><p>Runs candidates in isolated worktrees, scores outcomes and preserves the strongest path.</p></div>
+        <div><span>03</span><b>Contract-based verification</b><p>Grades output against explicit tests, constraints and artifact checks—not model confidence.</p></div>
+        <div><span>04</span><b>Repair and rollback</b><p>Feeds failures back into execution while maintaining transaction-safe recovery points.</p></div>
+      </div>
+    </section>
+
+    <section class="benefits">
+      <p class="kicker">WHAT THE CUSTOMER BUYS</p><h2>LESS COORDINATION.<br>MORE COMPLETED WORK.</h2>
+      <div class="benefit-grid"><div><b>FASTER DELIVERY</b><p>Move from request to usable output without stitching together chat, IDE, terminal and office tools.</p></div><div><b>LOWER REWORK</b><p>Catch broken builds, inconsistent numbers and unsupported claims before delivery.</p></div><div><b>STRONGER CONTROL</b><p>Keep data, models, secrets and execution within the customer’s chosen boundary.</p></div><div><b>PROVABLE QUALITY</b><p>Replace “the AI said it worked” with checks, evidence, history and reproducible evaluation.</p></div></div>
+    </section>
+
+    <section class="cta"><small>READY TO GO DEEPER?</small><h2>SEE THE INTERFACE.<br><span>READ THE ARCHITECTURE.</span></h2><div class="actions"><a class="primary" href="demo.html">Try browser chat <span>↗</span></a><a class="secondary" href="documentation.html">Open documentation →</a><a class="secondary" href="pitch.html">View pitch →</a></div></section>
+  </main>
+
+  <footer><div class="brand"><span>W</span><b>WREXLYN</b><small>BY NISHANT PRABHAKAR</small></div><p>© 2026 NISHANT PRABHAKAR. ALL RIGHTS RESERVED.<br>WREXLYN IS PROPRIETARY SOFTWARE.</p><a href="index.html">Return to landing page ↑</a></footer>
+  <script src="product-demo.js" defer></script>
+</body>
+</html>
