@@ -4,14 +4,31 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="Wrexlyn is the proprietary, local-first AI agent for verified code and professional business deliverables.">
+  <meta name="author" content="Nishant Prabhakar">
+  <meta name="copyright" content="Copyright © 2026 Nishant Prabhakar. All rights reserved.">
   <meta property="og:title" content="Wrexlyn — Stop Chatting. Start Shipping.">
   <meta property="og:description" content="Code, models, reports and decks. Executed locally. Verified before delivery.">
   <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Wrexlyn by Nishant Prabhakar">
   <title>Wrexlyn — Stop Chatting. Start Shipping.</title>
   <link rel="icon" href="icon-512.png">
   <link rel="stylesheet" href="landing.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Wrexlyn",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Windows, macOS, Linux",
+    "description": "A proprietary, local-first AI execution system for verified code and professional business deliverables.",
+    "creator": { "@type": "Person", "name": "Nishant Prabhakar" },
+    "copyrightHolder": { "@type": "Person", "name": "Nishant Prabhakar" },
+    "copyrightYear": "2026"
+  }
+  </script>
 </head>
 <body>
+<div class="scroll-progress" aria-hidden="true"><i></i></div>
 <main id="top">
   <div class="noise" aria-hidden="true"></div>
   <nav class="nav shell" aria-label="Main navigation">
@@ -21,22 +38,41 @@
   </nav>
 
   <section class="hero shell">
+    <canvas id="system-field" aria-hidden="true"></canvas>
     <div class="eyebrow"><span class="pulse"></span> LOCAL-FIRST AGENTIC WORKSTATION <b>PROPRIETARY</b></div>
-    <h1>STOP CHATTING.<br><span>START SHIPPING.</span></h1>
-    <p class="heroCopy">The AI agent that writes the code, runs the checks, builds the spreadsheet, creates the deck—and shows you the evidence.</p>
+    <div class="productLockup" aria-label="Wrexlyn by Nishant Prabhakar">
+      <div class="productName">WREXLYN<span class="registered">™</span></div>
+      <div class="creatorLine"><span></span><small>CREATED BY</small><strong>NISHANT PRABHAKAR</strong><span></span></div>
+    </div>
+    <h1><span class="hero-line">STOP CHATTING.</span><br><span class="hero-line outline">START SHIPPING.</span></h1>
+    <p class="heroCopy">The local AI execution system that understands the repository, controls every action, verifies the outcome and delivers the evidence.</p>
     <div class="heroActions"><a class="primary" href="demo.html">Experience Wrexlyn <span>→</span></a><a class="secondary" href="documentation.html"><span class="play">▶</span> Read documentation</a></div>
-    <div class="trust"><span><span class="check">✓</span> Proprietary platform</span><span><span class="check">✓</span> Bring your own model</span><span><span class="check">✓</span> Runs on your machine</span></div>
+    <div class="trust"><span><span class="check">&#10003;</span> All 13 phases complete</span><span><span class="check">&#10003;</span> Any hosted or local model</span><span><span class="check">&#10003;</span> Customer-controlled runtime</span></div>
 
-    <div class="consoleWrap"><div class="orbit orbit1"></div><div class="orbit orbit2"></div>
+    <div class="heroTelemetry" aria-label="System highlights">
+      <div><small>SYSTEM STATE</small><strong><i></i> OPERATIONAL</strong></div>
+      <div><small>VERIFICATION</small><strong>6-STATE ENGINE</strong></div>
+      <div><small>EXECUTION</small><strong>BEST-OF-N</strong></div>
+      <div><small>TRUST BOUNDARY</small><strong>YOUR MACHINE</strong></div>
+    </div>
+
+    <div class="missionSwitch" role="tablist" aria-label="Example Wrexlyn missions">
+      <button class="active" type="button" data-mission="engineering">ENGINEERING</button>
+      <button type="button" data-mission="diligence">DILIGENCE</button>
+      <button type="button" data-mission="artifacts">ARTIFACTS</button>
+    </div>
+    <div class="consoleWrap" data-tilt><div class="orbit orbit1"></div><div class="orbit orbit2"></div>
       <div class="console"><div class="consoleTop"><div class="dots"><i></i><i></i><i></i></div><span>WREXLYN // ACTIVE MISSION</span><div class="secure"><i></i> LOCAL SESSION</div></div>
         <div class="consoleBody"><aside><div class="sideLabel">WORKSPACE</div><div class="project"><span>◆</span> ACME DILIGENCE</div><div class="tree"><p>⌄ &nbsp;src</p><p>　◇ analysis.ts</p><p>　◇ model.ts</p><p>◇ research.pdf</p></div><div class="sideLabel outputLabel">OUTPUTS</div><div class="output"><span class="doc xls">X</span> Operating Model.xlsx</div><div class="output"><span class="doc ppt">P</span> IC Presentation.pptx</div></aside>
-          <div class="work"><div class="taskHead"><div><small>MISSION / 04</small><h3>Build the model. Find the risk. Brief the room.</h3></div><span class="running"><i></i> RUNNING</span></div>
+          <div class="work"><div class="taskHead"><div><small id="mission-code">MISSION / ENGINEERING</small><h3 id="mission-title">Refactor the service. Prove the build. Ship the patch.</h3></div><span class="running"><i></i> RUNNING</span></div>
             <div class="steps"><div class="step done"><b>01</b><span><strong>Evidence extracted</strong><small>42 source references mapped</small></span><em>✓</em></div><div class="step done"><b>02</b><span><strong>Operating model built</strong><small>Formulas reconciled · 0 broken refs</small></span><em>✓</em></div><div class="step active"><b>03</b><span><strong>Generating IC presentation</strong><small>12 / 16 slides complete</small><span class="progress"><i></i></span></span><em>72%</em></div><div class="step"><b>04</b><span><strong>Cross-artifact verification</strong><small>Queued</small></span><em>—</em></div></div>
             <div class="verified"><div class="shield">✓</div><div><small>VERIFICATION STATUS</small><strong>Evidence-backed execution</strong></div><div class="metric"><b>18</b><small>CHECKS PASSED</small></div><div class="metric"><b>0</b><small>CONFLICTS</small></div></div>
           </div></div>
       </div>
     </div>
   </section>
+
+  <section class="proofRail" aria-label="Wrexlyn proof points"><div class="proofTrack"><span>13 PHASES COMPLETE</span><i></i><span>LOCAL ENTERPRISE GOVERNANCE</span><i></i><span>MODEL-INDEPENDENT</span><i></i><span>VERIFIED OUTCOMES</span><i></i><span>BINARY-SAFE ROLLBACK</span><i></i><span>REPRODUCIBLE EVALUATION</span><i></i></div></section>
 
   <section class="manifesto"><div class="shell manifestoGrid"><p class="sectionTag">THE PROBLEM</p><div><h2>MOST AI TOOLS STOP<br>AT <span>“HERE’S SOME CODE.”</span></h2><p>Wrexlyn keeps going. It executes. It validates. It produces the finished artifact. Because an answer is not an outcome—and your work deserves more than autocomplete with a marketing budget.</p></div></div></section>
 
@@ -46,6 +82,8 @@
 
   <section class="outcomes"><div class="shell"><div class="outcomeHead"><div><p class="sectionTag">FROM PROMPT TO PROOF</p><h2>BUILT FOR WORK<br>THAT HAS TO <span>HOLD UP.</span></h2></div><p>Every mutation is permissioned. Every result is inspectable. Every controlled file change is tracked.</p></div><div class="pipeline"><div><b>01</b><strong>PLAN</strong><small>Break the mission into executable steps</small></div><i>→</i><div><b>02</b><strong>ACT</strong><small>Edit, calculate, generate and run</small></div><i>→</i><div><b>03</b><strong>VERIFY</strong><small>Test the output against real checks</small></div><i>→</i><div class="lit"><b>04</b><strong>DELIVER</strong><small>Ship artifacts with an audit trail</small></div></div></div></section>
 
+  <section class="numbers shell" aria-label="Platform architecture metrics"><div><strong data-count="13">0</strong><span>COMPLETED PHASES</span></div><div><strong data-count="6">0</strong><span>VERIFICATION STATES</span></div><div><strong>&infin;</strong><span>COMPATIBLE MODELS</span></div><div><strong>0</strong><span>MANDATORY CLOUDS</span></div></section>
+
   <section class="compare shell" id="compare"><div class="compareHead"><div><p class="sectionTag">NO POLITE COMPARISONS</p><h2>THEY HELP YOU CODE.<br><span>WREXLYN HELPS YOU FINISH.</span></h2></div><p>Local agentic execution and professional artifact creation in one proprietary, provider-independent platform.</p></div>
     <div class="tableWrap"><table><thead><tr><th>CAPABILITY</th><th class="wrex"><span class="miniMark">W</span> WREXLYN</th><th>CURSOR</th><th>CLAUDE CODE</th><th>AIDER</th></tr></thead><tbody><tr><td>Local-first agent</td><td class="wrex"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr><tr><td>Choose your model provider</td><td class="wrex"><span class="yes">✓</span></td><td><span class="limited">Limited</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td></tr><tr><td>Native Word / Excel / PowerPoint</td><td class="wrex"><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr><tr><td>Deterministic document checks</td><td class="wrex"><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr><tr><td>Built-in verification loop</td><td class="wrex"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="limited">Basic</span></td></tr><tr><td>Browser UI + terminal</td><td class="wrex"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr></tbody></table></div><p class="disclaimer">Comparison reflects publicly documented product capabilities and Wrexlyn’s current product specification. Competitor capabilities change over time.</p>
   </section>
@@ -54,7 +92,14 @@
 
   <section class="finalCta shell"><div class="ctaGlow"></div><p class="sectionTag">CHOOSE YOUR ENTRY POINT</p><h2>SEE THE SYSTEM.<br>READ THE PROOF.</h2><p>Experience the interface, inspect the architecture, or review the commercial case.</p><div class="heroActions"><a class="primary" href="demo.html">Launch demo <span>↗</span></a><a class="secondary" href="documentation.html">Documentation →</a><a class="secondary" href="pitch.html">View pitch →</a></div><small>Proprietary · Local-first · Private deployment available</small></section>
 
-  <footer class="shell"><a href="#top" class="brand"><span class="mark">W</span><span>WREXLYN</span></a><p>THE VERIFIABLE LOCAL AGENT FOR CODE &amp; BUSINESS DELIVERABLES.</p><div><a href="demo.html">Demo</a><a href="documentation.html">Documentation</a><a href="pitch.html">Pitch</a><a href="#top">Top ↑</a></div></footer>
+  <section class="creatorStatement" aria-label="Creator and ownership"><div class="shell creatorGrid">
+    <div class="creatorSeal"><span>NP</span><small>ORIGINAL<br>SYSTEM</small></div>
+    <div class="creatorCopy"><p class="sectionTag">THE CREATOR</p><h2>ENGINEERED WITH<br><span>CONVICTION.</span></h2><p>Wrexlyn is the product vision and proprietary work of <strong>Nishant Prabhakar</strong>—built to turn artificial intelligence from a conversational novelty into an accountable execution system.</p></div>
+    <div class="creatorSignature"><small>CREATED &amp; DESIGNED BY</small><strong>Nishant Prabhakar</strong><span>WREXLYN // 2026</span></div>
+  </div></section>
+
+  <footer class="shell"><div class="footerIdentity"><a href="#top" class="brand"><span class="mark">W</span><span>WREXLYN</span></a><small>BY NISHANT PRABHAKAR</small></div><p>© 2026 NISHANT PRABHAKAR. ALL RIGHTS RESERVED.<br>WREXLYN IS PROPRIETARY SOFTWARE.</p><div><a href="demo.html">Demo</a><a href="documentation.html">Documentation</a><a href="pitch.html">Pitch</a><a href="#top">Top ↑</a></div></footer>
 </main>
+<script src="landing.js" defer></script>
 </body>
 </html>
