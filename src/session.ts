@@ -125,7 +125,13 @@ export function saveSession(
       tasks,
       createdFiles,
     };
-    fs.writeFileSync(sessionPath(root, id), JSON.stringify(payload, null, 2), "utf-8");
+    // Atomic write (temp file + rename, same pattern as codeIndex.ts's savePersisted) so a second
+    // tab writing this same session concurrently, or a crash mid-write, never leaves a half-written
+    // JSON file that the next loadSession() would silently discard.
+    const finalPath = sessionPath(root, id);
+    const tmpPath = `${finalPath}.${process.pid}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(payload, null, 2), "utf-8");
+    fs.renameSync(tmpPath, finalPath); // atomic on both Windows and POSIX for a same-volume rename
   } catch (err: any) {
     console.error("[coding-agent] warning: failed to save session:", err.message ?? err);
   }

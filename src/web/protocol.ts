@@ -35,7 +35,8 @@ export type ServerMessage =
   | { type: "skills_changed" }
   | { type: "parallel_attempt_event"; attemptIndex: number; event: ParallelAttemptEvent }
   | { type: "parallel_run_complete"; runId: string; attempts: ParallelAttemptResult[] }
-  | { type: "parallel_run_merged"; ok: boolean; message: string };
+  | { type: "parallel_run_merged"; ok: boolean; message: string }
+  | { type: "session_changed_elsewhere"; sessionId: string };
 
 export type ClientMessage =
   | { type: "user_message"; text: string }

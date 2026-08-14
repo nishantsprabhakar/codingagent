@@ -101,6 +101,10 @@ class TaggedReporter implements Reporter {
     this.result.confidence = confidence;
     this.emit({ type: "transaction_summary", transactionId, confidence, outcome, rollbackAvailable });
   }
+  sessionPersisted(): void {
+    // Each attempt runs in its own isolated worktree with its own session file -- there is no
+    // sibling tab viewing the same session to warn.
+  }
 }
 
 interface AttemptState {

@@ -13,9 +13,15 @@ function nextId(prefix: string): string {
   return `${prefix}_${counter}`;
 }
 
-/** Bridges Agent's Reporter events to JSON messages over a WebSocket connection. */
+/** Bridges Agent's Reporter events to JSON messages over a WebSocket connection.
+ *  `notifyOthers`, if given, is called on every session save so the server's connection registry
+ *  can warn sibling connections viewing the same session — see server.ts's activeConnections. */
 export class WebSocketReporter implements Reporter {
-  constructor(private send: (msg: ServerMessage) => void) {}
+  constructor(private send: (msg: ServerMessage) => void, private notifyOthers?: (sessionId: string) => void) {}
+
+  sessionPersisted(sessionId: string): void {
+    this.notifyOthers?.(sessionId);
+  }
 
   toolCall(id: string, name: string, label: string, args: unknown, risk: RiskLevel): void {
     this.send({ type: "tool_call", id, name, label, args, risk });

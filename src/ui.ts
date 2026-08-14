@@ -131,6 +131,10 @@ export class ConsoleReporter implements Reporter {
     console.log(color.yellow(`\nindependent review: ${reason}`));
   }
 
+  sessionPersisted(_sessionId: string): void {
+    // A single CLI REPL process has no notion of "other tabs" to warn.
+  }
+
   assistantDelta(chunk: string): void {
     this.stopSpinner();
     if (!this.streaming) {

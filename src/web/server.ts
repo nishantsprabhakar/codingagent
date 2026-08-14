@@ -151,6 +151,11 @@ export function startWebServer(
     },
   });
 
+  // Every open WebSocket connection registers itself here so a session save from one tab can warn
+  // every other tab currently viewing that same session (see WebSocketReporter.sessionPersisted).
+  // One server instance = one project root, so it's safe to share across all connections.
+  const activeConnections = new Set<{ send: (msg: ServerMessage) => void; getSessionId: () => string }>();
+
   wss.on("connection", (ws) => {
     const send = (msg: ServerMessage) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
@@ -175,11 +180,23 @@ export function startWebServer(
       send({ type: "mcp_status", servers: agent.getMcpStatuses() });
     };
 
+    // Set once `agent` exists below; declared as a mutable box here so notifyOthers (used by
+    // reporter, constructed first) can close over it without a chicken-and-egg ordering problem.
+    let selfConn: { send: (msg: ServerMessage) => void; getSessionId: () => string } | null = null;
+    const notifyOthers = (sessionId: string) => {
+      for (const conn of activeConnections) {
+        if (conn === selfConn) continue;
+        if (conn.getSessionId() === sessionId) conn.send({ type: "session_changed_elsewhere", sessionId });
+      }
+    };
+
     const pending = new Map<string, (decision: PermissionDecision) => void>();
-    const reporter = new WebSocketReporter(send);
+    const reporter = new WebSocketReporter(send, notifyOthers);
     const confirmFn = createConfirmFn(send, pending);
     const permissions = new PermissionManager(yolo, confirmFn);
     let agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter, undefined, sandboxOptions);
+    selfConn = { send, getSessionId: () => agent.getSessionId() };
+    activeConnections.add(selfConn);
     agent
       .connectMcp()
       .then(sendMcpStatus)
@@ -216,7 +233,7 @@ export function startWebServer(
           await agent.dispose();
           currentRoot = target;
           addRecentFolder(currentRoot);
-          agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter);
+          agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter, undefined, sandboxOptions);
           agent
             .connectMcp()
             .then(sendMcpStatus)
@@ -398,6 +415,7 @@ export function startWebServer(
     ws.on("close", () => {
       for (const resolve of pending.values()) resolve("deny");
       pending.clear();
+      if (selfConn) activeConnections.delete(selfConn);
       agent.dispose().catch(() => {});
     });
   });

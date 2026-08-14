@@ -1275,6 +1275,36 @@ body::before {
 
 .thinking-row { display: flex; align-items: center; gap: 8px; color: var(--text-faint); font-size: 15px; padding: 2px 0; }
 
+.session-changed-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--surface-2, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.session-changed-banner-reload {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.session-changed-banner-reload:hover {
+  background: var(--accent);
+  color: var(--bg, #111);
+}
+
 .stream-caret {
   display: inline-block;
   color: var(--accent);

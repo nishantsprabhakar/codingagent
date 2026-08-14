@@ -844,6 +844,7 @@ export class Agent {
       this.tasks,
       this.createdFiles
     );
+    this.reporter.sessionPersisted(this.sessionId);
   }
 
   /**

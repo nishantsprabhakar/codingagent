@@ -320,4 +320,8 @@ export interface Reporter {
   critique(pass: boolean, reason: string): void;
   /** Final evidence-based summary of a completed transaction (one user turn). */
   transactionSummary(transactionId: string, confidence: number, outcome: TransactionOutcome, rollbackAvailable: boolean): void;
+  /** Fires every time a session is written to disk — lets a multi-tab-aware reporter (WebSocketReporter)
+   *  warn other connections viewing the same session that their in-memory copy is now stale. A no-op for
+   *  reporters with no notion of "other viewers" (console, eval, parallel-run attempts). */
+  sessionPersisted(sessionId: string): void;
 }

@@ -443,6 +443,11 @@
       case "parallel_run_merged":
         handleParallelRunMerged(msg.ok, msg.message);
         break;
+      case "session_changed_elsewhere":
+        // Only relevant if it's the session currently open in this tab — a save to some other
+        // session (e.g. a background parallel-run attempt) shouldn't interrupt this view at all.
+        if (msg.sessionId === state.sessionId) appendSessionChangedBanner(msg.sessionId);
+        break;
     }
   }
 
@@ -879,6 +884,26 @@
     bubble.className = "bubble";
     bubble.textContent = `⚠ ${text}`;
     row.appendChild(bubble);
+    el.chatLog.appendChild(row);
+    scrollToBottom();
+  }
+
+  function appendSessionChangedBanner(sessionId) {
+    clearEmptyState();
+    const row = document.createElement("div");
+    row.className = "session-changed-banner";
+    const text = document.createElement("span");
+    text.textContent = "This chat was updated in another tab.";
+    const reloadBtn = document.createElement("button");
+    reloadBtn.type = "button";
+    reloadBtn.className = "session-changed-banner-reload";
+    reloadBtn.textContent = "Reload";
+    reloadBtn.addEventListener("click", () => {
+      row.remove();
+      send({ type: "switch_session", id: sessionId });
+    });
+    row.appendChild(text);
+    row.appendChild(reloadBtn);
     el.chatLog.appendChild(row);
     scrollToBottom();
   }
