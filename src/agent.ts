@@ -334,9 +334,10 @@ export class Agent {
     private llmConfig: LlmConfig,
     private permissions: PermissionManager,
     private reporter: Reporter,
-    sessionId?: string
+    sessionId?: string,
+    sandboxOptions?: { sandbox?: boolean; sandboxImage?: string }
   ) {
-    this.ctx = { root };
+    this.ctx = { root, sandbox: sandboxOptions?.sandbox, sandboxImage: sandboxOptions?.sandboxImage };
     this.projectContext = gatherProjectContext(root);
     this.projectMemory = detectProjectMemory(root);
     this.projectSkills = loadProjectSkills(root);

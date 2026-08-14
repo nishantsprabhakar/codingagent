@@ -90,7 +90,8 @@ export function startWebServer(
   llmConfig: LlmConfig,
   yolo: boolean,
   port: number,
-  lan = false
+  lan = false,
+  sandboxOptions?: { sandbox?: boolean; sandboxImage?: string }
 ): WebServerHandle {
   let currentRoot = initialRoot;
   let currentProvider = llmConfig.provider;
@@ -178,7 +179,7 @@ export function startWebServer(
     const reporter = new WebSocketReporter(send);
     const confirmFn = createConfirmFn(send, pending);
     const permissions = new PermissionManager(yolo, confirmFn);
-    let agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter);
+    let agent = new Agent(currentRoot, { provider: currentProvider, model: currentModel, apiKey: currentApiKey, baseUrl: currentBaseUrl }, permissions, reporter, undefined, sandboxOptions);
     agent
       .connectMcp()
       .then(sendMcpStatus)

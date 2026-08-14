@@ -86,9 +86,16 @@ function whenReady(): Promise<void> {
 /**
  * Runs a shell command in the dedicated shell-execution service process rather than in-process.
  * Same `{ok, output}` shape and behavior (timeout, output truncation) as the previous in-process
- * `exec()` call — only where it physically runs has changed.
+ * `exec()` call — only where it physically runs has changed. `sandbox`/`sandboxImage` are opt-in
+ * (the --sandbox CLI flag) and forwarded as-is to the service, which decides host vs. Docker.
  */
-export async function runInService(command: string, cwd: string, timeoutMs?: number): Promise<{ ok: boolean; output: string }> {
+export async function runInService(
+  command: string,
+  cwd: string,
+  timeoutMs?: number,
+  sandbox?: boolean,
+  sandboxImage?: string
+): Promise<{ ok: boolean; output: string }> {
   await whenReady();
   const proc = getChild();
   const id = crypto.randomBytes(8).toString("hex");
@@ -100,7 +107,7 @@ export async function runInService(command: string, cwd: string, timeoutMs?: num
     }, (timeoutMs && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS) + IPC_SLACK_MS);
 
     pending.set(id, { resolve: (res) => resolve({ ok: res.ok, output: res.output }), timer });
-    proc.send({ id, command, cwd, timeoutMs } as ShellRequest);
+    proc.send({ id, command, cwd, timeoutMs, sandbox, sandboxImage } as ShellRequest);
   });
 }
 

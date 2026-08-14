@@ -29,6 +29,7 @@ export const runShellCommandTool: ToolSpec = {
   },
   describe: (args) => `run: ${args.command}`,
   // Runs in a dedicated shell-execution service process, not in-process with the web server —
-  // see shellService.ts's doc comment for exactly what that isolation does and doesn't provide.
-  run: async (args, ctx) => runInService(String(args.command ?? ""), ctx.root, args.timeout_ms),
+  // see shellService.ts's doc comment for exactly what that isolation does and doesn't provide,
+  // and for how ctx.sandbox (the --sandbox flag) routes this into a Docker container instead.
+  run: async (args, ctx) => runInService(String(args.command ?? ""), ctx.root, args.timeout_ms, ctx.sandbox, ctx.sandboxImage),
 };

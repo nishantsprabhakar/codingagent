@@ -123,6 +123,13 @@ export interface ToolSpec {
 
 export interface ToolContext {
   root: string;
+  /** When set, run_shell_command executes inside a Docker container instead of on the host — see
+   *  dockerSandbox.ts. Opt-in only (the --sandbox CLI flag); undefined/false means host execution,
+   *  unchanged from before this existed. */
+  sandbox?: boolean;
+  /** Docker image for sandboxed execution, if sandbox is set. Defaults to dockerSandbox.ts's own
+   *  DEFAULT_IMAGE when omitted. */
+  sandboxImage?: string;
 }
 
 export type TaskStatus = "pending" | "in_progress" | "completed";

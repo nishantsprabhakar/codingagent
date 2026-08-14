@@ -44,6 +44,8 @@ interface CliOptions {
   web: boolean;
   port: number;
   lan: boolean;
+  sandbox: boolean;
+  sandboxImage?: string;
 }
 
 async function parseArgs(argv: string[]): Promise<CliOptions> {
@@ -59,6 +61,7 @@ async function parseArgs(argv: string[]): Promise<CliOptions> {
     web: false,
     port: 4390,
     lan: false,
+    sandbox: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -82,6 +85,10 @@ async function parseArgs(argv: string[]): Promise<CliOptions> {
       options.port = Number(argv[++i]) || options.port;
     } else if (arg === "--lan") {
       options.lan = true;
+    } else if (arg === "--sandbox") {
+      options.sandbox = true;
+    } else if (arg === "--sandbox-image") {
+      options.sandboxImage = argv[++i];
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -128,6 +135,12 @@ Options:
   --lan             Bind the web UI to all network interfaces so another device (e.g. a phone) on the same
                     network can reach it (default: local-only, bound to 127.0.0.1). Every connection — local
                     or LAN — still requires the auth token printed at startup, or a paired QR-code link.
+  --sandbox         Run shell commands inside a Docker container (mounting --cwd) instead of directly on the
+                    host, if Docker is installed and reachable — falls back to host execution with a clear
+                    warning otherwise. Network stays enabled inside the container (npm install/git still
+                    work); the default image only has what it ships with, so a command needing a tool the
+                    image lacks (e.g. git isn't in node:alpine) will fail there where it wouldn't on the host.
+  --sandbox-image <name>  Docker image for --sandbox (default: node:18-alpine).
   --help            Show this help
 `);
 }
@@ -154,7 +167,10 @@ async function main(): Promise<void> {
 
   if (options.web) {
     const { startWebServer } = await import("./web/server");
-    startWebServer(options.root, options.llmConfig, options.yolo, options.port, options.lan);
+    startWebServer(options.root, options.llmConfig, options.yolo, options.port, options.lan, {
+      sandbox: options.sandbox,
+      sandboxImage: options.sandboxImage,
+    });
     return;
   }
 
@@ -180,7 +196,10 @@ async function runRepl(options: CliOptions): Promise<void> {
 
   const permissions = new PermissionManager(options.yolo, confirmFn);
   const reporter = new ConsoleReporter();
-  let agent = new Agent(options.root, options.llmConfig, permissions, reporter);
+  let agent = new Agent(options.root, options.llmConfig, permissions, reporter, undefined, {
+    sandbox: options.sandbox,
+    sandboxImage: options.sandboxImage,
+  });
   agent.connectMcp().catch((err) => printError(`MCP connect error: ${err.message ?? err}`));
   agent.replayCurrentState();
 
