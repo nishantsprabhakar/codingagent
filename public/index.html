@@ -32,7 +32,7 @@
   rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
 />
-<link rel="stylesheet" href="style.css?v=15" />
+<link rel="stylesheet" href="style.css?v=16" />
 </head>
 <body>
 <canvas id="bg-canvas" aria-hidden="true"></canvas>
@@ -238,6 +238,8 @@
       <button id="settings-tab-mcp" class="settings-tab">MCP Servers</button>
       <button id="settings-tab-apikeys" class="settings-tab">API Keys</button>
       <button id="settings-tab-skills" class="settings-tab">Skills</button>
+      <button id="settings-tab-history" class="settings-tab">History</button>
+      <button id="settings-tab-evidence" class="settings-tab">Evidence</button>
       <button id="settings-tab-phone" class="settings-tab">Connect from Phone</button>
     </div>
 
@@ -345,6 +347,26 @@
       </div>
     </div>
 
+    <div id="settings-panel-history" class="settings-panel" hidden>
+      <p class="settings-hint">
+        Past turns across this project's chats, most recent first, with their verification outcome and
+        a revert action where changes are still on disk.
+      </p>
+      <div id="history-list" class="history-list">
+        <div class="skills-list-empty">No transactions recorded yet.</div>
+      </div>
+    </div>
+
+    <div id="settings-panel-evidence" class="settings-panel" hidden>
+      <p class="settings-hint">
+        Figures and facts the agent has recorded in the current chat, so they can be cross-checked
+        against each other. Conflicting entries are flagged.
+      </p>
+      <div id="evidence-list" class="evidence-list">
+        <div class="skills-list-empty">No evidence recorded yet in this chat.</div>
+      </div>
+    </div>
+
     <div id="settings-panel-phone" class="settings-panel" hidden>
       <p class="settings-hint">
         Scan this with your iPhone's camera (same Wi-Fi network) to open Wrexlyn in Safari. For the best experience,
@@ -400,6 +422,6 @@
 </div>
 
 <script src="background.js?v=10"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

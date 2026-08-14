@@ -31,6 +31,8 @@ import { loadProjectSkills, saveProjectSkill, deleteProjectSkill } from "../tool
 import { loadSkillLibrary } from "../skillLibrary";
 import { STARTER_SKILLS } from "../starterSkills";
 import { redact, logError } from "../errors";
+import { listTransactions } from "../transactionLog";
+import { listEvidenceWithConflicts } from "../tools/evidence";
 
 const VALID_PROVIDERS: LlmProvider[] = ["pollinations", ...API_KEY_PROVIDERS];
 
@@ -461,6 +463,8 @@ function handleHttp(
   if (url.pathname === "/api/skills") return sendJson(res, 200, { skills: loadProjectSkills(root) });
   if (url.pathname === "/api/skill-library") return sendJson(res, 200, { skills: loadSkillLibrary(root) });
   if (url.pathname === "/api/starter-skills") return sendJson(res, 200, { skills: STARTER_SKILLS });
+  if (url.pathname === "/api/transactions") return handleTransactions(url, res, root);
+  if (url.pathname === "/api/evidence") return handleEvidence(url, res, root);
 
   serveStatic(url.pathname, res, scriptNonce);
 }
@@ -628,6 +632,25 @@ function handleMcpConfig(res: http.ServerResponse, root: string): void {
   } catch (err: any) {
     sendJson(res, 200, { mcpServers: {}, error: `Failed to parse mcp.json: ${err.message ?? err}` });
   }
+}
+
+/** Read-only history view (Phase 11) — across the whole project by default, or one session via
+ *  ?sessionId=, most recent first. sessionId is validated the same way the WS rollback path already
+ *  validates it (isValidId), since it's a client-supplied string landing in a filesystem path. */
+function handleTransactions(url: URL, res: http.ServerResponse, root: string): void {
+  const sessionId = url.searchParams.get("sessionId") ?? undefined;
+  if (sessionId && !isValidId(sessionId)) return sendJson(res, 400, { error: "Invalid sessionId." });
+  const limitParam = Number(url.searchParams.get("limit"));
+  const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 100;
+  sendJson(res, 200, { transactions: listTransactions(root, { sessionId, limit }) });
+}
+
+/** Read-only evidence view (Phase 11) for one session — evidence is inherently per-session, so
+ *  sessionId is required, not optional like /api/transactions. */
+function handleEvidence(url: URL, res: http.ServerResponse, root: string): void {
+  const sessionId = url.searchParams.get("sessionId");
+  if (!sessionId || !isValidId(sessionId)) return sendJson(res, 400, { error: "A valid sessionId query parameter is required." });
+  sendJson(res, 200, { entries: listEvidenceWithConflicts(root, sessionId) });
 }
 
 async function handleModels(res: http.ServerResponse, provider: string): Promise<void> {

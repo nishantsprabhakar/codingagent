@@ -76,6 +76,13 @@ worktrees having no installed dependencies), and a further real bug — a missin
 would have made the feature's own clean-tree precondition reject nearly every freshly-opened project
 — was found and fixed during live verification itself. Done on explicit user request.
 
+**Update (2026-08-14, still later):** Phase 11's verification history dashboard and evidence panel
+(below) are now DONE — see `2026-08-phase11-verification-evidence-ui.md`. The VS Code extension
+portion is explicitly deferred at the user's request, not built this round. Shipped as two new
+Settings tabs reusing existing UI chrome and rollback machinery verbatim — no new evidence data model,
+no new rollback logic. A real path-traversal-adjacent bug (a session-id validation check that could be
+silently skipped) was found and fixed before shipping. Done on explicit user request.
+
 ## Immediately next (before any Phase 3+ feature work) — ALL DONE
 
 1. ~~**SSRF-hardened outbound web fetch**~~ — DONE. See
@@ -252,11 +259,27 @@ verified live (real worktree creation/teardown, live per-attempt streaming, merg
 the one gap (a free-tier model making no actual file edits during the live run, closed instead by
 direct byte-for-byte verification of the merge logic against a real repo).
 
-## Phase 11 — Product UX / VS Code extension
+## ~~Phase 11 — Product UX / VS Code extension~~ — dashboard + evidence panel DONE, VS Code extension explicitly deferred, see `2026-08-phase11-verification-evidence-ui.md`
 
 Depends on Phase 3 (verification dashboard needs real verification states
 to show) and Phase 6 (evidence panel needs the evidence graph) to not be
 UI-without-substance.
+
+**Update (2026-08-14):** The verification history dashboard and evidence panel are DONE; the VS Code
+extension is explicitly deferred at the user's request, not built this round. Both dependencies turned
+out thinner than the backlog assumed — verification outcomes only ever rendered as inline chat-log
+rows (no persistent view), and there was no evidence UI at all, since Phase 6 shipped a flat
+same-session conflict check, not the graph this phase's own text implied would exist by now. Shipped
+as two new Settings tabs (History, Evidence) reusing the existing tab/panel chrome and the existing
+`OUTCOME_CLASS`/`OUTCOME_LABELS` styling — History's "Revert" reuses the already-existing rollback
+message verbatim, and Evidence is a deliberately flat list matching what the underlying data actually
+is, not a new graph. A real bug was caught and fixed before shipping: `listTransactions`'s
+directory-existence check ran before its `sessionId` validation, so an invalid/traversal-shaped id
+would silently pass whenever no transaction had ever been recorded for the project. See
+`2026-08-phase11-verification-evidence-ui.md` for the full design and live verification against real
+seeded transaction/evidence data. The VS Code extension itself remains open for a future phase — its
+main open design fork (embed the existing web UI in a webview vs. drive the WS protocol with native
+VS Code UI) was never resolved.
 
 ## Phase 12 — Enterprise readiness
 

@@ -2044,6 +2044,60 @@ body::before {
   border-radius: 8px;
 }
 
+/* ---------- History panel (Phase 11) ---------- */
+
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+
+.history-row {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.history-row-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.history-row-intent { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-row-meta { display: flex; align-items: center; gap: 10px; font-size: 11.5px; }
+.history-row-time { color: var(--text-faint); }
+.history-revert-btn { flex-shrink: 0; padding: 5px 12px; font-size: 12.5px; }
+.history-row.outcome-verified .transaction-outcome { color: var(--success); }
+.history-row.outcome-reviewed .transaction-outcome { color: var(--accent); }
+.history-row.outcome-partial .transaction-outcome { color: var(--warn, #fbbf24); }
+.history-row.outcome-unverified .transaction-outcome { color: var(--text-dim); }
+.history-row.outcome-failed .transaction-outcome { color: var(--danger); }
+.history-row.outcome-blocked .transaction-outcome { color: var(--text-faint); }
+
+/* ---------- Evidence panel (Phase 11) ---------- */
+
+.evidence-list { display: flex; flex-direction: column; gap: 8px; }
+
+.evidence-row {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.evidence-row-label { font-weight: 600; }
+.evidence-row-value { font-family: var(--mono); }
+.evidence-row-source { color: var(--text-faint); font-size: 11.5px; text-align: right; }
+.evidence-row.evidence-conflict { border-color: rgba(248, 113, 113, 0.35); }
+.evidence-conflict-flag {
+  font-size: 10.5px;
+  color: var(--danger);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 999px;
+  padding: 1px 7px;
+  vertical-align: middle;
+}
+
 .skill-item {
   border: 1px solid var(--border-soft);
   border-radius: 8px;

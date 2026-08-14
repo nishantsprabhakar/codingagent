@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { appendEvidence, findConflicts, loadEvidence } from "../tools/evidence";
+import { appendEvidence, findConflicts, loadEvidence, listEvidenceWithConflicts } from "../tools/evidence";
 
 function mkRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "wrexlyn-evidence-test-"));
@@ -89,4 +89,31 @@ test("loadEvidence: a missing or corrupt ledger file returns [] rather than thro
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "corrupt.jsonl"), "{not valid json\n{\"also\": \"broken\n", "utf-8");
   assert.deepEqual(loadEvidence(root, "corrupt"), []);
+});
+
+test("listEvidenceWithConflicts: flags an entry only if an EARLIER same-label entry disagrees with it (Phase 11 panel)", () => {
+  const root = mkRoot();
+  appendEvidence(root, "sess1", "Revenue", "$5M", "source A", "tx1");
+  appendEvidence(root, "sess1", "Revenue", "$4.8M", "source B", "tx2"); // disagrees with tx1
+  appendEvidence(root, "sess1", "Headcount", "1,204", "source C", "tx3"); // unrelated label, no conflict
+
+  const entries = listEvidenceWithConflicts(root, "sess1");
+  assert.equal(entries.length, 3);
+  assert.equal(entries[0].hasConflict, false, "the first-ever entry for a label has nothing earlier to conflict with");
+  assert.equal(entries[1].hasConflict, true, "disagrees with the earlier Revenue entry");
+  assert.equal(entries[2].hasConflict, false, "a different label entirely");
+});
+
+test("listEvidenceWithConflicts: an entry that only agrees with everything earlier is never flagged", () => {
+  const root = mkRoot();
+  appendEvidence(root, "sess1", "Revenue", "$5M", "source A", "tx1");
+  appendEvidence(root, "sess1", "Revenue", "5,000,000", "source B", "tx2"); // numerically equivalent
+
+  const entries = listEvidenceWithConflicts(root, "sess1");
+  assert.deepEqual(entries.map((e) => e.hasConflict), [false, false]);
+});
+
+test("listEvidenceWithConflicts: empty for a session with no recorded evidence", () => {
+  const root = mkRoot();
+  assert.deepEqual(listEvidenceWithConflicts(root, "no-such-session"), []);
 });

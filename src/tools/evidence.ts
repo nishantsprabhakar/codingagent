@@ -146,6 +146,24 @@ export function findConflicts(root: string, sessionId: string, label: string, va
     .map((e) => ({ label: e.label, priorValue: e.value, priorSource: e.source, priorTransactionId: e.transactionId }));
 }
 
+/** One recorded evidence entry, flagged with whether ANY earlier same-label entry this session
+ *  conflicts with it — for the Phase 11 evidence panel (read-only; reuses loadEvidence's already-
+ *  persisted data and this module's existing conflict logic, no new storage or scoring). */
+export interface EvidenceEntryWithConflict extends EvidenceEntry {
+  hasConflict: boolean;
+}
+
+/** Never throws. Ordered oldest-first (recording order), matching loadEvidence's own order. */
+export function listEvidenceWithConflicts(root: string, sessionId: string): EvidenceEntryWithConflict[] {
+  const entries = loadEvidence(root, sessionId);
+  return entries.map((entry, i) => {
+    const hasConflict = entries
+      .slice(0, i)
+      .some((earlier) => earlier.normalizedLabel === entry.normalizedLabel && valuesConflict(earlier, entry.value, entry.numericValue));
+    return { ...entry, hasConflict };
+  });
+}
+
 /** Best-effort — a write failure shouldn't interrupt the agent loop. */
 export function appendEvidence(root: string, sessionId: string, label: string, value: string, source: string, transactionId: string): void {
   try {

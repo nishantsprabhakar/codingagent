@@ -48,3 +48,42 @@ export function loadTransaction(root: string, sessionId: string, transactionId: 
     return null;
   }
 }
+
+/**
+ * Lists transactions across this project (or one session, if given), most recent first --
+ * read-only, for the Phase 11 history view. Reuses the same per-line JSON.parse-and-skip-corrupt
+ * approach as loadTransaction, just across every session file instead of one known id. Throws if
+ * `sessionId` is given but invalid (see assertValidId) -- validated unconditionally, before the
+ * directory-existence check below, so an invalid id is rejected the same way whether or not any
+ * transaction has ever been recorded for this project. Otherwise never throws.
+ */
+export function listTransactions(root: string, opts: { limit?: number; sessionId?: string } = {}): TransactionRecord[] {
+  // sessionId can arrive from a REST query param (a client-supplied string) -- validated the same
+  // way transactionLogPath() validates it for the write path, so it can never escape `dir` via a
+  // ".."/separator, per this module's own established path-traversal defense (idValidation.ts).
+  if (opts.sessionId) assertValidId(opts.sessionId, "session id");
+
+  const dir = transactionsDir(root);
+  if (!fs.existsSync(dir)) return [];
+
+  const fileNames = opts.sessionId ? [`${opts.sessionId}.jsonl`] : fs.readdirSync(dir).filter((n) => n.endsWith(".jsonl"));
+
+  const records: TransactionRecord[] = [];
+  for (const fileName of fileNames) {
+    try {
+      const lines = fs.readFileSync(path.join(dir, fileName), "utf-8").split("\n").filter(Boolean);
+      for (const line of lines) {
+        try {
+          records.push(JSON.parse(line) as TransactionRecord);
+        } catch {
+          // skip corrupt line
+        }
+      }
+    } catch {
+      // skip unreadable file
+    }
+  }
+
+  records.sort((a, b) => (b.endedAt ?? b.startedAt) - (a.endedAt ?? a.startedAt));
+  return opts.limit ? records.slice(0, opts.limit) : records;
+}

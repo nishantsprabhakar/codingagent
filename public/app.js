@@ -99,6 +99,12 @@
     parallelResults: document.getElementById("parallel-results"),
     parallelResultsActions: document.getElementById("parallel-results-actions"),
     parallelDiscardBtn: document.getElementById("parallel-discard-btn"),
+    settingsTabHistory: document.getElementById("settings-tab-history"),
+    settingsTabEvidence: document.getElementById("settings-tab-evidence"),
+    settingsPanelHistory: document.getElementById("settings-panel-history"),
+    settingsPanelEvidence: document.getElementById("settings-panel-evidence"),
+    historyList: document.getElementById("history-list"),
+    evidenceList: document.getElementById("evidence-list"),
   };
 
   const TOOL_ICONS = {
@@ -1046,21 +1052,25 @@
     scrollToBottom();
   }
 
+  function updateRevertButton(btn, ok, restored, conflicts) {
+    if (!btn) return;
+    btn.textContent = !ok
+      ? "Revert failed"
+      : conflicts
+        ? `Reverted ${restored} file(s), ${conflicts} skipped`
+        : `Reverted ${restored} file(s)`;
+    btn.classList.toggle("revert-failed", !ok);
+    btn.classList.toggle("revert-partial", ok && conflicts > 0);
+  }
+
   function handleRollbackResult(transactionId, ok, items) {
     const row = el.chatLog.querySelector(`.transaction-summary[data-transaction-id="${CSS.escape(transactionId)}"]`);
     const btn = row ? row.querySelector(".transaction-revert-btn") : null;
     const restored = items.filter((i) => i.status === "restored").length;
     const conflicts = items.filter((i) => i.status === "skipped_conflict").length;
-
-    if (btn) {
-      btn.textContent = !ok
-        ? "Revert failed"
-        : conflicts
-          ? `Reverted ${restored} file(s), ${conflicts} skipped`
-          : `Reverted ${restored} file(s)`;
-      btn.classList.toggle("revert-failed", !ok);
-      btn.classList.toggle("revert-partial", ok && conflicts > 0);
-    }
+    updateRevertButton(btn, ok, restored, conflicts);
+    // The History panel (Phase 11) may show a row for this same transaction id -- update it too.
+    updateRevertButton(el.historyList.querySelector(`.history-revert-btn[data-transaction-id="${CSS.escape(transactionId)}"]`), ok, restored, conflicts);
 
     const problems = items.filter((i) => i.status !== "restored");
     if (row && problems.length) {
@@ -1678,13 +1688,19 @@
     el.settingsTabMcp.classList.toggle("active", tab === "mcp");
     el.settingsTabApiKeys.classList.toggle("active", tab === "apikeys");
     el.settingsTabSkills.classList.toggle("active", tab === "skills");
+    el.settingsTabHistory.classList.toggle("active", tab === "history");
+    el.settingsTabEvidence.classList.toggle("active", tab === "evidence");
     el.settingsTabPhone.classList.toggle("active", tab === "phone");
     el.settingsPanelInstructions.hidden = tab !== "instructions";
     el.settingsPanelMcp.hidden = tab !== "mcp";
     el.settingsPanelApiKeys.hidden = tab !== "apikeys";
     el.settingsPanelSkills.hidden = tab !== "skills";
+    el.settingsPanelHistory.hidden = tab !== "history";
+    el.settingsPanelEvidence.hidden = tab !== "evidence";
     el.settingsPanelPhone.hidden = tab !== "phone";
     if (tab === "skills") loadSkillsPanel();
+    if (tab === "history") loadHistoryPanel();
+    if (tab === "evidence") loadEvidencePanel();
   }
 
   // Rows are built from this list rather than hand-duplicated HTML, so adding a future provider
@@ -1769,6 +1785,92 @@
 
   async function loadSkillsPanel() {
     await Promise.all([loadLearnedSkills(), loadStarterSkills(), loadSkillLibrary()]);
+  }
+
+  // ---------- History panel (Phase 11) ----------
+
+  function formatHistoryTimestamp(ms) {
+    if (!ms) return "";
+    return new Date(ms).toLocaleString();
+  }
+
+  async function loadHistoryPanel() {
+    el.historyList.innerHTML = `<div class="skills-list-empty">Loading…</div>`;
+    let transactions = [];
+    try {
+      const res = await apiFetch("/api/transactions?limit=100");
+      transactions = (await res.json()).transactions || [];
+    } catch {
+      el.historyList.innerHTML = `<div class="skills-list-empty">Failed to load history.</div>`;
+      return;
+    }
+
+    if (!transactions.length) {
+      el.historyList.innerHTML = `<div class="skills-list-empty">No transactions recorded yet.</div>`;
+      return;
+    }
+
+    el.historyList.innerHTML = "";
+    for (const tx of transactions) {
+      const rollbackAvailable = tx.actions.some((a) => a.ok && (a.fileSnapshot || a.treeSnapshot));
+      const row = document.createElement("div");
+      row.className = `history-row ${OUTCOME_CLASS[tx.outcome] || "outcome-unverified"}`;
+      row.innerHTML = `
+        <div class="history-row-main">
+          <div class="history-row-intent">${escapeHtml(tx.intent || "(no description)")}</div>
+          <div class="history-row-meta">
+            <span class="transaction-outcome">${escapeHtml(OUTCOME_LABELS[tx.outcome] || tx.outcome)}</span>
+            <span class="transaction-confidence">conf ${tx.confidence}</span>
+            <span class="history-row-time">${escapeHtml(formatHistoryTimestamp(tx.endedAt || tx.startedAt))}</span>
+          </div>
+        </div>
+        ${rollbackAvailable ? `<button class="btn btn-secondary history-revert-btn" data-transaction-id="${escapeHtml(tx.id)}">Revert</button>` : ""}
+      `;
+      const btn = row.querySelector(".history-revert-btn");
+      if (btn) {
+        btn.addEventListener("click", () => {
+          btn.disabled = true;
+          btn.textContent = "Reverting…";
+          send({ type: "rollback_request", transactionId: tx.id });
+        });
+      }
+      el.historyList.appendChild(row);
+    }
+  }
+
+  // ---------- Evidence panel (Phase 11) ----------
+
+  async function loadEvidencePanel() {
+    el.evidenceList.innerHTML = `<div class="skills-list-empty">Loading…</div>`;
+    if (!state.sessionId) {
+      el.evidenceList.innerHTML = `<div class="skills-list-empty">No active chat yet.</div>`;
+      return;
+    }
+
+    let entries = [];
+    try {
+      const res = await apiFetch(`/api/evidence?sessionId=${encodeURIComponent(state.sessionId)}`);
+      entries = (await res.json()).entries || [];
+    } catch {
+      el.evidenceList.innerHTML = `<div class="skills-list-empty">Failed to load evidence.</div>`;
+      return;
+    }
+
+    if (!entries.length) {
+      el.evidenceList.innerHTML = `<div class="skills-list-empty">No evidence recorded yet in this chat.</div>`;
+      return;
+    }
+
+    el.evidenceList.innerHTML = entries
+      .map(
+        (e) => `
+        <div class="evidence-row ${e.hasConflict ? "evidence-conflict" : ""}">
+          <div class="evidence-row-label">${escapeHtml(e.label)}${e.hasConflict ? ` <span class="evidence-conflict-flag">conflict</span>` : ""}</div>
+          <div class="evidence-row-value">${escapeHtml(e.value)}</div>
+          <div class="evidence-row-source">${escapeHtml(e.source)}</div>
+        </div>`
+      )
+      .join("");
   }
 
   async function loadLearnedSkills() {
@@ -2090,6 +2192,8 @@
   el.settingsTabMcp.addEventListener("click", () => showSettingsTab("mcp"));
   el.settingsTabApiKeys.addEventListener("click", () => showSettingsTab("apikeys"));
   el.settingsTabSkills.addEventListener("click", () => showSettingsTab("skills"));
+  el.settingsTabHistory.addEventListener("click", () => showSettingsTab("history"));
+  el.settingsTabEvidence.addEventListener("click", () => showSettingsTab("evidence"));
   el.settingsTabPhone.addEventListener("click", () => {
     showSettingsTab("phone");
     loadPhoneConnectInfo();
