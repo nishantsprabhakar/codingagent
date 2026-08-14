@@ -64,6 +64,13 @@ test("partially_verified (mixed authoritative): one check passed, another failed
   assert.deepEqual(result, { outcome: "partially_verified", confidenceBase: 65 });
 });
 
+// Since agent.ts's critique-ordering fix, a critic entry here represents an *informed* opinion —
+// the critic is invoked once per verification cycle, after deterministic checks run, and is shown
+// their result as evidence (see critic.ts's critiqueStep and agent.ts's critiqueIfNeeded). So a
+// critic FAIL alongside a clean authoritative pass means the critic saw the passing test result
+// and still flagged a real concern beyond what the test suite covers — not a blind pre-verification
+// guess (the bug a live 12-task benchmark caught: 12/12 tasks passed their test, but 11/12 were
+// downgraded here purely because the critic used to run before verification ever existed).
 test("partially_verified (critic flagged a clean pass): all authoritative pass but critic fails", () => {
   const result = deriveOutcome(contract(deterministic("typecheck", true), critic(false)), true, false);
   assert.deepEqual(result, { outcome: "partially_verified", confidenceBase: 70 });

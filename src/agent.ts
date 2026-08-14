@@ -22,7 +22,7 @@ import { isReadOnlyIshShellCommand } from "./riskClassifier";
 import { appendTransaction, loadTransaction } from "./transactionLog";
 import { detectProjectMemory, updateProjectMemory, loadProjectMemory, formatProjectMemoryForPrompt } from "./projectMemory";
 import { runVerification } from "./verification";
-import { critiqueStep } from "./critic";
+import { critiqueStep, type CritiqueResult } from "./critic";
 import { runDivergentRepairEnsemble, computeConvergenceScore, hasRecurredKnownFailure } from "./convergence";
 import { withIdleTimeout } from "./timeout";
 import { recordSessionStart, recordSessionEnd, recordToolUsage, recordModelUsage } from "./usageLedger";
@@ -320,6 +320,10 @@ export class Agent {
   /** Same-session evidence conflicts (see tools/evidence.ts) found during the current transaction, flushed into
    *  tx.contract.checks by finalizeTransaction and cleared at the start of every turn. */
   private pendingEvidenceConflicts: EvidenceConflict[] = [];
+  /** Index into tx.actions up to which the critic has already judged — lets critiqueIfNeeded cover only actions
+   *  taken since the last critique call, even though it now fires once per verification cycle instead of once
+   *  per tool-calling round. Reset at the start of every turn. */
+  private lastCritiquedActionIndex = 0;
   /** The currently active Best-of-N run (Phase 10), if any — one at a time per Agent, matching how
    *  everything else in this class is already single-transaction-at-a-time. */
   private activeParallelRun: ParallelRunState | null = null;
@@ -648,6 +652,7 @@ export class Agent {
     this.needsVerification = false;
     this.lastRepairSignature = null;
     this.pendingEvidenceConflicts = [];
+    this.lastCritiquedActionIndex = 0;
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       let result;
@@ -710,9 +715,15 @@ export class Agent {
           this.needsVerification = false; // no applicable check for what changed — nothing to run, don't re-check every round
         }
 
+        // Critique runs here, once per verification cycle, informed by whatever verification
+        // just found — never earlier, mid-round, with no ground truth to judge against (see
+        // critiqueIfNeeded's own comment for why that ordering used to produce false FAILs).
+        const critique = await this.critiqueIfNeeded(verification);
+        const critiqueFailed = critique !== null && !critique.pass;
+
         this.messages.push({ role: "assistant", content: text });
         if (text.trim()) this.historyLog.push({ type: "assistant", text });
-        this.reporter.assistantDeltaEnd(text, !willRepair);
+        this.reporter.assistantDeltaEnd(text, !(willRepair || critiqueFailed));
 
         if (verification) {
           this.reporter.verification(verification);
@@ -751,6 +762,19 @@ export class Agent {
             type: "user",
             text: `(automatic) verification failed — requesting repair (${tx.repairAttempts}/${MAX_REPAIR_ATTEMPTS})`,
           });
+        }
+
+        if (critiqueFailed) {
+          this.messages.push({
+            role: "user",
+            content:
+              `An independent reviewer checked your last step and found a problem:\n${critique!.reason}\n\n` +
+              `Fix this before moving on (this doesn't count against your automatic build/test repair budget).`,
+          });
+          this.historyLog.push({ type: "user", text: `(automatic) independent review flagged an issue — requesting a fix` });
+        }
+
+        if (willRepair || critiqueFailed) {
           this.persist();
           continue;
         }
@@ -788,7 +812,6 @@ export class Agent {
         this.reporter.assistantDeltaEnd(result.content, false);
       }
 
-      const actionsBefore = this.currentTransaction!.actions.length;
       const outputs = await this.runToolCalls(result.toolCalls);
       for (let i = 0; i < result.toolCalls.length; i++) {
         this.messages.push({
@@ -798,7 +821,6 @@ export class Agent {
           content: outputs[i],
         });
       }
-      await this.critiqueRoundIfNeeded(actionsBefore);
       this.persist();
     }
 
@@ -909,35 +931,52 @@ export class Agent {
   }
 
   /**
-   * Runs the independent per-step reviewer over whatever mutating actions
-   * succeeded in the round that just finished (actions[actionsBefore:]).
-   * Distinct from end-of-turn verification: this judges *intent*, not just
-   * "did it run without erroring" — the two catch different failure modes.
-   * Never throws and never blocks the turn; a FAIL just queues a follow-up
-   * message for the model to address on its next iteration.
+   * Runs the independent per-step reviewer once per verification cycle, covering every action
+   * taken since the last critique call (not just the latest round) — distinct from automatic
+   * build/test/lint verification, which only checks "did it run without erroring." This judges
+   * *intent*. Never throws and never blocks the turn; the caller decides whether a FAIL should
+   * queue a follow-up message.
+   *
+   * Deliberately called from the turn's terminal (no-tool-calls) branch, AFTER verification has
+   * had a chance to run — not from every tool-calling round, which is where this used to live.
+   * Critiquing mid-round meant the critic was always judging code with zero visibility into
+   * whether it would actually pass the test suite that runs moments later in the same turn:
+   * verification only ever executes in the terminal round, so every critic check that could ever
+   * exist was chronologically BEFORE the deterministic evidence — and verificationOutcome.ts
+   * treats any critic failure as capping the outcome below "verified", regardless of what the
+   * tests ultimately show. A live 12-task benchmark proved this wasn't a rare edge case: 12/12
+   * tasks passed their real test, but 11/12 were downgraded anyway, purely from this blind
+   * pre-verification guess. Feeding the critic the actual verification result (when one ran)
+   * fixes the blindness without losing the critic's value for turns verification can't cover
+   * (non-code changes, off-task work).
+   *
+   * Returns null when skipped (nothing new since the last critique, everything already passed
+   * its own quality gate, or the per-transaction critic budget is spent) so the caller can tell
+   * "no verdict" apart from "verdict: pass".
    */
-  private async critiqueRoundIfNeeded(actionsBefore: number): Promise<void> {
+  private async critiqueIfNeeded(verification: VerificationResult | undefined): Promise<CritiqueResult | null> {
     const tx = this.currentTransaction;
-    if (!tx || tx.criticCalls >= MAX_CRITIC_CALLS) return;
+    if (!tx || tx.criticCalls >= MAX_CRITIC_CALLS) return null;
 
-    const roundActions = tx.actions.slice(actionsBefore).filter((a) => a.ok);
-    if (!roundActions.length) return;
+    const roundActions = tx.actions.slice(this.lastCritiquedActionIndex).filter((a) => a.ok);
+    if (!roundActions.length) return null;
 
     // A round where every action already passed its own deterministic structural quality gate
     // (create_docx/create_pptx/create_xlsx — see documentQuality.ts) doesn't need an extra LLM
     // round-trip to catch the same class of mistake a fast, free check already caught for free —
     // this is a real request-count reduction on document-heavy turns, not a reliability trade-off,
     // since the critic's marginal value here (checking structural/formatting correctness) is exactly
-    // what the quality gate already verified. Skip it only when *every* action in the round qualifies;
-    // a round that mixes a quality-checked document with a plain code edit still gets critiqued.
-    if (roundActions.every((a) => a.qualityGate?.ok === true)) return;
+    // what the quality gate already verified. Skip it only when *every* action qualifies; a batch
+    // that mixes a quality-checked document with a plain code edit still gets critiqued.
+    if (roundActions.every((a) => a.qualityGate?.ok === true)) return null;
 
     const stepSummary = roundActions
       .map((a) => `- ${a.label}\n  result: ${a.output.slice(0, MAX_CRITIQUE_ACTION_CHARS)}`)
       .join("\n");
 
     tx.criticCalls++;
-    const critique = await critiqueStep(this.llmConfig, tx.intent, stepSummary);
+    const verificationSummary = verification ? summarizeVerification(verification) : undefined;
+    const critique = await critiqueStep(this.llmConfig, tx.intent, stepSummary, verificationSummary);
     tx.contract.checks.push({
       source: "critic",
       name: `independent review (round ${tx.criticCalls})`,
@@ -948,15 +987,8 @@ export class Agent {
     this.reporter.critique(critique.pass, critique.reason);
     if (critique.reason) this.historyLog.push({ type: "critique", pass: critique.pass, reason: critique.reason });
 
-    if (!critique.pass) {
-      this.messages.push({
-        role: "user",
-        content:
-          `An independent reviewer checked your last step and found a problem:\n${critique.reason}\n\n` +
-          `Fix this before moving on (this doesn't count against your automatic build/test repair budget).`,
-      });
-      this.historyLog.push({ type: "user", text: `(automatic) independent review flagged an issue — requesting a fix` });
-    }
+    this.lastCritiquedActionIndex = tx.actions.length;
+    return critique;
   }
 
   /** Document-generating tools whose failure output comes from documentQuality.ts's deterministic checks. */
