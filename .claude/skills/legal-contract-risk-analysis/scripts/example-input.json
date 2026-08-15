@@ -1,0 +1,44 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 — Brightline Retail Corp (customer) reviewing a Master Subscription Agreement from Vertex Cloud Analytics (vendor). Expected NLRS 72.7, 'Acceptable, minor flags — proceed with redlines' tier, High confidence.",
+  "contractContext": {
+    "customer": "Brightline Retail Corp",
+    "vendor": "Vertex Cloud Analytics",
+    "contractType": "Enterprise B2B SaaS subscription/services agreement (Master Subscription Agreement)"
+  },
+  "liabilityIndemnification": {
+    "liabilityCapMultipleOfACV": 1.5,
+    "carveOutsFromCap": [
+      "ip_infringement",
+      "confidentiality_breach",
+      "data_breach_security_incident"
+    ],
+    "indemnificationMutualityRubric": 3
+  },
+  "terminationExit": {
+    "customerTerminationForConvenience": true,
+    "customerTerminationNoticeDays": 60,
+    "terminationForCauseCureDays": 30,
+    "postTerminationObligationsRubric": 4
+  },
+  "ipConfidentiality": {
+    "ipOwnershipClarityRubric": 4,
+    "licenseScopeRubric": 3,
+    "confidentialityTermYears": 3,
+    "standardConfidentialityCarveOutsPresent": true
+  },
+  "disputeResolution": {
+    "disputeResolutionMechanism": "arbitration_with_injunctive_relief_carveout",
+    "venueGoverningLawFavorabilityRubric": 3,
+    "waiverMutualityRubric": 4
+  },
+  "commercialPerformance": {
+    "netPaymentDays": 45,
+    "slaRemedySpecificityRubric": 4,
+    "annualPriceIncreaseCapPct": 5
+  },
+  "counterpartyCompliance": {
+    "counterpartyFinancialStabilityTier": "private_stable_profitable",
+    "complianceRepsAdequacyRubric": 4,
+    "assignmentChangeOfControlRestriction": "consent_required_not_unreasonably_withheld"
+  }
+}

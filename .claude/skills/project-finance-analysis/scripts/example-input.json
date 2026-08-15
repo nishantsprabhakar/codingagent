@@ -1,0 +1,34 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 (Highway 42 Toll Road Concession, Year 4 of a 30-year BOT concession, post-construction). Run node score.js example-input.json to reproduce these numbers exactly.",
+  "project": "Highway 42 Toll Road Concession — 30-year BOT, Year 4 of operations (ramp-up complete)",
+  "dscr": {
+    "minDscr": 1.25,
+    "avgDscr": 1.55
+  },
+  "revenue": {
+    "contractedRevenuePct": 35,
+    "offtakerCreditQualityRubric": 4
+  },
+  "construction": {
+    "isOperational": true,
+    "epcContractQualityRubric": null,
+    "contingencyPctOfHardCost": null,
+    "sponsorCompletionSupportRubric": null
+  },
+  "operating": {
+    "omContractQualityRubric": 4,
+    "technologyTrackRecordRubric": 5,
+    "hasMaterialResourceOrVolumeRisk": true,
+    "resourceVolumeCoV": 0.08
+  },
+  "sponsor": {
+    "sponsorExperienceCreditRubric": 4,
+    "dsraMonthsCoverage": 6,
+    "covenantPackageRubric": 4
+  },
+  "regulatory": {
+    "jurisdictionRiskRubric": 4,
+    "permittingStatusRubric": 5,
+    "forceMajeureProtectionRubric": 3
+  }
+}

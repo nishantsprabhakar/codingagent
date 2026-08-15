@@ -1,0 +1,37 @@
+{
+  "_comment": "Matches the worked example in reference/algorithm.md section 7 (NimbusHR Payroll). Run node score.js example-input.json to reproduce the numbers exactly.",
+  "vendor": "NimbusHR Payroll — cloud HR/payroll SaaS, processes employee PII and direct-deposit bank account data, integrated via API with read-write access to the client's core HRIS system",
+  "dataAccess": {
+    "dataSensitivityRubric": 4,
+    "accessBreadthRubric": 3
+  },
+  "securityPosture": {
+    "certificationStatusRubric": 4,
+    "monthsSinceLastCertAudit": 8,
+    "monthsSincePentest": 10,
+    "confirmedIncidentFlags": ["minor_incident_disclosed_trailing_24mo"]
+  },
+  "businessContinuity": {
+    "bcpDrMaturityRubric": 4,
+    "slaUptimeCommitmentPct": 99.9,
+    "slaBreachesTrailing12moCount": 1,
+    "financialStabilityRubric": 4
+  },
+  "contractualCompliance": {
+    "dpaAdequacyRubric": 4,
+    "breachNotificationSlaHours": 72,
+    "auditSubprocessorGovernanceRubric": 3,
+    "regulatoryGapFlags": ["payroll_financial_data_handling_not_separately_attested"]
+  },
+  "concentrationCriticality": {
+    "businessCriticalityRubric": 4,
+    "exitAlternativeFeasibilityRubric": 3,
+    "redundancySpofRubric": 3
+  },
+  "monitoringRemediation": {
+    "questionnaireResponsivenessRubric": 4,
+    "avgTimeToRemediateDays": 45,
+    "monitoringCadenceRubric": 4,
+    "openOverdueFindingFlags": ["one_high_finding_past_remediation_deadline"]
+  }
+}

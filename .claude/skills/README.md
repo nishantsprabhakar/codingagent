@@ -8,7 +8,7 @@ scratch every session.
 [`skills-library-pitch.pptx`](skills-library-pitch.pptx) is a short deck
 covering the library's positioning and the original eight algorithms'
 verified headline scores — useful for introducing the library to someone who
-hasn't seen it before (predates the two most recent additions below).
+hasn't seen it before (predates the six most recent additions below).
 
 ## Available skills
 
@@ -24,6 +24,10 @@ hasn't seen it before (predates the two most recent additions below).
 | [`logistics-network-optimization`](logistics-network-optimization/SKILL.md) | Logistics / supply chain | **Nishant Logistics Network Efficiency Score (NLNES)** + **Nishant Consolidation Heuristic (NCH)** | A network-health diagnostic score, plus an actual route-consolidation heuristic (Clarke-Wright savings backbone + a proprietary priority-weighting overlay for tier/urgency/carbon). |
 | [`saas-business-health`](saas-business-health/SKILL.md) | SaaS / subscription businesses | **Nishant SaaS Health Score (NSHS)** | Revenue retention/expansion, growth efficiency, unit economics, churn & cohort quality, capital efficiency/burn, and qualitative/governance risk. |
 | [`ma-synergy-analysis`](ma-synergy-analysis/SKILL.md) | M&A / corporate development | **Nishant M&A Synergy & Integration Score (NMSI)** | Scores a *proposed transaction's* synergy realism and integration risk — revenue- and cost-synergy realism, cultural fit, integration complexity, valuation/deal-structure discipline, execution governance. Distinct from NDQI, which scores a standalone deal as an investment. |
+| [`project-finance-analysis`](project-finance-analysis/SKILL.md) | Infrastructure / project finance | **Nishant Project Finance Score (NPFS)** | Scores a single-asset project finance facility (toll roads, power plants, PPPs) — DSCR profile, revenue/offtake certainty, construction/completion risk, operating risk, sponsor & structure quality, regulatory/political risk. Distinct from NCRS's corporate-lending anchors, which don't fit a project SPV with no operating history. |
+| [`insurance-underwriting-analysis`](insurance-underwriting-analysis/SKILL.md) | Commercial insurance underwriting | **Nishant Insurance Underwriting Score (NIUS)** | Underwrites a commercial property risk submission — loss history/experience, exposure quality (COPE), financial strength/moral hazard, risk management & controls, coverage/limits adequacy, market/pricing context — mapped to a bind/decline underwriting tier. |
+| [`legal-contract-risk-analysis`](legal-contract-risk-analysis/SKILL.md) | Legal / contract risk (in-house counsel) | **Nishant Legal Risk Score (NLRS)** | Scores an enterprise SaaS subscription agreement's legal risk from the customer's side — liability/indemnification exposure, termination/exit rights, IP/confidentiality terms, dispute resolution, commercial terms, counterparty/compliance risk. Assists triage only — not legal advice, never a substitute for attorney review. |
+| [`vendor-risk-analysis`](vendor-risk-analysis/SKILL.md) | Third-party / vendor security risk (TPRM) | **Nishant Vendor Risk Score (NVRS)** | Scores a third-party vendor for onboarding/reassessment — data access & sensitivity, security posture/certifications, business continuity/resilience, contractual/compliance controls, concentration/criticality, monitoring & remediation track record. |
 
 Each skill's `reference/algorithm.md` is the authoritative spec; `scripts/score.js`
 (and, for logistics, `scripts/consolidate.js`) is a literal, runnable
