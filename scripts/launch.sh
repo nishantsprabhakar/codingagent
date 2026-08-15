@@ -35,9 +35,28 @@ if [ ! -d "$ROOT/node_modules" ]; then
   npm install
 fi
 
+# Rebuild if dist/ is missing OR stale relative to the checked-out commit — "missing" alone isn't enough:
+# a `git pull` (manual, or from check-update.js if declined/skipped) leaves an old dist/index.js sitting
+# there untouched, and the app would silently launch mismatched compiled output against new source/deps.
+BUILD_SHA_PATH="$ROOT/dist/.build-sha"
+CURRENT_SHA="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+
+NEEDS_BUILD=0
 if [ ! -f "$ROOT/dist/index.js" ]; then
+  NEEDS_BUILD=1
+elif [ -n "$CURRENT_SHA" ]; then
+  BUILT_SHA="$(cat "$BUILD_SHA_PATH" 2>/dev/null || true)"
+  if [ "$BUILT_SHA" != "$CURRENT_SHA" ]; then
+    NEEDS_BUILD=1
+  fi
+fi
+
+if [ "$NEEDS_BUILD" = "1" ]; then
   echo "Building..."
   npm run build
+  if [ -n "$CURRENT_SHA" ]; then
+    printf '%s' "$CURRENT_SHA" > "$BUILD_SHA_PATH"
+  fi
 fi
 
 eval "$(node "$ROOT/scripts/launch-config.js" "$@")"

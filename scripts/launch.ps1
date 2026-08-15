@@ -53,10 +53,25 @@ if (-not (Test-Path "$root\node_modules")) {
     if ($LASTEXITCODE -ne 0) { Write-Host "Dependency install failed." -ForegroundColor Red; exit 1 }
 }
 
-if (-not (Test-Path "$root\dist\index.js")) {
+# Rebuild if dist/ is missing OR stale relative to the checked-out commit — "missing" alone isn't enough:
+# a `git pull` (manual, or from check-update.js if declined/skipped) leaves an old dist/index.js sitting
+# there untouched, and the app would silently launch mismatched compiled output against new source/deps.
+$buildShaPath = "$root\dist\.build-sha"
+$currentSha = $null
+try { $currentSha = (& git -C $root rev-parse HEAD 2>$null); if ($LASTEXITCODE -ne 0) { $currentSha = $null } } catch { $currentSha = $null }
+
+$needsBuild = -not (Test-Path "$root\dist\index.js")
+if (-not $needsBuild -and $currentSha) {
+    $builtSha = $null
+    if (Test-Path $buildShaPath) { $builtSha = (Get-Content $buildShaPath -Raw -ErrorAction SilentlyContinue) }
+    if ($builtSha -ne $currentSha) { $needsBuild = $true }
+}
+
+if ($needsBuild) {
     Write-Step "Building..."
     & $npmPath run build
     if ($LASTEXITCODE -ne 0) { Write-Host "Build failed." -ForegroundColor Red; exit 1 }
+    if ($currentSha) { Set-Content -Path $buildShaPath -Value $currentSha -NoNewline }
 }
 
 $configPath = "$root\agent.config.json"
