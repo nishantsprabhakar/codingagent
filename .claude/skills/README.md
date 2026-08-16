@@ -6,9 +6,9 @@ something reusable and consistent, instead of re-deriving judgment calls from
 scratch every session.
 
 [`skills-library-pitch.pptx`](skills-library-pitch.pptx) is a short deck
-covering the library's positioning and the original eight algorithms'
-verified headline scores — useful for introducing the library to someone who
-hasn't seen it before (predates the six most recent additions below).
+covering the library's positioning and all fourteen algorithms' verified
+headline scores — useful for introducing the library to someone who hasn't
+seen it before.
 
 ## Available skills
 
