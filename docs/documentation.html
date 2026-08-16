@@ -337,6 +337,9 @@
         <div class="card"><h3><span class="tick">&#10003;</span>Multi-session projects</h3><p>Chats are scoped per project and grouped by recency, so switching between several codebases keeps separate history and context for each.</p></div>
         <div class="card"><h3><span class="tick">&#10003;</span>MCP servers</h3><p>Any Model Context Protocol server — filesystem, git, memory, custom — plugs in from Settings and its tools become available immediately.</p></div>
         <div class="card"><h3><span class="tick">&#10003;</span>Mobile access</h3><p>A QR code in Settings opens the same session from a phone on the same network — full chat, same project, no separate app.</p></div>
+        <div class="card"><h3><span class="tick">&#10003;</span>Live usage tracking</h3><p>A running token counter in the topbar, seeded from the durable usage ledger so it's correct even after a reconnect or restart mid-session — the same data that already fed the exported spreadsheet, now visible live.</p></div>
+        <div class="card"><h3><span class="tick">&#10003;</span>Mid-turn cancel</h3><p>The send button becomes a stop button while a turn is running. It aborts the in-flight model call immediately, across every supported provider, rather than making the user wait out a slow or runaway response.</p></div>
+        <div class="card"><h3><span class="tick">&#10003;</span>Cross-session search</h3><p>A search box above the chat list finds past sessions by content — transcript and tool activity both — not just by scrolling the recency-grouped list.</p></div>
       </div>
     </section>
 
@@ -520,13 +523,12 @@
       <div class="chapter-head"><span class="chapter-num">09</span><h2>Roadmap</h2></div>
       <div class="prose"><p class="lede">Known gaps, tracked rather than hidden — the same honesty this document tries to apply to everything else it describes.</p></div>
       <div class="grid-2">
-        <div class="card"><h3>Sandboxed execution</h3><p>Container-level isolation for shell commands, for the small set of use cases where host-level trust isn't acceptable.</p></div>
-        <div class="card"><h3>Mid-flight cancel</h3><p>A cancel affordance for a long-running tool call, rather than waiting it out.</p></div>
+        <div class="card"><h3>Sandboxed execution</h3><p>Container-level isolation for shell commands, for the small set of use cases where host-level trust isn't acceptable. A currently-running tool call also can't be force-killed mid-execution yet — a cancel request stops the loop from continuing, but a shell command already dispatched still finishes on its own.</p></div>
         <div class="card"><h3>Optional customer-controlled coordination</h3><p>Where organizations require shared policy or team administration, coordination should remain customer-hosted or explicitly opt-in. A mandatory Wrexlyn cloud control plane is intentionally outside the local-first product contract.</p></div>
-        <div class="card"><h3>Cross-session search</h3><p>Semantic search across past sessions, beyond the current recency-grouped list.</p></div>
         <div class="card"><h3>Prose-quality scoring</h3><p>The &sect;12 quality gate is deterministic and structural by design; a genuinely writing-quality-aware check would need its own model call, with its own cost and reliability trade-offs, and hasn't been added yet.</p></div>
         <div class="card"><h3>Shared/team skills</h3><p>&sect;13 skills are per-project today; a way to promote one to a team-shared library is a natural next step, not yet built.</p></div>
       </div>
+      <div class="callout">Two items previously listed here — a mid-flight cancel affordance and cross-session search — have since shipped; see &sect;01 Capabilities. Cross-session search is lexical (term-frequency relevance), not embedding-based semantic search — no embedding model is part of this deployment yet.</div>
     </section>
 
     <section class="chapter" id="skills-library">
