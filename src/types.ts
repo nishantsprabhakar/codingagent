@@ -324,4 +324,8 @@ export interface Reporter {
    *  warn other connections viewing the same session that their in-memory copy is now stale. A no-op for
    *  reporters with no notion of "other viewers" (console, eval, parallel-run attempts). */
   sessionPersisted(sessionId: string): void;
+  /** Running token totals for the active session, updated after every model call that reported usage
+   *  (see usageLedger.ts, the durable source of truth this mirrors) — lets a UI show live cost/usage
+   *  instead of only the after-the-fact exported spreadsheet. */
+  usageUpdate(totals: TokenUsage): void;
 }

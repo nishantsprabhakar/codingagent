@@ -3,7 +3,7 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { Reporter, TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome } from "./types";
+import type { Reporter, TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome, TokenUsage } from "./types";
 
 const CODES = {
   reset: "\x1b[0m",
@@ -102,6 +102,7 @@ export class ConsoleReporter implements Reporter {
   private spinnerTimer: ReturnType<typeof setInterval> | null = null;
   private spinnerFrame = 0;
   private streaming = false;
+  private lastUsage: TokenUsage | null = null;
 
   toolCall(_id: string, _name: string, label: string, _args: unknown, risk: RiskLevel): void {
     this.stopSpinner();
@@ -144,7 +145,7 @@ export class ConsoleReporter implements Reporter {
     process.stdout.write(chunk);
   }
 
-  assistantDeltaEnd(fullText: string, _isFinal: boolean): void {
+  assistantDeltaEnd(fullText: string, isFinal: boolean): void {
     if (this.streaming) {
       process.stdout.write("\n\n");
     } else if (fullText) {
@@ -154,6 +155,13 @@ export class ConsoleReporter implements Reporter {
       process.stdout.write(fullText + "\n\n");
     }
     this.streaming = false;
+    if (isFinal && this.lastUsage && this.lastUsage.totalTokens > 0) {
+      console.log(color.dim(`tokens this session: ${this.lastUsage.totalTokens.toLocaleString()}`));
+    }
+  }
+
+  usageUpdate(totals: TokenUsage): void {
+    this.lastUsage = totals;
   }
 
   error(text: string): void {

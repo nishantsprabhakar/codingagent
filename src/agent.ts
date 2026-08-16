@@ -25,7 +25,7 @@ import { runVerification } from "./verification";
 import { critiqueStep, type CritiqueResult } from "./critic";
 import { runDivergentRepairEnsemble, computeConvergenceScore, hasRecurredKnownFailure } from "./convergence";
 import { withIdleTimeout } from "./timeout";
-import { recordSessionStart, recordSessionEnd, recordToolUsage, recordModelUsage } from "./usageLedger";
+import { recordSessionStart, recordSessionEnd, recordToolUsage, recordModelUsage, getSessionUsageTotals } from "./usageLedger";
 import { deriveOutcome } from "./verificationOutcome";
 import {
   startParallelRun,
@@ -53,6 +53,7 @@ import type {
   ToolQualityGateResult,
   ProjectMemory,
   ToolSpec,
+  TokenUsage,
 } from "./types";
 
 const MAX_TOOL_ITERATIONS = 30;
@@ -328,6 +329,16 @@ export class Agent {
   /** The currently active Best-of-N run (Phase 10), if any — one at a time per Agent, matching how
    *  everything else in this class is already single-transaction-at-a-time. */
   private activeParallelRun: ParallelRunState | null = null;
+  /** Running token totals for the active session — seeded from the durable usage ledger (see
+   *  usageLedger.ts) so a reconnect/restart mid-session shows the true cumulative figure, not zero. */
+  private sessionTokenTotals: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+  /** Aborts the in-flight model call the moment abortCurrentTurn() is called — recreated fresh for every
+   *  model call so a stale controller from a previous, already-finished call is never reused. */
+  private currentAbortController: AbortController | null = null;
+  /** Set by abortCurrentTurn(); checked between tool-calling rounds so a stop request also takes effect
+   *  when the turn is between iterations rather than mid model-call (where the abort signal itself
+   *  already interrupts things). Reset at the start of every new turn. */
+  private stopRequested = false;
 
   constructor(
     root: string,
@@ -384,6 +395,7 @@ export class Agent {
       this.createdFiles = [];
       this.sessionTitle = "New chat";
     }
+    this.sessionTokenTotals = getSessionUsageTotals(this.sessionId);
   }
 
   /** Pushes this session's history/tasks/files to the reporter — call after construction or a session switch. */
@@ -391,6 +403,17 @@ export class Agent {
     this.reporter.history(this.historyLog);
     this.reporter.tasks(this.tasks);
     this.reporter.files(this.createdFiles);
+    this.reporter.usageUpdate(this.sessionTokenTotals);
+  }
+
+  /** Requests that the current turn stop as soon as safely possible: a model call already in flight is
+   *  aborted immediately (the fetch itself is cancelled — see providers' AbortSignal wiring); a tool call
+   *  that's already running (e.g. a shell command dispatched to the shell-execution service) finishes on
+   *  its own rather than being killed mid-execution — no in-flight cancel exists for that path yet, see
+   *  shellServiceClient.ts. Safe to call when nothing is in flight; it's just a no-op then. */
+  abortCurrentTurn(): void {
+    this.stopRequested = true;
+    this.currentAbortController?.abort();
   }
 
   getSessionId(): string {
@@ -415,6 +438,7 @@ export class Agent {
     this.tasks = [];
     this.createdFiles = [];
     this.sessionTitle = "New chat";
+    this.sessionTokenTotals = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
     return this.sessionId;
   }
 
@@ -655,9 +679,12 @@ export class Agent {
     this.lastRepairSignature = null;
     this.pendingEvidenceConflicts = [];
     this.lastCritiquedActionIndex = 0;
+    this.stopRequested = false;
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       let result;
+      const abortController = new AbortController();
+      this.currentAbortController = abortController;
       try {
         this.reporter.thinking(true);
         result = await withIdleTimeout(
@@ -676,23 +703,36 @@ export class Agent {
               (chunk) => {
                 heartbeat();
                 this.reporter.assistantDelta(chunk);
-              }
+              },
+              abortController.signal
             ),
           MODEL_IDLE_TIMEOUT_MS,
           "model call"
         );
       } catch (err: any) {
         this.reporter.thinking(false);
+        if (err?.name === "AbortError") {
+          this.stoppedByUser();
+          return;
+        }
         const message = err.message ?? String(err);
         this.reporter.error(message);
         this.historyLog.push({ type: "error", text: message });
         this.finalizeTransaction("failed");
         this.persist();
         return;
+      } finally {
+        this.currentAbortController = null;
       }
       this.reporter.thinking(false);
       if (result.usage) {
         recordModelUsage(this.sessionId, this.llmConfig.provider, this.llmConfig.model, result.usage);
+        this.sessionTokenTotals = {
+          promptTokens: this.sessionTokenTotals.promptTokens + result.usage.promptTokens,
+          completionTokens: this.sessionTokenTotals.completionTokens + result.usage.completionTokens,
+          totalTokens: this.sessionTokenTotals.totalTokens + result.usage.totalTokens,
+        };
+        this.reporter.usageUpdate(this.sessionTokenTotals);
       }
 
       if (result.toolCalls.length === 0) {
@@ -828,6 +868,14 @@ export class Agent {
         });
       }
       this.persist();
+
+      // A stop request that arrived while these tool calls were running (rather than while the model
+      // call itself was in flight, which the AbortSignal above already handles) — the tool calls just
+      // dispatched are allowed to finish and their results are kept, but no further iteration starts.
+      if (this.stopRequested) {
+        this.stoppedByUser();
+        return;
+      }
     }
 
     const message = `Stopped after ${MAX_TOOL_ITERATIONS} tool calls without a final response.`;
@@ -858,6 +906,15 @@ export class Agent {
    * `forced` overrides the derived outcome for hard-stop paths (LLM error,
    * iteration budget exhausted) where there was no clean verification phase.
    */
+  /** Common ending for a turn stopped by the user via abortCurrentTurn(), whether that was caught as an
+   *  AbortError from an in-flight model call or as stopRequested between tool-calling rounds. */
+  private stoppedByUser(): void {
+    this.historyLog.push({ type: "assistant", text: "(stopped by user)" });
+    this.reporter.assistantDeltaEnd("(stopped by user)", true);
+    this.finalizeTransaction("blocked");
+    this.persist();
+  }
+
   private finalizeTransaction(forced?: TransactionOutcome): void {
     const tx = this.currentTransaction;
     if (!tx) return;

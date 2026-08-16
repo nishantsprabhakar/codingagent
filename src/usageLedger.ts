@@ -87,6 +87,20 @@ export function recordModelUsage(sessionId: string, provider: LlmProvider, model
   });
 }
 
+/** Summed prompt/completion/total tokens for every model call recorded so far in one session —
+ *  the live, in-UI counterpart to usageExport.ts's after-the-fact spreadsheet. Reads the same
+ *  durable ledger, so it stays correct across a server restart or a reconnect mid-session. */
+export function getSessionUsageTotals(sessionId: string): TokenUsage {
+  const totals: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+  for (const e of readAllEvents()) {
+    if (e.type !== "model" || e.sessionId !== sessionId) continue;
+    totals.promptTokens += e.promptTokens;
+    totals.completionTokens += e.completionTokens;
+    totals.totalTokens += e.totalTokens;
+  }
+  return totals;
+}
+
 /** Reads every event ever recorded (across all sessions/processes on this machine). */
 export function readAllEvents(): UsageEvent[] {
   let text: string;

@@ -76,24 +76,25 @@ export async function chatCompletion(
   messages: ChatMessage[],
   tools: ToolDefinition[],
   config: LlmConfig,
-  onDelta?: OnDelta
+  onDelta?: OnDelta,
+  signal?: AbortSignal
 ): Promise<ChatCompletionResult> {
   const safeMessages = sanitizeMessagesForProvider(messages, config.provider);
 
   if (config.provider === "kilo") {
-    return kilo.chatCompletion(safeMessages, tools, config.model, undefined, onDelta, config.temperature);
+    return kilo.chatCompletion(safeMessages, tools, config.model, undefined, onDelta, config.temperature, signal);
   }
 
   if (config.provider === "custom") {
     if (!config.baseUrl) {
       throw new Error(`custom provider selected but no base URL was configured (--base-url, or Settings > API Keys > Custom / Local Model).`);
     }
-    return custom.chatCompletion(safeMessages, tools, config.model, config.apiKey ?? "", config.baseUrl, undefined, onDelta, config.temperature);
+    return custom.chatCompletion(safeMessages, tools, config.model, config.apiKey ?? "", config.baseUrl, undefined, onDelta, config.temperature, signal);
   }
 
   const entry = KEYED_PROVIDERS[config.provider];
   if (!config.apiKey) {
     throw new Error(`${config.provider} provider selected but no API key was supplied (--api-key or ${entry.envHint}).`);
   }
-  return entry.chatCompletion(safeMessages, tools, config.model, config.apiKey, undefined, onDelta, config.temperature);
+  return entry.chatCompletion(safeMessages, tools, config.model, config.apiKey, undefined, onDelta, config.temperature, signal);
 }

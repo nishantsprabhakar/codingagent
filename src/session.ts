@@ -15,6 +15,15 @@ export interface SessionMeta {
   updatedAt: number;
 }
 
+/** One session's match for a searchSessions query. */
+export interface SessionSearchResult {
+  id: string;
+  title: string;
+  updatedAt: number;
+  /** A short excerpt around the strongest match, for context in the results list. */
+  snippet: string;
+}
+
 interface PersistedSession extends SessionMeta {
   messages: ChatMessage[];
   historyLog: HistoryItem[];
@@ -143,6 +152,71 @@ export function deleteSession(root: string, id: string): void {
   } catch {
     // best-effort
   }
+}
+
+const SNIPPET_RADIUS = 60;
+const MAX_SEARCH_RESULTS = 20;
+
+/** Flattens one session's history into plain text worth searching: user/assistant turns (the actual
+ *  conversation) plus tool labels (so "create_pptx" or a filename mentioned in a tool call still
+ *  matches) — deliberately excludes raw tool args/output, which is mostly noise for this purpose. */
+function searchableText(historyLog: HistoryItem[]): string {
+  return historyLog
+    .map((item) => {
+      if (item.type === "user" || item.type === "assistant") return item.text;
+      if (item.type === "tool") return item.label;
+      return "";
+    })
+    .filter(Boolean)
+    .join(" \n ");
+}
+
+/**
+ * Lexical (not embedding-based) relevance search across every persisted session in this project —
+ * scores by how many times each query term appears, so a session that mentions a term repeatedly
+ * ranks above one with a single passing mention. Never throws; an unreadable session is just skipped,
+ * matching listSessions/loadSession's own error handling.
+ */
+export function searchSessions(root: string, query: string): SessionSearchResult[] {
+  const terms = query
+    .toLowerCase()
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+  if (terms.length === 0) return [];
+
+  const results: Array<SessionSearchResult & { score: number }> = [];
+  for (const meta of listSessions(root)) {
+    const full = loadSession(root, meta.id);
+    if (!full) continue;
+    const text = searchableText(full.historyLog);
+    const lower = text.toLowerCase();
+
+    let score = 0;
+    let firstMatchIdx = -1;
+    for (const term of terms) {
+      let fromIdx = 0;
+      let idx: number;
+      while ((idx = lower.indexOf(term, fromIdx)) !== -1) {
+        score++;
+        if (firstMatchIdx === -1) firstMatchIdx = idx;
+        fromIdx = idx + term.length;
+      }
+    }
+    if (score === 0) continue;
+
+    const start = Math.max(0, firstMatchIdx - SNIPPET_RADIUS);
+    const end = Math.min(text.length, firstMatchIdx + SNIPPET_RADIUS);
+    const snippet =
+      (start > 0 ? "…" : "") + text.slice(start, end).replace(/\s+/g, " ").trim() + (end < text.length ? "…" : "");
+
+    results.push({ id: meta.id, title: meta.title, updatedAt: meta.updatedAt, snippet, score });
+  }
+
+  return results
+    .sort((a, b) => b.score - a.score || b.updatedAt - a.updatedAt)
+    .slice(0, MAX_SEARCH_RESULTS)
+    .map(({ score: _score, ...rest }) => rest);
 }
 
 /** The session to resume on a fresh connection when none is explicitly requested. */

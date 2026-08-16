@@ -544,6 +544,20 @@ body::before {
 }
 .new-chat-btn:hover { background: var(--accent); color: #06232a; }
 
+.session-search-input {
+  margin: 0 12px 8px;
+  width: calc(100% - 24px);
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 10px;
+}
+.session-search-input:focus { outline: none; border-color: var(--accent); }
+.session-search-input::placeholder { color: var(--text-faint); }
+
 .session-list {
   max-height: 220px;
   overflow-y: auto;
@@ -576,6 +590,13 @@ body::before {
 }
 .session-item.active .session-item-title { color: var(--text); font-weight: 600; }
 .session-item-time { font-size: 12px; color: var(--text-faint); font-family: var(--mono); }
+.session-item-snippet {
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .session-item-delete {
   flex-shrink: 0;
@@ -1069,6 +1090,11 @@ body::before {
   transition: all 0.15s ease;
 }
 .badge-clickable:hover { color: var(--accent); border-color: var(--accent); }
+
+.badge-usage {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
 
 .model-provider-chips {
   display: flex;
@@ -1587,6 +1613,12 @@ body::before {
 
 .send-btn:hover:not(:disabled) { transform: translateY(-1px); }
 .send-btn:disabled { opacity: 0.35; cursor: default; }
+
+.send-btn-stop {
+  background: var(--danger);
+  color: #fff;
+  font-size: 14px;
+}
 
 /* ---------- Code panel ---------- */
 

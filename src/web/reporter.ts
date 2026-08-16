@@ -3,7 +3,7 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { Reporter, TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome } from "../types";
+import type { Reporter, TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome, TokenUsage } from "../types";
 import type { ConfirmFn, PermissionDecision } from "../permissions";
 import type { ServerMessage } from "./protocol";
 
@@ -69,6 +69,10 @@ export class WebSocketReporter implements Reporter {
 
   history(items: HistoryItem[]): void {
     this.send({ type: "history", items });
+  }
+
+  usageUpdate(totals: TokenUsage): void {
+    this.send({ type: "usage_update", ...totals });
   }
 }
 

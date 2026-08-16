@@ -37,3 +37,22 @@ jobs:
       # advisories (image-size, no non-vulnerable release published yet) are allowlisted with
       # rationale in .audit-ci.json, not silently ignored.
       - run: npm run audit
+
+  eval-smoke:
+    name: eval CLI smoke test
+    # The 12-task pilot corpus against a real provider costs real API quota/rate-limit budget on
+    # every push, which CI shouldn't spend unattended — the harness's own unit tests (fixture
+    # discovery, report scoring/aggregation, a fake-server smoke test of runOne()'s plumbing) are
+    # already covered by the "verify" job above via src/eval/*.test.ts. This job is deliberately
+    # just a build + a no-network invocation of the eval CLI entry point, catching a broken
+    # `npm run eval` command without ever making a live model call from CI.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node dist/eval/cli.js --help

@@ -20,7 +20,7 @@ import { loadGlobalInstructions } from "../globalSettings";
 import { loadApiKey, saveApiKey, clearApiKey, maskApiKey, API_KEY_PROVIDERS, type ApiKeyProvider } from "../apiKeys";
 import { describeActiveBackend } from "../secretStore";
 import { listOpenRouterModels, GROQ_MODELS, GEMINI_MODELS, CEREBRAS_MODELS, MISTRAL_MODELS } from "../providers/openrouterModels";
-import { listSessions } from "../session";
+import { listSessions, searchSessions } from "../session";
 import type { ClientMessage, ServerMessage } from "./protocol";
 import { DEFAULT_MODEL } from "../types";
 import type { LlmConfig, LlmProvider } from "../types";
@@ -310,6 +310,15 @@ export function startWebServer(
           sendSessions();
         } else if (msg.type === "list_sessions") {
           sendSessions();
+        } else if (msg.type === "session_search") {
+          send({ type: "session_search_results", query: msg.query, results: searchSessions(currentRoot, msg.query) });
+        } else if (msg.type === "abort_turn") {
+          // Deliberately not awaited relative to any in-flight handleUserMessage call above — this
+          // handler invocation runs concurrently with that one (a new WS "message" event starts a new
+          // call to this async function regardless of a prior call's pending await), so calling this
+          // synchronously here reaches the Agent and aborts its in-flight model call immediately
+          // rather than queuing behind the very turn it's meant to interrupt.
+          agent.abortCurrentTurn();
         } else if (msg.type === "update_global_instructions") {
           agent.setGlobalInstructions(msg.text);
           send({ type: "settings_saved", which: "instructions" });

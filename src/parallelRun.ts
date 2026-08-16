@@ -105,6 +105,10 @@ class TaggedReporter implements Reporter {
     // Each attempt runs in its own isolated worktree with its own session file -- there is no
     // sibling tab viewing the same session to warn.
   }
+  usageUpdate(): void {
+    // Every attempt's own model calls are still recorded in the durable usage ledger regardless
+    // (see usageLedger.ts) -- there's just no per-attempt live counter in the parallel-run UI yet.
+  }
 }
 
 interface AttemptState {

@@ -16,7 +16,8 @@ export async function chatCompletion(
   apiKey: string,
   maxRetries = 5,
   onDelta?: (chunk: string) => void,
-  temperature?: number
+  temperature?: number,
+  signal?: AbortSignal
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
@@ -28,6 +29,7 @@ export async function chatCompletion(
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
+        signal,
         body: JSON.stringify({
           model,
           messages,
@@ -68,7 +70,7 @@ export async function chatCompletion(
       return { content, toolCalls, usage };
     } catch (err: any) {
       lastError = err;
-      if (err.fatal) throw err;
+      if (err.fatal || err?.name === "AbortError") throw err;
       if (attempt < maxRetries) {
         await sleep(Math.min(1500 * 2 ** attempt, 15000));
       }

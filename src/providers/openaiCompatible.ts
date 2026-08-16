@@ -40,9 +40,10 @@ export function createOpenAiCompatibleProvider(config: OpenAiCompatibleConfig) {
     apiKey: string,
     maxRetries = 5,
     onDelta?: (chunk: string) => void,
-    temperature?: number
+    temperature?: number,
+    signal?: AbortSignal
   ): Promise<ChatCompletionResult> =>
-    runOpenAiCompatibleChatCompletion(config, messages, tools, model, apiKey, maxRetries, onDelta, temperature);
+    runOpenAiCompatibleChatCompletion(config, messages, tools, model, apiKey, maxRetries, onDelta, temperature, signal);
 }
 
 /**
@@ -58,7 +59,8 @@ export async function runOpenAiCompatibleChatCompletion(
   apiKey: string,
   maxRetries = 5,
   onDelta?: (chunk: string) => void,
-  temperature?: number
+  temperature?: number,
+  signal?: AbortSignal
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
@@ -70,6 +72,7 @@ export async function runOpenAiCompatibleChatCompletion(
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
+        signal,
         body: JSON.stringify({
           model,
           messages,
@@ -131,7 +134,7 @@ export async function runOpenAiCompatibleChatCompletion(
       return { content, toolCalls, usage };
     } catch (err: any) {
       lastError = err;
-      if (err.fatal) throw err;
+      if (err.fatal || err?.name === "AbortError") throw err;
       if (attempt < maxRetries) {
         await sleep(Math.min(1500 * 2 ** attempt, 15000));
       }

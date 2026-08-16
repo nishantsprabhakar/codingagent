@@ -42,6 +42,7 @@ export class EvalReporter implements Reporter {
   verification(_result: VerificationResult): void {}
   critique(): void {}
   sessionPersisted(): void {}
+  usageUpdate(): void {}
   transactionSummary(transactionId: string, confidence: number, outcome: TransactionOutcome): void {
     this.captured.transactionId = transactionId;
     this.captured.confidence = confidence;

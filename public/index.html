@@ -61,6 +61,13 @@
       <span>Chats</span>
       <button id="new-chat-btn" class="new-chat-btn" title="New chat">+ New</button>
     </div>
+    <input
+      id="session-search-input"
+      class="session-search-input"
+      type="search"
+      placeholder="Search chats…"
+      title="Full-text search across every saved chat in this project"
+    />
     <div id="session-list" class="session-list"></div>
 
     <div id="progress-section" hidden></div>
@@ -84,6 +91,7 @@
         <span id="cwd-label" class="cwd-label"></span>
       </div>
       <div class="topbar-right">
+        <span id="usage-badge" class="badge badge-usage" title="Tokens used so far in this chat" hidden></span>
         <button id="model-badge" class="badge badge-clickable" title="Click to choose a different model"></button>
         <span id="yolo-badge" class="badge badge-yolo" hidden>YOLO</span>
         <button id="theme-btn" class="icon-btn" title="Change theme">&#127912;</button>

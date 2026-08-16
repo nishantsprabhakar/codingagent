@@ -4,8 +4,8 @@
  * See LICENSE for details.
  */
 import type { PermissionDecision } from "../permissions";
-import type { TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome } from "../types";
-import type { SessionMeta } from "../session";
+import type { TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome, TokenUsage } from "../types";
+import type { SessionMeta, SessionSearchResult } from "../session";
 import type { FileRestoreResult } from "../workspaceSnapshot";
 import type { McpServerStatus } from "../mcp";
 import type { ParallelAttemptEvent, ParallelAttemptResult } from "../parallelRun";
@@ -36,7 +36,9 @@ export type ServerMessage =
   | { type: "parallel_attempt_event"; attemptIndex: number; event: ParallelAttemptEvent }
   | { type: "parallel_run_complete"; runId: string; attempts: ParallelAttemptResult[] }
   | { type: "parallel_run_merged"; ok: boolean; message: string }
-  | { type: "session_changed_elsewhere"; sessionId: string };
+  | { type: "session_changed_elsewhere"; sessionId: string }
+  | ({ type: "usage_update" } & TokenUsage)
+  | { type: "session_search_results"; query: string; results: SessionSearchResult[] };
 
 export type ClientMessage =
   | { type: "user_message"; text: string }
@@ -71,4 +73,6 @@ export type ClientMessage =
   | { type: "add_starter_skill"; name: string }
   | { type: "start_parallel_run"; task: string; n: number }
   | { type: "parallel_run_pick"; attemptIndex: number }
-  | { type: "parallel_run_cancel" };
+  | { type: "parallel_run_cancel" }
+  | { type: "abort_turn" }
+  | { type: "session_search"; query: string };

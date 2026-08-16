@@ -24,7 +24,8 @@ export async function chatCompletion(
   model: string,
   maxRetries = 5,
   onDelta?: (chunk: string) => void,
-  temperature?: number
+  temperature?: number,
+  signal?: AbortSignal
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
@@ -33,6 +34,7 @@ export async function chatCompletion(
       const res = await fetch(BASE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal,
         body: JSON.stringify({
           model,
           messages,
@@ -73,7 +75,7 @@ export async function chatCompletion(
       return { content: rawContent, toolCalls, usage };
     } catch (err: any) {
       lastError = err;
-      if (err.fatal) throw err;
+      if (err.fatal || err?.name === "AbortError") throw err;
       if (attempt < maxRetries) {
         await sleep(Math.min(1500 * 2 ** attempt, 15000));
       }

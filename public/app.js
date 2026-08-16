@@ -105,6 +105,8 @@
     settingsPanelEvidence: document.getElementById("settings-panel-evidence"),
     historyList: document.getElementById("history-list"),
     evidenceList: document.getElementById("evidence-list"),
+    usageBadge: document.getElementById("usage-badge"),
+    sessionSearchInput: document.getElementById("session-search-input"),
   };
 
   const TOOL_ICONS = {
@@ -136,6 +138,8 @@
     sessions: [],
     createdFiles: [],
     streamingBubble: null,
+    usage: null,
+    sessionSearchQuery: "",
   };
 
   // ---------- Auth ----------
@@ -348,6 +352,10 @@
         el.codePanel.hidden = true;
         showEmptyState(rootChanged ? "Switched project folder." : "Ready when you are.");
         loadTree(el.fileTree, ".");
+        state.usage = null;
+        renderUsageBadge();
+        el.sessionSearchInput.value = "";
+        state.sessionSearchQuery = "";
         break;
       }
       case "sessions":
@@ -437,6 +445,13 @@
       case "parallel_attempt_event":
         handleParallelAttemptEvent(msg.attemptIndex, msg.event);
         break;
+      case "usage_update":
+        state.usage = { promptTokens: msg.promptTokens, completionTokens: msg.completionTokens, totalTokens: msg.totalTokens };
+        renderUsageBadge();
+        break;
+      case "session_search_results":
+        if (msg.query === state.sessionSearchQuery) renderSessionSearchResults(msg.results);
+        break;
       case "parallel_run_complete":
         handleParallelRunComplete(msg.attempts);
         break;
@@ -455,6 +470,25 @@
     const text = state.currentProvider ? `${state.currentProvider} · ${state.currentModel}` : state.currentModel;
     el.modelBadge.textContent = text;
     el.modelBadge.title = `${text} — click to change`;
+  }
+
+  function formatTokenCount(n) {
+    if (n < 1000) return String(n);
+    if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}k`;
+    return `${(n / 1_000_000).toFixed(1)}M`;
+  }
+
+  function renderUsageBadge() {
+    const usage = state.usage;
+    if (!usage || !usage.totalTokens) {
+      el.usageBadge.hidden = true;
+      return;
+    }
+    el.usageBadge.hidden = false;
+    el.usageBadge.textContent = `${formatTokenCount(usage.totalTokens)} tok`;
+    el.usageBadge.title =
+      `${usage.totalTokens.toLocaleString()} tokens this chat ` +
+      `(${usage.promptTokens.toLocaleString()} prompt / ${usage.completionTokens.toLocaleString()} completion)`;
   }
 
   function updateProjectCard(root) {
@@ -1280,7 +1314,12 @@
     state.busy = busy;
     const disconnected = !(state.ws && state.ws.readyState === WebSocket.OPEN);
     el.composerInput.disabled = busy || disconnected;
-    el.sendBtn.disabled = busy || disconnected;
+    // The send button stays enabled while busy — it becomes a stop button instead of a disabled
+    // send button, so a runaway or just-too-long turn can always be interrupted from the UI.
+    el.sendBtn.disabled = disconnected;
+    el.sendBtn.classList.toggle("send-btn-stop", busy);
+    el.sendBtn.innerHTML = busy ? "&#9632;" : "&#x2191;";
+    el.sendBtn.title = busy ? "Stop" : "Send";
     setStatus(disconnected ? "disconnected" : busy ? "busy" : "connected");
     el.progressSection.classList.toggle("hud-busy", busy);
   }
@@ -1301,7 +1340,13 @@
     hudOnTurnStart();
   }
 
-  el.sendBtn.addEventListener("click", sendUserMessage);
+  el.sendBtn.addEventListener("click", () => {
+    if (state.busy) {
+      send({ type: "abort_turn" });
+    } else {
+      sendUserMessage();
+    }
+  });
   el.composerInput.addEventListener("input", autoGrow);
   el.composerInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1371,6 +1416,47 @@
       }
     }
   }
+
+  /** Full-text (lexical, not embedding-based) search results across every saved chat in this
+   *  project — see session.ts's searchSessions for how each match is scored. */
+  function renderSessionSearchResults(results) {
+    el.sessionList.innerHTML = "";
+    if (!results.length) {
+      el.sessionList.innerHTML = `<div class="session-list-empty">No chats match "${escapeHtml(state.sessionSearchQuery)}".</div>`;
+      return;
+    }
+    const heading = document.createElement("div");
+    heading.className = "session-group-title";
+    heading.textContent = `${results.length} match${results.length === 1 ? "" : "es"}`;
+    el.sessionList.appendChild(heading);
+
+    for (const r of results) {
+      const row = document.createElement("div");
+      row.className = `session-item${r.id === state.sessionId ? " active" : ""}`;
+      row.innerHTML = `
+        <div class="session-item-text">
+          <div class="session-item-title">${escapeHtml(r.title)}</div>
+          <div class="session-item-snippet">${escapeHtml(r.snippet)}</div>
+        </div>
+      `;
+      row.addEventListener("click", () => {
+        if (r.id !== state.sessionId) send({ type: "switch_session", id: r.id });
+      });
+      el.sessionList.appendChild(row);
+    }
+  }
+
+  let sessionSearchDebounceTimer = null;
+  el.sessionSearchInput.addEventListener("input", () => {
+    const query = el.sessionSearchInput.value.trim();
+    state.sessionSearchQuery = query;
+    clearTimeout(sessionSearchDebounceTimer);
+    if (!query) {
+      renderSessionList();
+      return;
+    }
+    sessionSearchDebounceTimer = setTimeout(() => send({ type: "session_search", query }), 200);
+  });
 
   function formatRelativeTime(timestamp) {
     if (!timestamp) return "";
