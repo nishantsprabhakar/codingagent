@@ -125,10 +125,12 @@ test("server: an arbitrary session id sent over an authenticated WebSocket canno
 
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(`ws://127.0.0.1:${port}/?token=${handle.authToken}`);
+      // 10s, not 5s: same full-suite CPU-contention headroom as the two WS handshake tests above —
+      // this one also opens a fresh connection before doing its own work, so it needs at least as much.
       const timer = setTimeout(() => {
         ws.close();
         reject(new Error("test timed out waiting on WS round-trip"));
-      }, 5000);
+      }, 10000);
       ws.on("open", () => {
         ws.send(JSON.stringify({ type: "delete_session", id: relativeTraversal }));
         // No direct ack for delete_session besides a "sessions" broadcast; give it a moment to (fail to) act,
