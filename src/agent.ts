@@ -20,7 +20,7 @@ import { gitStatusPorcelain, snapshotFile, captureAfterSnapshot, restoreSnapshot
 import { isGitRepo, captureTree, restoreTree, protectTree } from "./gitCheckpoint";
 import { isReadOnlyIshShellCommand } from "./riskClassifier";
 import { appendTransaction, loadTransaction } from "./transactionLog";
-import { detectProjectMemory, updateProjectMemory, loadProjectMemory, formatProjectMemoryForPrompt } from "./projectMemory";
+import { detectProjectMemory, updateProjectMemory, loadProjectMemory, formatProjectMemoryForPrompt, refreshMissingCommands } from "./projectMemory";
 import { runVerification } from "./verification";
 import { critiqueStep, type CritiqueResult } from "./critic";
 import { runDivergentRepairEnsemble, computeConvergenceScore, hasRecurredKnownFailure } from "./convergence";
@@ -703,6 +703,10 @@ export class Agent {
         const tx = this.currentTransaction!;
         if (this.needsVerification && shouldVerify(tx.actions)) {
           const touchedFiles = tx.actions.map((a) => a.fileSnapshot?.path).filter((p): p is string => !!p);
+          // A test/build/lint script the model just added to package.json (this turn or an earlier one)
+          // would otherwise never be discovered — detectProjectMemory() only scans package.json once,
+          // the very first time a project is opened. Cheap no-op once all three are already known.
+          this.projectMemory = refreshMissingCommands(this.ctx.root, this.projectMemory);
           verification = await runVerification(this.ctx.root, this.projectMemory, touchedFiles);
           this.setDeterministicChecks(tx, verification);
           this.needsVerification = false;

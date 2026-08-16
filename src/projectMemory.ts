@@ -62,6 +62,39 @@ export function updateProjectMemory(root: string, patch: Partial<ProjectMemory>)
   saveProjectMemory(root, { ...current, ...patch });
 }
 
+/** The package.json/lockfile scan shared by detectProjectMemory (first run) and refreshMissingCommands
+ *  (every later run) — pulled out so both can re-derive the same facts from the same source of truth. */
+function scanPackageJson(root: string): Pick<ProjectMemory, "packageManager" | "testCommand" | "buildCommand" | "lintCommand" | "framework"> {
+  const found: ReturnType<typeof scanPackageJson> = {};
+  if (fs.existsSync(path.join(root, "pnpm-lock.yaml"))) found.packageManager = "pnpm";
+  else if (fs.existsSync(path.join(root, "yarn.lock"))) found.packageManager = "yarn";
+  else if (fs.existsSync(path.join(root, "package-lock.json"))) found.packageManager = "npm";
+  else if (fs.existsSync(path.join(root, "requirements.txt")) || fs.existsSync(path.join(root, "pyproject.toml")))
+    found.packageManager = "pip";
+
+  const pkgPath = path.join(root, "package.json");
+  if (fs.existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+      const runner = found.packageManager && found.packageManager !== "pip" ? found.packageManager : "npm";
+      if (pkg.scripts?.test) found.testCommand = `${runner} test`;
+      if (pkg.scripts?.build) found.buildCommand = `${runner} run build`;
+      if (pkg.scripts?.lint) found.lintCommand = `${runner} run lint`;
+
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      for (const [pattern, name] of FRAMEWORK_HINTS) {
+        if (Object.keys(deps ?? {}).some((dep) => pattern.test(dep))) {
+          found.framework = name;
+          break;
+        }
+      }
+    } catch {
+      // unreadable/corrupt package.json — leave found as-is
+    }
+  }
+  return found;
+}
+
 /**
  * Seeds project memory from package.json + lockfiles the first time a
  * project is opened (no-op if memory.json already exists — we never
@@ -69,37 +102,34 @@ export function updateProjectMemory(root: string, patch: Partial<ProjectMemory>)
  */
 export function detectProjectMemory(root: string): ProjectMemory {
   if (fs.existsSync(memoryPath(root))) return loadProjectMemory(root);
-
-  const memory: ProjectMemory = {};
-  if (fs.existsSync(path.join(root, "pnpm-lock.yaml"))) memory.packageManager = "pnpm";
-  else if (fs.existsSync(path.join(root, "yarn.lock"))) memory.packageManager = "yarn";
-  else if (fs.existsSync(path.join(root, "package-lock.json"))) memory.packageManager = "npm";
-  else if (fs.existsSync(path.join(root, "requirements.txt")) || fs.existsSync(path.join(root, "pyproject.toml")))
-    memory.packageManager = "pip";
-
-  const pkgPath = path.join(root, "package.json");
-  if (fs.existsSync(pkgPath)) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-      const runner = memory.packageManager && memory.packageManager !== "pip" ? memory.packageManager : "npm";
-      if (pkg.scripts?.test) memory.testCommand = `${runner} test`;
-      if (pkg.scripts?.build) memory.buildCommand = `${runner} run build`;
-      if (pkg.scripts?.lint) memory.lintCommand = `${runner} run lint`;
-
-      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-      for (const [pattern, name] of FRAMEWORK_HINTS) {
-        if (Object.keys(deps ?? {}).some((dep) => pattern.test(dep))) {
-          memory.framework = name;
-          break;
-        }
-      }
-    } catch {
-      // unreadable/corrupt package.json — leave memory as-is
-    }
-  }
-
+  const memory: ProjectMemory = scanPackageJson(root);
   saveProjectMemory(root, memory);
   return memory;
+}
+
+/**
+ * Closes a real gap `detectProjectMemory` alone leaves open: it only scans package.json the very
+ * first time a project is opened, so a test/build/lint script the model adds mid-session (or in an
+ * earlier session, before this project had one) never gets picked up — verification silently has
+ * nothing to run for the rest of the project's life, not just that one turn. Call this right before
+ * verification; it's a cheap no-op (no disk I/O beyond one directory check) once all three commands
+ * are already known, and only re-scans package.json when at least one is still missing.
+ */
+export function refreshMissingCommands(root: string, memory: ProjectMemory): ProjectMemory {
+  if (memory.testCommand && memory.buildCommand && memory.lintCommand) return memory;
+
+  const found = scanPackageJson(root);
+  const patch: Partial<ProjectMemory> = {};
+  if (!memory.testCommand && found.testCommand) patch.testCommand = found.testCommand;
+  if (!memory.buildCommand && found.buildCommand) patch.buildCommand = found.buildCommand;
+  if (!memory.lintCommand && found.lintCommand) patch.lintCommand = found.lintCommand;
+  if (!memory.framework && found.framework) patch.framework = found.framework;
+  if (!memory.packageManager && found.packageManager) patch.packageManager = found.packageManager;
+
+  if (Object.keys(patch).length === 0) return memory;
+  const updated = { ...memory, ...patch };
+  saveProjectMemory(root, updated);
+  return updated;
 }
 
 /** Renders known facts as a short block for the system prompt — omitted entirely when nothing is known yet. */

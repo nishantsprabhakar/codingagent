@@ -61,12 +61,22 @@ number:
 - 12 tasks, not 200.
 - No reproducibility data yet (repeats=1 only, for rate-limit reasons).
 - Sequential only; no CI wiring.
-- A separate, unrelated gap surfaced during manual verification (not fixed here, out of
+- ~~A separate, unrelated gap surfaced during manual verification (not fixed here, out of
   scope): `detectProjectMemory`'s `testCommand` is read once, at session start — if a task
   requires the model to add its own test script to a project that didn't have one yet,
-  automatic verification has nothing to run for the rest of that session. All 12 pilot
-  fixtures ship their test script already in place, so this didn't affect the numbers above,
-  but it's a real limitation for tasks shaped differently.
+  automatic verification has nothing to run for the rest of that session.~~ **Fixed
+  2026-08-16.** `detectProjectMemory` is indeed a one-time seed (unchanged — it still no-ops
+  once `memory.json` exists), but the actual gap was that nothing ever re-scanned
+  `package.json` afterward. Added `refreshMissingCommands(root, memory)` in
+  `projectMemory.ts` — a cheap no-op once test/build/lint commands are all already known,
+  otherwise re-scans `package.json` for just the still-missing ones and persists what it
+  finds — called from `agent.ts` immediately before `runVerification()` on every turn. Covers
+  both a test script the model adds via a file edit in the same turn and one added in an
+  earlier session before this fix existed. Five new regression tests in
+  `src/__tests__/projectMemory.test.ts`, including the exact scenario this bullet originally
+  described (a test script appearing after the project was already known); full suite green
+  (280 tests: 274 pass, 5 skip, 1 pre-existing flake in `server.security.test.ts` confirmed
+  unrelated — passes 10/10 in isolation).
 
 ## Verification
 
