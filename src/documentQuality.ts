@@ -174,6 +174,33 @@ export function checkPptxQuality(slides: any[]): QualityCheckResult {
         blocking.push(`${where}'s table has header columns but no data rows — fill in real rows or remove the table.`);
       }
     }
+
+    // layout=cover fields
+    for (const field of [slide?.subtitle, slide?.description]) {
+      const placeholder = findPlaceholder(field);
+      if (placeholder) blocking.push(`Placeholder text "${placeholder}" found on ${where}.`);
+    }
+    for (const tag of Array.isArray(slide?.tags) ? slide.tags : []) {
+      const placeholder = findPlaceholder(tag);
+      if (placeholder) blocking.push(`Placeholder text "${placeholder}" found in a tag on ${where}.`);
+    }
+    for (const stat of Array.isArray(slide?.stats) ? slide.stats : []) {
+      const placeholder = findPlaceholder(stat?.label) ?? findPlaceholder(stat?.caption);
+      if (placeholder) blocking.push(`Placeholder text "${placeholder}" found in a stat on ${where}.`);
+    }
+
+    // layout=cards
+    for (const card of Array.isArray(slide?.cards) ? slide.cards : []) {
+      const placeholder = findPlaceholder(card?.heading) ?? findPlaceholder(card?.text);
+      if (placeholder) blocking.push(`Placeholder text "${placeholder}" found in a card on ${where}.`);
+    }
+
+    // sidebar (layout=cards or table)
+    if (slide?.sidebar) {
+      const placeholder =
+        findPlaceholder(slide.sidebar.title) ?? findPlaceholder(slide.sidebar.text) ?? findPlaceholder(slide.sidebar.quote);
+      if (placeholder) blocking.push(`Placeholder text "${placeholder}" found in the sidebar on ${where}.`);
+    }
   });
 
   return result(blocking, warnings);

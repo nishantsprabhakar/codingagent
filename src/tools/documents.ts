@@ -60,12 +60,29 @@ const HEADING_LEVELS = [
   HeadingLevel.HEADING_6,
 ];
 
-/** Default dark theme for pptx — slide background/text colors when theme !== "light". */
-const PPTX_DARK_BG = "0F172A";
-const PPTX_DARK_BODY_TEXT = "E2E8F0";
-const PPTX_DARK_TITLE_TEXT = "F8FAFC";
-const PPTX_DARK_ZEBRA = "1E293B";
+/** Default dark theme for pptx — slide background/text colors when theme !== "light". Matches the
+ *  "Wrexlyn Professional" reference deck style: near-black navy, restrained muted body text (not
+ *  high-contrast white-on-black everywhere), a bordered-card visual language, and a rotating
+ *  color-coded badge palette for numbered/sequential content instead of one flat accent everywhere.
+ *  Every value below is read directly out of the reference deck's own XML (python-pptx), not
+ *  estimated from a rendered image — exact, not approximate. */
+const PPTX_DARK_BG = "0A0E17";
+const PPTX_DARK_BODY_TEXT = "8FA0B8";
+const PPTX_DARK_TITLE_TEXT = "F4F7FB";
+const PPTX_DARK_ZEBRA = "161F30";
 const PPTX_LIGHT_ZEBRA = "F3F4F6";
+const PPTX_CARD_BG = "111826";
+const PPTX_CARD_BORDER = "232E45";
+const PPTX_MUTED_TEXT = "8FA0B8";
+const PPTX_FOOTER_TEXT = "5F7186";
+/** The sidebar/callout panel is a visually distinct shade from a plain content card, not a reuse of
+ *  PPTX_CARD_BG/PPTX_CARD_BORDER — slightly lighter fill, and a darker, more restrained teal border
+ *  than the bright accent used for kickers/badges. */
+const PPTX_SIDEBAR_BG = "161F30";
+const PPTX_SIDEBAR_BORDER = "1B8F87";
+/** Rotating palette for numbered/sequential card badges (the "01/02/03" and "1/2/3/4" step patterns) —
+ *  cycling through distinct hues reads as deliberately designed, not the same accent repeated. */
+const PPTX_BADGE_COLORS = ["2FE6D9", "FF6B6B", "FFB454", "8B7CFA", "4ADE80"];
 
 /** Small curated icon vocabulary rendered as an emoji glyph inside an accent-colored circle badge — no
  *  image assets or native-binary rendering dependencies (react-icons/sharp), so this always works the
@@ -415,18 +432,21 @@ export const createPptxTool: ToolSpec = {
       description:
         "Create a well-formatted PowerPoint (.pptx) presentation from a list of slides. `slides` must contain " +
         "the actual content the user asked for — never call this with empty or placeholder slides. Bullet text " +
-        "supports inline markup: **bold**, _italic_, __underline__, ~~strikethrough~~. Defaults to a dark theme " +
-        "with an icon badge next to each slide title — pick a fitting `icon` for most slides rather than leaving " +
-        "it off, it's the deck's default look now, not a rare flourish.",
+        "supports inline markup: **bold**, _italic_, __underline__, ~~strikethrough~~. Defaults to a dark, " +
+        "restrained professional theme (near-black background, muted body text, bordered-card content panels, " +
+        "a rotating color-coded badge per numbered item) — this is the deck's default look now, not a rare " +
+        "flourish, so lean into `cover`/`cards`/`kicker` rather than defaulting every slide to plain bullets.",
       parameters: {
         type: "object",
         properties: {
           path: { type: "string", description: "Output path relative to the working directory, ending in .pptx" },
-          accentColor: { type: "string", description: "Optional hex color used for the title accent bar and section-divider backgrounds, instead of the default blue." },
+          accentColor: { type: "string", description: "Optional hex color used for the title accent bar and section-divider backgrounds, instead of the default teal." },
+          docTitle: { type: "string", description: "Short deck name shown at the bottom-left of every content slide's footer (e.g. the company/product name)." },
+          footerText: { type: "string", description: "Short subtitle shown centered in every content slide's footer (e.g. 'Orchestration layer for AI hosting')." },
           theme: {
             type: "string",
             enum: ["dark", "light"],
-            description: "'dark' (default): dark slide background with light text. 'light': the classic white-background look.",
+            description: "'dark' (default): the near-black professional theme. 'light': the classic white-background look.",
           },
           slides: {
             type: "array",
@@ -434,6 +454,12 @@ export const createPptxTool: ToolSpec = {
               type: "object",
               properties: {
                 title: { type: "string" },
+                kicker: {
+                  type: "string",
+                  description:
+                    "Optional short uppercase eyebrow label shown above the title (e.g. 'THE PROBLEM', 'MODEL FREEDOM') — " +
+                    "use this on most slides in the default theme, it's a core part of the look, not decoration.",
+                },
                 icon: {
                   type: "string",
                   enum: Object.keys(ICON_GLYPHS),
@@ -441,21 +467,70 @@ export const createPptxTool: ToolSpec = {
                 },
                 layout: {
                   type: "string",
-                  enum: ["title_bullets", "section", "two_column"],
+                  enum: ["title_bullets", "section", "two_column", "cover", "cards"],
                   description:
                     "'title_bullets' (default): title + bullet list. 'section': a large centered title on an " +
                     "accent-colored background, for dividing the deck into sections. 'two_column': title + two " +
-                    "side-by-side bullet lists (use with `columns`).",
+                    "side-by-side bullet lists (use with `columns`). 'cover': a deck-opening slide with tag pills, " +
+                    "a big title, subtitle, description, and a row of small stat labels (use with `tags`/`subtitle`/" +
+                    "`description`/`stats`) — also fits a closing/CTA slide. 'cards': a row or stack of numbered, " +
+                    "color-badged bordered boxes for enumerated points, options, or process steps (use with `cards`), " +
+                    "optionally paired with a `sidebar` callout panel.",
                 },
                 bullets: {
                   type: "array",
-                  description: "Bullet items (layout=title_bullets). Each is a string or {text, level} to nest as a sub-bullet.",
+                  description:
+                    "Bullet items (layout=title_bullets). Each is a string, {text, level} to nest as a sub-bullet, or " +
+                    "{title, caption} to render as a bold title with a muted caption line beneath a colored dot — good " +
+                    "for a short closing/CTA list of next steps.",
                   items: {},
                 },
                 columns: {
                   type: "array",
                   description: "Exactly two arrays of bullet strings, side by side (layout=two_column only).",
                   items: { type: "array", items: { type: "string" } },
+                },
+                tags: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Short pill-badge labels shown in a row above the title (layout=cover only), e.g. ['Local-first', 'Proprietary', '2026'].",
+                },
+                subtitle: { type: "string", description: "A one-line statement shown just below the title (layout=cover only)." },
+                description: { type: "string", description: "A short paragraph shown below the subtitle (layout=cover only)." },
+                stats: {
+                  type: "array",
+                  description: "Small bordered label/caption boxes shown in a row (layout=cover only), e.g. {label: '6-STATE', caption: 'verification engine'}.",
+                  items: {
+                    type: "object",
+                    properties: { label: { type: "string" }, caption: { type: "string" } },
+                  },
+                },
+                cards: {
+                  type: "array",
+                  description: "Numbered, color-badged bordered boxes (layout=cards only). Each is {number, heading, text} — `number` can be a plain integer (colored circle badge) or a zero-padded string like '01'.",
+                  items: {
+                    type: "object",
+                    properties: {
+                      number: {},
+                      heading: { type: "string" },
+                      text: { type: "string" },
+                    },
+                  },
+                },
+                cardLayout: {
+                  type: "string",
+                  enum: ["row", "stack"],
+                  description: "'row' (default when cards are short, e.g. process steps): equal-width boxes side by side. 'stack' (default when cards have longer body text): full-width boxes stacked vertically. Layout=cards only.",
+                },
+                sidebar: {
+                  type: "object",
+                  description: "An optional bordered callout panel on the right side of a 'cards' or 'table' slide.",
+                  properties: {
+                    kicker: { type: "string" },
+                    title: { type: "string" },
+                    text: { type: "string" },
+                    quote: { type: "string", description: "Optional italic pull-quote shown below `text`." },
+                  },
                 },
                 image: {
                   type: "object",
@@ -469,7 +544,7 @@ export const createPptxTool: ToolSpec = {
                 },
                 table: {
                   type: "object",
-                  description: "A table to place on this slide, below the title (overrides layout/bullets for this slide).",
+                  description: "A table to place on this slide, below the title (overrides layout/bullets for this slide, unless layout='cards' with no `cards` given, in which case `sidebar` still applies).",
                   properties: {
                     headers: { type: "array", items: { type: "string" } },
                     rows: { type: "array", items: { type: "array", items: {} } },
@@ -496,13 +571,29 @@ export const createPptxTool: ToolSpec = {
       return { ok: false, output, qualityGate: { name: "pptx quality gate", ok: false, output } };
     }
 
-    const accent = optionalHexColor(args.accentColor) ?? DEFAULT_ACCENT_HEX;
+    const accent = optionalHexColor(args.accentColor) ?? PPTX_BADGE_COLORS[0];
     const isDark = args.theme !== "light";
     const bgColor = isDark ? PPTX_DARK_BG : "FFFFFF";
     const titleColor = isDark ? PPTX_DARK_TITLE_TEXT : TEXT_HEX;
     const bodyColor = isDark ? PPTX_DARK_BODY_TEXT : "374151";
-    const zebraColor = isDark ? PPTX_DARK_ZEBRA : PPTX_LIGHT_ZEBRA;
-    const captionColor = isDark ? "94A3B8" : "6B7280";
+    const zebraColor = isDark ? PPTX_CARD_BG : PPTX_LIGHT_ZEBRA;
+    const captionColor = isDark ? PPTX_MUTED_TEXT : "6B7280";
+    const cardBg = isDark ? PPTX_CARD_BG : "F8FAFC";
+    const cardBorder = isDark ? PPTX_CARD_BORDER : "E2E8F0";
+    const mutedColor = isDark ? PPTX_MUTED_TEXT : "6B7280";
+    const footerColor = isDark ? PPTX_FOOTER_TEXT : "9CA3AF";
+    // A sidebar/callout panel and a numbered-badge circle are each a visually distinct shade from a
+    // plain content card, not a reuse of cardBg/cardBorder/accent — see the constants' own doc comment.
+    const sidebarBg = isDark ? PPTX_SIDEBAR_BG : "F0F9F8";
+    const sidebarBorder = isDark ? PPTX_SIDEBAR_BORDER : accent;
+    const badgeBg = isDark ? PPTX_SIDEBAR_BG : "FFFFFF";
+
+    // Shared content-area geometry (10x5.625in slide) — a slide with a kicker/footer needs the same
+    // top/bottom margins regardless of which layout renders the body, so every mode below anchors to
+    // these instead of each choosing its own y-coordinates.
+    const CONTENT_Y = 1.4;
+    const CONTENT_BOTTOM = 4.95;
+    const FOOTER_Y = 5.18;
 
     const filePath = resolveInRoot(ctx.root, args.path);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -533,11 +624,120 @@ export const createPptxTool: ToolSpec = {
       });
     }
 
-    for (const spec of args.slides ?? []) {
+    /** Rough estimate of wrapped line count for a plain-text box — good enough to size a text box tall
+     *  enough that PowerPoint's own wrapping never overflows past it (real layout isn't available here,
+     *  so this deliberately over-estimates height slightly rather than risk overlapping the next element). */
+    function estimateWrappedLines(text: string, widthIn: number, fontSizePt: number): number {
+      const avgCharWidthIn = fontSizePt * 0.0092;
+      const charsPerLine = Math.max(6, Math.floor(widthIn / avgCharWidthIn));
+      const rawLines = text.split("\n");
+      return rawLines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
+    }
+
+    /** Total estimated height (in) `text` + `quote` would need at a given base font size, so a shrink-
+     *  to-fit loop can search for the largest size that actually fits the space left after the kicker/
+     *  title — sizing the box correctly doesn't help if the font itself is too large to fit its own
+     *  text in the available width/height at that size, the way a fixed font size does. */
+    function estimateTextQuoteHeight(text: string, quote: string, widthIn: number, fontSize: number): number {
+      const textLines = text ? estimateWrappedLines(text, widthIn, fontSize) : 0;
+      const quoteLines = quote ? estimateWrappedLines(quote, widthIn, fontSize - 1) : 0;
+      const gapBetween = text && quote ? 0.16 : 0;
+      return textLines * fontSize * 0.0187 + quoteLines * (fontSize - 1) * 0.0187 + gapBetween;
+    }
+
+    /** A bordered callout panel — the "sidebar" pattern paired with a `cards` or `table` slide: a
+     *  kicker, a bold statement, body copy, and an optional italic pull-quote. The kicker/title are
+     *  placed from an estimate of their own wrapped line count (never a fixed guessed offset), and the
+     *  body/quote font size shrinks in a small loop until what's left of the panel can actually hold
+     *  them — sizing the *box* correctly (the earlier fix) doesn't help if the *font* is too large to
+     *  fit its own text in the remaining space at a fixed size. */
+    function addSidebar(slide: PptxGenJS.Slide, sidebar: any, x: number, y: number, w: number, h: number): void {
+      slide.addShape("roundRect", { x, y, w, h, rectRadius: 0.05, fill: { color: sidebarBg }, line: { color: sidebarBorder, width: 1 } });
+      const innerX = x + 0.28;
+      const innerW = w - 0.56;
+      let cy = y + 0.26;
+
+      if (sidebar.kicker) {
+        slide.addText(String(sidebar.kicker).toUpperCase(), {
+          x: innerX, y: cy, w: innerW, h: 0.28, fontFace: BODY_FONT, fontSize: 12, bold: true, color: accent, charSpacing: 2,
+        });
+        cy += 0.36;
+      }
+      if (sidebar.title) {
+        const titleH = estimateWrappedLines(String(sidebar.title), innerW, 18) * 0.34;
+        slide.addText(String(sidebar.title), {
+          x: innerX, y: cy, w: innerW, h: titleH, fontFace: BODY_FONT, fontSize: 18, bold: true, color: titleColor, valign: "top",
+        });
+        cy += titleH + 0.16;
+      }
+      const text = sidebar.text ? String(sidebar.text) : "";
+      const quote = sidebar.quote ? String(sidebar.quote) : "";
+      if (text || quote) {
+        const available = Math.max(0.35, y + h - cy - 0.22);
+        let fontSize = 12.5;
+        while (fontSize > 9 && estimateTextQuoteHeight(text, quote, innerW, fontSize) > available) fontSize -= 0.5;
+
+        if (text) {
+          const textH = estimateWrappedLines(text, innerW, fontSize) * fontSize * 0.0187;
+          slide.addText(pptxRuns(text, { fontFace: BODY_FONT, fontSize, color: mutedColor }), {
+            x: innerX, y: cy, w: innerW, h: textH, valign: "top", lineSpacingMultiple: 1.3,
+          });
+          cy += textH + (quote ? 0.16 : 0);
+        }
+        if (quote) {
+          const quoteFontSize = fontSize - 1;
+          // Sized from the quote's own estimated line count (like textH above), not from whatever space
+          // happens to be left in the panel — a box sized to "leftover space" can be smaller than what
+          // the text actually needs and overflow it, even when the shrink-to-fit loop above chose a
+          // font size meant to make the total fit.
+          const quoteH = Math.max(0.3, estimateWrappedLines(quote, innerW, quoteFontSize) * quoteFontSize * 0.0187);
+          // The pull-quote renders in the bright title color, not the muted body tone — a deliberate
+          // emphasis choice in the reference deck, confirmed directly from its own XML.
+          slide.addText(pptxRuns(quote, { fontFace: BODY_FONT, fontSize: quoteFontSize, color: titleColor }), {
+            x: innerX, y: cy, w: innerW, h: quoteH, valign: "top", italic: true, lineSpacingMultiple: 1.3,
+          });
+        }
+      }
+    }
+
+    /** Bullet items shaped as {title, caption} (not {text, level}) — the closing/CTA "next steps" list
+     *  pattern: a colored dot, a bold title, and a muted caption line beneath it. */
+    function isDotListItems(bullets: any[]): boolean {
+      return bullets.length > 0 && bullets.every((b) => b && typeof b === "object" && !Array.isArray(b) && typeof b.title === "string");
+    }
+
+    function renderDotList(slide: PptxGenJS.Slide, items: any[], x: number, y: number, w: number): void {
+      let cy = y;
+      for (const item of items) {
+        const rowH = item.caption ? 0.72 : 0.45;
+        slide.addShape("ellipse", { x, y: cy + 0.08, w: 0.16, h: 0.16, fill: { color: accent }, line: { type: "none" } });
+        slide.addText(String(item.title ?? ""), { x: x + 0.32, y: cy, w: w - 0.32, h: 0.35, fontFace: BODY_FONT, fontSize: 15, bold: true, color: titleColor });
+        if (item.caption) {
+          slide.addText(String(item.caption), { x: x + 0.32, y: cy + 0.33, w: w - 0.32, h: 0.3, fontFace: BODY_FONT, fontSize: 11.5, color: mutedColor });
+        }
+        cy += rowH;
+      }
+    }
+
+    for (let slideIdx = 0; slideIdx < (args.slides ?? []).length; slideIdx++) {
+      const spec = (args.slides ?? [])[slideIdx];
       const slide = pres.addSlide();
       slide.background = { color: bgColor };
 
-      const mode = spec.image ? "image" : spec.table ? "table" : spec.layout === "section" ? "section" : spec.layout === "two_column" ? "two_column" : "title_bullets";
+      const mode =
+        spec.layout === "section"
+          ? "section"
+          : spec.layout === "cover"
+          ? "cover"
+          : spec.layout === "cards"
+          ? "cards"
+          : spec.image
+          ? "image"
+          : spec.table
+          ? "table"
+          : spec.layout === "two_column"
+          ? "two_column"
+          : "title_bullets";
 
       if (mode === "section") {
         slide.background = { color: accent };
@@ -557,45 +757,118 @@ export const createPptxTool: ToolSpec = {
         continue;
       }
 
-      // No decorative accent stripe/underline here on purpose — a repeated geometric flourish under every title
-      // is one of the most recognizable tells of an AI-generated deck. The accent color still does real work
-      // elsewhere (icon badges, section backgrounds, table headers) instead of existing purely as decoration.
+      if (mode === "cover") {
+        const tags: any[] = Array.isArray(spec.tags) ? spec.tags : [];
+        let coverCy = 0.5;
+        if (tags.length) {
+          const tagText = tags.map((t) => String(t).toUpperCase()).join("   ·   ");
+          const pillW = Math.min(9, 0.5 + tagText.length * 0.078);
+          slide.addShape("roundRect", { x: 0.5, y: coverCy, w: pillW, h: 0.48, rectRadius: 0.24, fill: { color: bgColor }, line: { color: accent, width: 1 } });
+          slide.addText(tagText, { x: 0.65, y: coverCy, w: pillW - 0.3, h: 0.48, valign: "middle", fontFace: BODY_FONT, fontSize: 11.5, bold: true, color: accent, charSpacing: 2 });
+          coverCy += 0.7;
+        }
+        coverCy = Math.max(coverCy, 1.4);
+        // Title through description flow top-down from each other's estimated (not guessed-fixed)
+        // height, same reasoning as the title/content-area fix above — a longer real title or subtitle
+        // must push what follows down instead of sitting on top of it.
+        if (spec.title) {
+          const lines = estimateWrappedLines(String(spec.title), 9, 44);
+          const h = Math.max(0.6, lines * 0.62);
+          slide.addText(String(spec.title), { x: 0.5, y: coverCy, w: 9, h, fontFace: BODY_FONT, fontSize: 44, bold: true, color: titleColor, valign: "top" });
+          coverCy += h + 0.12;
+        }
+        if (spec.subtitle) {
+          const lines = estimateWrappedLines(String(spec.subtitle), 9, 17);
+          const h = Math.max(0.4, lines * 0.32);
+          slide.addText(pptxRuns(String(spec.subtitle), { fontFace: BODY_FONT, fontSize: 17, color: mutedColor }), { x: 0.5, y: coverCy, w: 9, h, valign: "top" });
+          coverCy += h + 0.15;
+        }
+        if (spec.description) {
+          const lines = estimateWrappedLines(String(spec.description), 9, 12.5);
+          const h = Math.max(0.35, lines * 0.24 * 1.3);
+          slide.addText(pptxRuns(String(spec.description), { fontFace: BODY_FONT, fontSize: 12.5, color: mutedColor }), {
+            x: 0.5, y: coverCy, w: 9, h, valign: "top", lineSpacingMultiple: 1.3,
+          });
+          coverCy += h + 0.3;
+        }
+        const bottomY = Math.max(coverCy, 4.3);
+        const bulletsAsDots = Array.isArray(spec.bullets) ? spec.bullets : [];
+        if (isDotListItems(bulletsAsDots)) {
+          renderDotList(slide, bulletsAsDots, 0.5, bottomY, 9);
+        } else {
+          const stats: any[] = Array.isArray(spec.stats) ? spec.stats : [];
+          if (stats.length) {
+            const gap = 0.16;
+            const w = (9 - gap * (stats.length - 1)) / stats.length;
+            stats.forEach((s, i) => {
+              const sx = 0.5 + i * (w + gap);
+              slide.addShape("rect", { x: sx, y: bottomY, w, h: 0.78, fill: { color: cardBg }, line: { color: cardBorder, width: 0.75 } });
+              slide.addShape("rect", { x: sx, y: bottomY, w: 0.045, h: 0.78, fill: { color: accent }, line: { type: "none" } });
+              slide.addText(String(s?.label ?? "").toUpperCase(), { x: sx + 0.16, y: bottomY + 0.1, w: w - 0.28, h: 0.3, fontFace: BODY_FONT, fontSize: 12.5, bold: true, color: accent });
+              slide.addText(String(s?.caption ?? ""), { x: sx + 0.16, y: bottomY + 0.42, w: w - 0.28, h: 0.3, fontFace: BODY_FONT, fontSize: 10, color: mutedColor });
+            });
+          }
+        }
+        if (spec.notes) slide.addNotes(String(spec.notes));
+        continue;
+      }
+
+      // No decorative accent stripe/underline under the title itself on purpose — a repeated geometric
+      // flourish under every title is one of the most recognizable tells of an AI-generated deck. The
+      // kicker label and per-card badge colors below do real work instead of existing purely as decoration.
       const hasIcon = !!spec.icon && ICON_GLYPHS[spec.icon];
+      const hasKicker = typeof spec.kicker === "string" && spec.kicker.trim().length > 0;
+      if (hasKicker) {
+        slide.addText(String(spec.kicker).toUpperCase(), {
+          x: hasIcon ? 1.3 : 0.5, y: 0.2, w: 8, h: 0.28, fontFace: BODY_FONT, fontSize: 12, bold: true, color: accent, charSpacing: 2,
+        });
+      }
       if (hasIcon) addIconBadge(slide, spec.icon, 0.5, 0.35, 0.62);
+      // Title box height (and the content area below it) is sized from the title's own line count —
+      // a fixed single-line-height box would let a wrapped 2-line title overflow straight into the
+      // content below it rather than making room, since PowerPoint doesn't auto-shrink text that
+      // wasn't laid out through its own editor.
+      const titleY = hasKicker ? 0.55 : 0.35;
+      const titleLineCount = spec.title ? estimateWrappedLines(String(spec.title), hasIcon ? 8.2 : 9, 32) : 0;
+      const titleH = Math.max(0.55, titleLineCount * 0.46);
+      const contentY = Math.max(CONTENT_Y, titleY + titleH + 0.12);
       if (spec.title) {
         slide.addText(String(spec.title), {
           x: hasIcon ? 1.3 : 0.5,
-          y: 0.35,
+          y: titleY,
           w: hasIcon ? 8.2 : 9,
-          h: 0.9,
+          h: titleH,
           fontFace: BODY_FONT,
-          fontSize: 36,
+          fontSize: 32,
           bold: true,
           color: titleColor,
+          valign: "top",
         });
       }
 
       if (mode === "image") {
         const loaded = loadImageFile(ctx.root, String(spec.image.path ?? ""), MAX_IMAGE_BYTES);
         if ("error" in loaded) return { ok: false, output: loaded.error };
-        const y = 1.55;
+        const y = contentY;
         // Slide is 5.625in tall; a portrait screenshot sized only by width would otherwise derive a height that
         // runs off the bottom edge — cap it to whatever room is actually left below the title, minus space for
         // the caption (if any) plus a bottom margin.
-        const maxHeightIn = 5.625 - y - (spec.image.caption ? 0.7 : 0.3);
+        const maxHeightIn = CONTENT_BOTTOM - y - (spec.image.caption ? 0.4 : 0.1);
         const { widthIn, heightIn } = fitImageBox(loaded.intrinsic, 8, spec.image.width, spec.image.height, maxHeightIn);
         const x = Math.max(0.5, (10 - widthIn) / 2);
         slide.addImage({ data: `data:image/${loaded.type};base64,${loaded.buffer.toString("base64")}`, x, y, w: widthIn, h: heightIn });
         if (spec.image.caption) {
           slide.addText(pptxRuns(String(spec.image.caption), { fontFace: BODY_FONT, fontSize: 13, color: captionColor }), {
             x: 0.5,
-            y: Math.min(y + heightIn + 0.15, 5.2),
+            y: Math.min(y + heightIn + 0.15, CONTENT_BOTTOM),
             w: 9,
-            h: 0.4,
+            h: 0.35,
             align: "center",
           });
         }
       } else if (mode === "table") {
+        const hasSidebar = spec.sidebar && typeof spec.sidebar === "object";
+        const tableW = hasSidebar ? 5.6 : 9;
         const headers: any[] = spec.table.headers ?? [];
         const rows: any[][] = spec.table.rows ?? [];
         const tableRows: PptxGenJS.TableRow[] = [];
@@ -607,8 +880,13 @@ export const createPptxTool: ToolSpec = {
               // "**Total**" doesn't show as literal asterisks; the header row is already bold regardless.
               const flat = flattenCellMarkup(normalizeCell(h).text);
               return {
-                text: flat.text,
-                options: { bold: true, color: "FFFFFF", fill: { color: accent }, align: (normalizeCell(h).align as any) ?? "left" },
+                text: isDark ? flat.text.toUpperCase() : flat.text,
+                options: {
+                  bold: true,
+                  color: isDark ? accent : "FFFFFF",
+                  fill: { color: isDark ? cardBg : accent },
+                  align: (normalizeCell(h).align as any) ?? "left",
+                },
               };
             })
           );
@@ -635,27 +913,120 @@ export const createPptxTool: ToolSpec = {
         if (tableRows.length) {
           slide.addTable(tableRows, {
             x: 0.5,
-            y: 1.55,
-            w: 9,
+            y: contentY,
+            w: tableW,
             fontFace: BODY_FONT,
-            fontSize: 14,
-            border: { type: "solid", color: isDark ? "334155" : "D1D5DB", pt: 0.5 },
+            fontSize: 13,
+            border: { type: "solid", color: cardBorder, pt: 0.5 },
           });
         }
+        if (hasSidebar) addSidebar(slide, spec.sidebar, 0.5 + tableW + 0.2, contentY, 9 - tableW - 0.2, CONTENT_BOTTOM - contentY);
+      } else if (mode === "cards") {
+        const cardsArr: any[] = Array.isArray(spec.cards) ? spec.cards : [];
+        const hasSidebar = spec.sidebar && typeof spec.sidebar === "object";
+        const areaX = 0.5;
+        const areaW = hasSidebar ? 5.6 : 9;
+        const cardLayout: "row" | "stack" =
+          spec.cardLayout === "row" || spec.cardLayout === "stack"
+            ? spec.cardLayout
+            : cardsArr.length <= 4 && cardsArr.every((c) => String(c?.text ?? "").length < 140)
+            ? "row"
+            : "stack";
+
+        if (cardLayout === "row" && cardsArr.length) {
+          const gap = 0.16;
+          const cw = (areaW - gap * (cardsArr.length - 1)) / cardsArr.length;
+          const ch = CONTENT_BOTTOM - contentY;
+          cardsArr.forEach((c, i) => {
+            const cx = areaX + i * (cw + gap);
+            const badgeColor = PPTX_BADGE_COLORS[i % PPTX_BADGE_COLORS.length];
+            slide.addShape("roundRect", { x: cx, y: contentY, w: cw, h: ch, rectRadius: 0.05, fill: { color: cardBg }, line: { color: cardBorder, width: 0.75 } });
+            slide.addShape("ellipse", { x: cx + 0.18, y: contentY + 0.18, w: 0.48, h: 0.48, fill: { color: badgeBg }, line: { color: badgeColor, width: 1.5 } });
+            slide.addText(String(c?.number ?? i + 1), {
+              x: cx + 0.18, y: contentY + 0.18, w: 0.48, h: 0.48, align: "center", valign: "middle", fontFace: BODY_FONT, fontSize: 14, bold: true, color: badgeColor,
+            });
+            slide.addText(String(c?.heading ?? "").toUpperCase(), {
+              x: cx + 0.18, y: contentY + 0.78, w: cw - 0.36, h: 0.35, fontFace: BODY_FONT, fontSize: 13, bold: true, color: badgeColor, charSpacing: 0.5,
+            });
+            slide.addText(pptxRuns(String(c?.text ?? ""), { fontFace: BODY_FONT, fontSize: 11.5, color: mutedColor }), {
+              x: cx + 0.18, y: contentY + 1.22, w: cw - 0.36, h: ch - 1.38, valign: "top", lineSpacingMultiple: 1.25,
+            });
+          });
+        } else if (cardsArr.length) {
+          // Each card's natural height is derived from its own heading+body line count (same flowing
+          // approach as addSidebar) rather than a fixed equal split — a rigid equal split let a card
+          // with more text than its siblings overflow past its own box. If the natural total is taller
+          // than the space actually available, every card (and the gap between them) is scaled down
+          // proportionally so the whole stack still ends exactly at CONTENT_BOTTOM instead of the last
+          // card or two running off the bottom of the slide.
+          const rawGap = 0.14;
+          const textW = areaW - 1.1;
+          const rawHeights = cardsArr.map((c) => {
+            const headingLines = estimateWrappedLines(String(c?.heading ?? ""), textW, 14.5);
+            const textLines = estimateWrappedLines(String(c?.text ?? ""), textW, 11.5);
+            return Math.max(0.9, 0.22 + headingLines * 0.26 + 0.12 + textLines * 0.24 * 1.25 + 0.2);
+          });
+          const available = CONTENT_BOTTOM - contentY;
+          const rawTotal = rawHeights.reduce((sum, h) => sum + h, 0) + rawGap * (cardsArr.length - 1);
+          const scale = rawTotal > available ? available / rawTotal : 1;
+          const heights = rawHeights.map((h) => h * scale);
+          const gap = rawGap * scale;
+
+          // A fixed badge diameter regardless of scale — deriving it from the (possibly quite small,
+          // post-scale) card height produced degenerate near-zero circles that clipped their own number.
+          const badgeD = Math.min(0.5, Math.max(0.3, rawHeights.length ? Math.min(...heights) - 0.15 : 0.5));
+          let cy = contentY;
+          cardsArr.forEach((c, i) => {
+            const chEach = heights[i];
+            const badgeColor = PPTX_BADGE_COLORS[i % PPTX_BADGE_COLORS.length];
+            const badgeCy = cy + (Math.min(chEach, 1.2) - badgeD) / 2;
+            slide.addShape("roundRect", { x: areaX, y: cy, w: areaW, h: chEach, rectRadius: 0.05, fill: { color: cardBg }, line: { color: cardBorder, width: 0.75 } });
+            slide.addShape("ellipse", { x: areaX + 0.2, y: badgeCy, w: badgeD, h: badgeD, fill: { color: badgeBg }, line: { color: badgeColor, width: 1.5 } });
+            slide.addText(String(c?.number ?? i + 1), {
+              x: areaX + 0.2, y: badgeCy, w: badgeD, h: badgeD, align: "center", valign: "middle", fontFace: BODY_FONT, fontSize: 13, bold: true, color: badgeColor,
+            });
+            slide.addText(String(c?.heading ?? ""), { x: areaX + 0.9, y: cy + 0.14 * scale, w: textW, h: 0.35, fontFace: BODY_FONT, fontSize: 14.5, bold: true, color: titleColor });
+            slide.addText(pptxRuns(String(c?.text ?? ""), { fontFace: BODY_FONT, fontSize: 11.5, color: mutedColor }), {
+              x: areaX + 0.9, y: cy + 0.5 * scale, w: textW, h: Math.max(0.2, chEach - 0.6 * scale), valign: "top", lineSpacingMultiple: 1.25,
+            });
+            cy += chEach + gap;
+          });
+        }
+        if (hasSidebar) addSidebar(slide, spec.sidebar, areaX + areaW + 0.2, contentY, 9 - areaW - 0.2, CONTENT_BOTTOM - contentY);
       } else if (mode === "two_column") {
         const columns = Array.isArray(spec.columns) ? spec.columns : [[], []];
         const left = mergeColonContinuations((columns[0] ?? []).map(normalizeListItem));
         const right = mergeColonContinuations((columns[1] ?? []).map(normalizeListItem));
-        if (left.length) slide.addText(pptxBulletRuns(left, bodyBase), { x: 0.5, y: 1.55, w: 4.3, h: 3.9, valign: "top" });
-        if (right.length) slide.addText(pptxBulletRuns(right, bodyBase), { x: 5.2, y: 1.55, w: 4.3, h: 3.9, valign: "top" });
+        const colH = CONTENT_BOTTOM - contentY;
+        if (left.length) slide.addText(pptxBulletRuns(left, bodyBase), { x: 0.5, y: contentY, w: 4.3, h: colH, valign: "top" });
+        if (right.length) slide.addText(pptxBulletRuns(right, bodyBase), { x: 5.2, y: contentY, w: 4.3, h: colH, valign: "top" });
       } else {
-        const items = mergeColonContinuations((spec.bullets ?? []).map(normalizeListItem));
-        if (items.length) {
-          // Slide is 5.625in tall; a box taller than that (the old h:5 constant) is harmless only by luck —
-          // it silently invites real overflow the day a slide has enough bullets to actually fill it.
-          slide.addText(pptxBulletRuns(items, bodyBase), { x: 0.5, y: 1.55, w: 9, h: 3.9, valign: "top" });
+        const rawBullets: any[] = Array.isArray(spec.bullets) ? spec.bullets : [];
+        if (isDotListItems(rawBullets)) {
+          renderDotList(slide, rawBullets, 0.5, contentY + 0.15, 9);
+        } else {
+          const items = mergeColonContinuations(rawBullets.map(normalizeListItem));
+          if (items.length) {
+            slide.addText(pptxBulletRuns(items, bodyBase), { x: 0.5, y: contentY, w: 9, h: CONTENT_BOTTOM - contentY, valign: "top" });
+          }
         }
       }
+
+      // Footer chrome: doc name (left) / subtitle (center) / page N of Total (right) — matches the
+      // reference deck's every-content-slide footer. Page numbers always show on content slides; the
+      // name/subtitle only show if the caller actually provided them, so a deck that didn't opt in
+      // doesn't get an unexplained label row.
+      const totalContentSlides = (args.slides ?? []).filter((s: any) => s.layout !== "cover" && s.layout !== "section").length;
+      const contentSlideIdx = (args.slides ?? []).slice(0, slideIdx + 1).filter((s: any) => s.layout !== "cover" && s.layout !== "section").length;
+      if (args.docTitle) {
+        slide.addText(String(args.docTitle), { x: 0.5, y: FOOTER_Y, w: 3, h: 0.28, fontFace: BODY_FONT, fontSize: 9.5, bold: true, color: footerColor });
+      }
+      if (args.footerText) {
+        slide.addText(String(args.footerText).toUpperCase(), {
+          x: 2.5, y: FOOTER_Y, w: 5, h: 0.28, align: "center", fontFace: BODY_FONT, fontSize: 9, color: footerColor, charSpacing: 1,
+        });
+      }
+      slide.addText(`${contentSlideIdx} / ${totalContentSlides}`, { x: 8.7, y: FOOTER_Y, w: 0.8, h: 0.28, align: "right", fontFace: BODY_FONT, fontSize: 9.5, color: footerColor });
 
       if (spec.notes) slide.addNotes(String(spec.notes));
     }
@@ -685,14 +1056,21 @@ function checkPptxHasContent(slides: any[] | undefined): string | null {
   const hasContent = slides.some(
     (s) =>
       (typeof s.title === "string" && s.title.trim().length > 0) ||
-      (Array.isArray(s.bullets) && s.bullets.some((b: any) => normalizeListItem(b).text.trim().length > 0)) ||
+      (Array.isArray(s.bullets) &&
+        s.bullets.some((b: any) => normalizeListItem(b).text.trim().length > 0 || (b && typeof b === "object" && String(b.title ?? "").trim().length > 0))) ||
       (s.image && typeof s.image.path === "string" && s.image.path.trim().length > 0) ||
       (s.table && ((Array.isArray(s.table.headers) && s.table.headers.length > 0) || (Array.isArray(s.table.rows) && s.table.rows.length > 0))) ||
-      (Array.isArray(s.columns) && s.columns.some((col: any) => Array.isArray(col) && col.length > 0))
+      (Array.isArray(s.columns) && s.columns.some((col: any) => Array.isArray(col) && col.length > 0)) ||
+      (Array.isArray(s.tags) && s.tags.length > 0) ||
+      (typeof s.subtitle === "string" && s.subtitle.trim().length > 0) ||
+      (typeof s.description === "string" && s.description.trim().length > 0) ||
+      (Array.isArray(s.stats) && s.stats.length > 0) ||
+      (Array.isArray(s.cards) && s.cards.some((c: any) => String(c?.heading ?? "").trim().length > 0 || String(c?.text ?? "").trim().length > 0)) ||
+      (s.sidebar && typeof s.sidebar === "object" && (s.sidebar.title || s.sidebar.text || s.sidebar.quote))
   );
   if (!hasContent) {
-    return "Every slide is empty (no title, bullets, image, table, or columns) — this would create a blank " +
-      "presentation. Fill in the actual content, then call this tool again.";
+    return "Every slide is empty (no title, bullets, image, table, columns, cover fields, or cards) — this would " +
+      "create a blank presentation. Fill in the actual content, then call this tool again.";
   }
   return null;
 }

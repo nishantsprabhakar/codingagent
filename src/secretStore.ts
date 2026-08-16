@@ -132,7 +132,11 @@ export class WindowsDpapiBackend implements SecretStore {
   async isAvailable(): Promise<boolean> {
     if (process.platform !== "win32") return false;
     try {
-      const out = await runCommand("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", DPAPI_ENCRYPT_SCRIPT], "probe", 8_000);
+      // 15s, not 8s: this spawns a real powershell.exe process, and under genuine system load (heavy
+      // CPU contention from something else running, e.g. this project's own 35-file test suite) 8s
+      // was tight enough to occasionally time out — which silently downgrades a real user's API keys
+      // to the plaintext fallback for the rest of the process's life, not just a test-suite flake.
+      const out = await runCommand("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", DPAPI_ENCRYPT_SCRIPT], "probe", 15_000);
       return out.length > 0;
     } catch {
       return false;
