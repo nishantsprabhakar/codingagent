@@ -16,7 +16,7 @@ import {
   _setApiKeysBaseDirForTesting,
   _resetApiKeysMigrationForTesting,
 } from "../apiKeys";
-import { _setBaseDirForTesting, _resetSecretStoreForTesting } from "../secretStore";
+import { _setBaseDirForTesting, _resetSecretStoreForTesting, _setSelectedBackendForTesting, WindowsDpapiBackend } from "../secretStore";
 
 function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wrexlyn-apikeys-test-"));
@@ -67,6 +67,14 @@ test("migration: a pre-existing legacy plaintext api-keys.json is moved into the
     // Simulate a user who already had a key saved before OS-backed storage existed.
     const legacyPath = path.join(dir, "api-keys.json");
     fs.writeFileSync(legacyPath, JSON.stringify({ groq: "gsk_legacy_value" }, null, 2), "utf-8");
+
+    if (process.platform === "win32") {
+      // Pin the backend instead of letting getSecretStore() probe live via a spawned PowerShell process —
+      // under full-suite CPU contention that probe can lose its race and fall back to the plaintext backend,
+      // which would make migration correctly no-op and fail this assertion for a reason unrelated to the
+      // migration logic actually being tested. See _setSelectedBackendForTesting's doc comment.
+      _setSelectedBackendForTesting(new WindowsDpapiBackend());
+    }
 
     const value = await loadApiKey("groq");
     assert.equal(value, "gsk_legacy_value", "the legacy value should still be readable through loadApiKey after migration");

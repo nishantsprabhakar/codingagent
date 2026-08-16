@@ -331,3 +331,15 @@ export function _resetSecretStoreForTesting(): void {
   selected = null;
   warnedFallback = false;
 }
+
+/**
+ * Test-only: pins the backend directly instead of letting getSecretStore() probe for one. Real backend
+ * selection spawns a subprocess (e.g. a PowerShell DPAPI probe on Windows) with its own timeout — under the
+ * CPU contention of a full parallel test-suite run, that probe can lose the race and fall back to a different
+ * backend than the one being tested, which is a source of flakiness unrelated to the logic under test. Tests
+ * that need to assert behavior specific to one backend (e.g. "a secure backend migrates and removes the
+ * legacy plaintext key") should pin it here rather than depend on the probe's outcome.
+ */
+export function _setSelectedBackendForTesting(store: SecretStore | null): void {
+  selected = store;
+}

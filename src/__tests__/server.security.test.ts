@@ -153,7 +153,9 @@ test("WebSocket: a connection without a token is rejected during the handshake",
   await withServer(async (_handle, port) => {
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(`ws://127.0.0.1:${port}/`);
-      const timer = setTimeout(() => reject(new Error("expected the handshake to be rejected, but it stayed open")), 3000);
+      // 8s, not 3s: this spawns a real server and connects a real socket, so it needs headroom for the CPU
+      // contention of the full 35-file suite running concurrently, not just for a quiet, unloaded machine.
+      const timer = setTimeout(() => reject(new Error("expected the handshake to be rejected, but it stayed open")), 8000);
       ws.on("open", () => {
         clearTimeout(timer);
         ws.close();
@@ -176,7 +178,8 @@ test("WebSocket: a connection with the correct token succeeds", async () => {
   await withServer(async (handle, port) => {
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(`ws://127.0.0.1:${port}/?token=${handle.authToken}`);
-      const timer = setTimeout(() => reject(new Error("expected the handshake to succeed")), 3000);
+      // 8s, not 3s: same full-suite CPU-contention headroom as the sibling rejection test above.
+      const timer = setTimeout(() => reject(new Error("expected the handshake to succeed")), 8000);
       ws.on("open", () => {
         clearTimeout(timer);
         ws.close();
