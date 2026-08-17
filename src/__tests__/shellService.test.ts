@@ -12,8 +12,8 @@ import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { runInService, _shutdownServiceForTesting } from "../shellServiceClient";
-import { runOne } from "../shellService";
+import { runInService, runDocumentScript, _shutdownServiceForTesting } from "../shellServiceClient";
+import { runOne, runDocumentScriptOnHost } from "../shellService";
 
 function mkTempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "wrexlyn-shellsvc-test-"));
@@ -82,4 +82,67 @@ test("runInService: transparently respawns after the service process is killed",
   const result = await runInService("echo after-respawn", root);
   assert.equal(result.ok, true);
   assert.match(result.output, /after-respawn/);
+});
+
+test("runDocumentScriptOnHost (in-process, no fork): executes a real .cjs file via execFile and returns its stdout", async () => {
+  const root = mkTempRoot();
+  const scriptPath = path.join(root, "gen.cjs");
+  const outputPath = path.join(root, "output.txt");
+  fs.writeFileSync(scriptPath, `require("fs").writeFileSync(${JSON.stringify(outputPath)}, "hello from document script");\nconsole.log("done");\n`);
+
+  const result = await runDocumentScriptOnHost({ id: "y", type: "run_document_script", scriptPath, cwd: root });
+  assert.equal(result.ok, true, result.output);
+  assert.match(result.output, /done/);
+  assert.equal(fs.readFileSync(outputPath, "utf-8"), "hello from document script");
+});
+
+test("runDocumentScript: NODE_PATH resolution actually works -- a real script requiring wrexlyn-pptx-kit and pptxgenjs succeeds", async () => {
+  const root = mkTempRoot();
+  const scriptPath = path.join(root, "gen.cjs");
+  const outputPath = path.join(root, "deck.pptx");
+  fs.writeFileSync(
+    scriptPath,
+    [
+      `const { createDeckTheme, PptxGenJS } = require("wrexlyn-pptx-kit");`,
+      `const theme = createDeckTheme({ accentColor: "2FE6D9", mode: "dark" });`,
+      `const pres = new PptxGenJS();`,
+      `const slide = pres.addSlide();`,
+      `slide.background = { color: theme.bgColor };`,
+      `slide.addText("real content", { x: 1, y: 1, w: 5, h: 1 });`,
+      `pres.writeFile({ fileName: ${JSON.stringify(outputPath)} }).then(() => console.log("script finished OK"));`,
+    ].join("\n")
+  );
+
+  const result = await runDocumentScript(scriptPath, root);
+  assert.equal(result.ok, true, result.output);
+  assert.match(result.output, /script finished OK/);
+  assert.ok(fs.existsSync(outputPath));
+});
+
+test("runDocumentScript: a throwing script returns ok:false with the real error output, not a swallowed failure", async () => {
+  const root = mkTempRoot();
+  const scriptPath = path.join(root, "broken.cjs");
+  fs.writeFileSync(scriptPath, `throw new Error("deliberate failure for the test");\n`);
+
+  const result = await runDocumentScript(scriptPath, root);
+  assert.equal(result.ok, false);
+  assert.match(result.output, /deliberate failure for the test/);
+});
+
+// Regression: an earlier design reused runInService's shell-string exec() path for document
+// scripts, which needs correct per-shell quoting for any path containing spaces -- this repo's own
+// working directory has one ("Desktop Code Base... coding-agent" style names are common on real
+// machines), so this isn't a hypothetical edge case. runDocumentScript uses execFile with a real
+// argv array instead, which never needs quoting at all.
+test("runDocumentScript: works correctly when the working directory and script path contain a space", async () => {
+  const root = mkTempRoot();
+  const spacedDir = path.join(root, "dir with spaces");
+  fs.mkdirSync(spacedDir);
+  const scriptPath = path.join(spacedDir, "gen.cjs");
+  const outputPath = path.join(spacedDir, "out.txt");
+  fs.writeFileSync(scriptPath, `require("fs").writeFileSync(${JSON.stringify(outputPath)}, "ok");\nconsole.log("space path OK");\n`);
+
+  const result = await runDocumentScript(scriptPath, spacedDir);
+  assert.equal(result.ok, true, result.output);
+  assert.match(result.output, /space path OK/);
 });
