@@ -65,7 +65,16 @@ const MAX_CRITIQUE_ACTION_CHARS = 800;
 const MODEL_IDLE_TIMEOUT_MS = 90_000;
 
 /** Tool calls whose `path` argument should surface in the "Created Files" panel. */
-const FILE_PRODUCING_TOOLS = new Set(["write_file", "edit_file", "create_docx", "create_pptx", "create_xlsx"]);
+const FILE_PRODUCING_TOOLS = new Set([
+  "write_file",
+  "edit_file",
+  "create_docx",
+  "create_pptx",
+  "create_xlsx",
+  "run_pptx_script",
+  "run_docx_script",
+  "run_xlsx_script",
+]);
 
 /** Extensions worth an automatic verification pass; touching only a generated document shouldn't trigger a test run. */
 const CODE_FILE_RE = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|c|cpp|h|hpp|cs)$/i;
@@ -256,6 +265,39 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "- For any spreadsheet that's a model rather than a static table (financial models, running totals, anything",
     "  someone would want to audit or change an input and have it recalculate), use live formulas — a cell value",
     "  starting with '=' in create_xlsx — instead of computing the numbers yourself and writing them as literals.",
+    "- For documents with substantial content — a deck past roughly 8 slides, a Word doc past roughly 40",
+    "  blocks/sections, or a spreadsheet past roughly 200 total data rows — prefer run_pptx_script/run_docx_script/",
+    "  run_xlsx_script over create_pptx/create_docx/create_xlsx. The create_* tools require describing the entire",
+    "  document as one JSON tool call, which can exceed your own output token limit on a large document and fail",
+    "  outright; the script tools have you write a compact Node.js script instead, using loops/variables to express",
+    "  repetitive structure far more compactly than expanded JSON ever could. If you call create_pptx/create_docx/",
+    "  create_xlsx anyway past that size, the tool itself will tell you to switch to the matching script tool",
+    "  rather than let you retry the same oversized call.",
+    "- Using the script tools: first write_file the script — it must end in .cjs, not .js (a plain .js file is",
+    "  parsed as ES Modules if the target project's own package.json has \"type\": \"module\", which makes a bare",
+    "  require() throw immediately). Then call run_pptx_script/run_docx_script/run_xlsx_script with {scriptPath,",
+    "  path}. Inside the script, require('pptxgenjs')/require('docx')/require('exceljs') and",
+    "  require('wrexlyn-pptx-kit')/'wrexlyn-docx-kit'/'wrexlyn-xlsx-kit' both resolve automatically — no npm install",
+    "  needed in the project. The wrexlyn-*-kit packages expose the same default look create_pptx/create_docx/",
+    "  create_xlsx themselves use — use them so a script-generated document still looks consistent with one made by",
+    "  the JSON tools, rather than reinventing the styling from scratch. For pptx: wrexlyn-pptx-kit's",
+    "  createDeckTheme({accentColor, mode}) is the only thing you call directly — it returns a theme object whose",
+    "  properties (theme.bgColor, theme.titleColor, ...) and METHODS (theme.addIconBadge(...), theme.addSidebar(...),",
+    "  theme.renderDotList(...)) provide the palette/icon-badges/shrink-to-fit-sidebar-text. Call these as",
+    "  theme.methodName(...) — they are not bare top-level functions, only pptxRuns and createDeckTheme themselves",
+    "  are. For docx: docxRuns/orderedListNumbering/createToc/LETTER_SIZE_DXA are all top-level exports. For xlsx:",
+    "  toFormulaAwareCellValue/styleHeaderRow/applyDataRowStyle are all top-level exports too.",
+    "- These three tools always ask for confirmation (classified high risk — a script is genuine code execution,",
+    "  not just document assembly) and never run inside --sandbox (the sandboxed container has no access to the",
+    "  libraries/kits these scripts need) — always on the host, --sandbox or not. After execution, the same kind",
+    "  of deterministic quality gate as create_pptx/create_docx/create_xlsx re-opens the actual produced file and",
+    "  blocks on placeholder text or an empty/near-blank result — fix the script and call the tool again rather",
+    "  than treating a blocking failure as final.",
+    "- Script gotchas worth knowing up front: pptxgenjs hex colors must be 6 digits with no '#' and no alpha",
+    "  channel baked in (corrupts the file); never reuse one options object (e.g. a shadow) across multiple",
+    "  addShape/addText calls (pptxgenjs mutates it in place); docx.js defaults to A4 unless you set the page size",
+    "  explicitly (wrexlyn-docx-kit's LETTER_SIZE_DXA); a docx PageBreak must sit inside a Paragraph, not standalone;",
+    "  docx table cell shading must use ShadingType.CLEAR, never SOLID (SOLID renders a black background).",
   ]
     .filter((line, i, arr) => !(line === "" && arr[i - 1] === ""))
     .join("\n");
@@ -1056,7 +1098,14 @@ export class Agent {
   }
 
   /** Document-generating tools whose failure output comes from documentQuality.ts's deterministic checks. */
-  private static readonly QUALITY_CHECKED_TOOLS = new Set(["create_docx", "create_pptx", "create_xlsx"]);
+  private static readonly QUALITY_CHECKED_TOOLS = new Set([
+    "create_docx",
+    "create_pptx",
+    "create_xlsx",
+    "run_pptx_script",
+    "run_docx_script",
+    "run_xlsx_script",
+  ]);
 
   /**
    * Folds newly-observed facts (a test command that just worked, a command the user denied, a document

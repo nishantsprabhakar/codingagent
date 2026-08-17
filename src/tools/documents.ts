@@ -143,6 +143,49 @@ function docxRuns(text: string, override?: { color?: string; bold?: boolean }): 
   );
 }
 
+// Deterministic backstop, not just system-prompt guidance: create_docx/create_pptx/create_xlsx
+// require the model to describe an entire document as one JSON tool-call argument, which every
+// provider's 8000-token completion cap (see src/providers/*.ts) makes unreliable past a certain
+// size — the model hits finish_reason=length mid-argument and has to regenerate the whole blob.
+// Rather than relying purely on the model reading and following prose guidance, these three tools
+// themselves refuse past a threshold and redirect to the matching run_*_script tool
+// (src/tools/documentScripts.ts), which has the model write a compact script instead. Thresholds
+// are illustrative, not load-bearing precision — tunable without changing the underlying reasoning.
+const DOCX_SCRIPT_THRESHOLD_BLOCKS = 40;
+const PPTX_SCRIPT_THRESHOLD_SLIDES = 8;
+const XLSX_SCRIPT_THRESHOLD_ROWS = 200;
+
+function checkDocxSizeThreshold(blocks: any[] | undefined): string | null {
+  const count = Array.isArray(blocks) ? blocks.length : 0;
+  if (count <= DOCX_SCRIPT_THRESHOLD_BLOCKS) return null;
+  return (
+    `This document has ${count} blocks — past create_docx's practical size for a single JSON tool call (risks ` +
+    `exceeding your own output token limit mid-argument). Use run_docx_script instead: write a .cjs script with ` +
+    `write_file (require('docx') or require('wrexlyn-docx-kit')), then call run_docx_script with {scriptPath, path}.`
+  );
+}
+
+function checkPptxSizeThreshold(slides: any[] | undefined): string | null {
+  const count = Array.isArray(slides) ? slides.length : 0;
+  if (count <= PPTX_SCRIPT_THRESHOLD_SLIDES) return null;
+  return (
+    `This deck has ${count} slides — past create_pptx's practical size for a single JSON tool call (risks ` +
+    `exceeding your own output token limit mid-argument). Use run_pptx_script instead: write a .cjs script with ` +
+    `write_file (require('pptxgenjs') or require('wrexlyn-pptx-kit')), then call run_pptx_script with {scriptPath, path}.`
+  );
+}
+
+function checkXlsxSizeThreshold(sheets: any[] | undefined): string | null {
+  const totalRows = Array.isArray(sheets) ? sheets.reduce((sum, s) => sum + (Array.isArray(s?.rows) ? s.rows.length : 0), 0) : 0;
+  if (totalRows <= XLSX_SCRIPT_THRESHOLD_ROWS) return null;
+  return (
+    `This workbook has ${totalRows} total data rows — past create_xlsx's practical size for a single JSON tool ` +
+    `call (risks exceeding your own output token limit mid-argument). Use run_xlsx_script instead: write a .cjs ` +
+    `script with write_file (require('exceljs') or require('wrexlyn-xlsx-kit')), then call run_xlsx_script with ` +
+    `{scriptPath, path}.`
+  );
+}
+
 export const createDocxTool: ToolSpec = {
   mutating: true,
   definition: {
@@ -174,6 +217,8 @@ export const createDocxTool: ToolSpec = {
   run: async (args, ctx) => {
     const emptyCheck = checkBlocksHaveContent(args.blocks);
     if (emptyCheck) return { ok: false, output: emptyCheck };
+    const sizeCheck = checkDocxSizeThreshold(args.blocks);
+    if (sizeCheck) return { ok: false, output: sizeCheck };
 
     const quality = checkBlocksQuality(args.blocks ?? []);
     if (!quality.ok) {
@@ -564,6 +609,8 @@ export const createPptxTool: ToolSpec = {
   run: async (args, ctx) => {
     const emptyCheck = checkPptxHasContent(args.slides);
     if (emptyCheck) return { ok: false, output: emptyCheck };
+    const sizeCheck = checkPptxSizeThreshold(args.slides);
+    if (sizeCheck) return { ok: false, output: sizeCheck };
 
     const quality = checkPptxQuality(args.slides ?? []);
     if (!quality.ok) {
@@ -1175,6 +1222,8 @@ export const createXlsxTool: ToolSpec = {
   run: async (args, ctx) => {
     const emptyCheck = checkXlsxHasContent(args.sheets);
     if (emptyCheck) return { ok: false, output: emptyCheck };
+    const sizeCheck = checkXlsxSizeThreshold(args.sheets);
+    if (sizeCheck) return { ok: false, output: sizeCheck };
 
     const quality = checkXlsxQuality(args.sheets ?? []);
     if (!quality.ok) {
