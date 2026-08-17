@@ -24,7 +24,9 @@ export interface QualityCheckResult {
   warnings: string[];
 }
 
-const PLACEHOLDER_PATTERNS: RegExp[] = [
+/** Exported so documentScriptQuality.ts's post-execution scan (over text extracted from a rendered
+ *  .pptx/.docx/.xlsx) shares this exact list rather than maintaining a second, driftable copy. */
+export const PLACEHOLDER_PATTERNS: RegExp[] = [
   /\btodo\b/i,
   /\btbd\b/i,
   /\bfixme\b/i,
@@ -35,7 +37,7 @@ const PLACEHOLDER_PATTERNS: RegExp[] = [
   /\byour (?:text|content) here\b/i,
 ];
 
-function findPlaceholder(text: unknown): string | null {
+export function findPlaceholder(text: unknown): string | null {
   if (typeof text !== "string" || !text) return null;
   for (const re of PLACEHOLDER_PATTERNS) {
     const m = text.match(re);
