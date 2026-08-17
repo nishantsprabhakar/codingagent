@@ -17,7 +17,7 @@
 import { fork, type ChildProcess } from "child_process";
 import * as path from "path";
 import * as crypto from "crypto";
-import type { ShellRequest, ShellResponse } from "./shellService";
+import type { ShellRequest, ShellResponse, RunDocumentScriptRequest } from "./shellService";
 
 /** How much longer than the caller's own exec timeout to wait for a response before giving up on the IPC round-trip itself. */
 const IPC_SLACK_MS = 5_000;
@@ -108,6 +108,30 @@ export async function runInService(
 
     pending.set(id, { resolve: (res) => resolve({ ok: res.ok, output: res.output }), timer });
     proc.send({ id, command, cwd, timeoutMs, sandbox, sandboxImage } as ShellRequest);
+  });
+}
+
+/**
+ * Runs a document-generation script (run_pptx_script/run_docx_script/run_xlsx_script) through the
+ * same forked shell-execution service child process as runInService — reusing its respawn/IPC
+ * machinery, not duplicating it — but as a distinct `run_document_script` request shape
+ * (shellService.ts's `RunDocumentScriptRequest`) that the child dispatches to `execFile`
+ * (argv-based, NODE_PATH-augmented) instead of the shell-string `exec()` path. See
+ * shellService.ts's `runDocumentScriptOnHost` for what NODE_PATH is actually set to and why.
+ */
+export async function runDocumentScript(scriptPath: string, cwd: string, timeoutMs?: number): Promise<{ ok: boolean; output: string }> {
+  await whenReady();
+  const proc = getChild();
+  const id = crypto.randomBytes(8).toString("hex");
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      resolve({ ok: false, output: "The shell-execution service did not respond in time." });
+    }, (timeoutMs && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS) + IPC_SLACK_MS);
+
+    pending.set(id, { resolve: (res) => resolve({ ok: res.ok, output: res.output }), timer });
+    proc.send({ id, type: "run_document_script", scriptPath, cwd, timeoutMs } as RunDocumentScriptRequest);
   });
 }
 

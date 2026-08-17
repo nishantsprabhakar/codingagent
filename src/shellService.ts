@@ -17,7 +17,8 @@
  * Communicates over Node's built-in fork() IPC channel with a tiny JSON request/response protocol
  * — see shellServiceClient.ts for the parent-side half, which is the only intended caller.
  */
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
+import * as path from "path";
 import { isDockerAvailable, runInDockerSandbox } from "./dockerSandbox";
 
 const MAX_OUTPUT = 20_000;
@@ -31,6 +32,24 @@ export interface ShellRequest {
   sandbox?: boolean;
   sandboxImage?: string;
 }
+
+/**
+ * A separate, narrower request shape for run_pptx_script/run_docx_script/run_xlsx_script — executing
+ * a model-written .cjs file rather than an arbitrary shell string. Distinguished from ShellRequest by
+ * `type` (absent on every existing ShellRequest, so this is purely additive to the IPC protocol).
+ * Deliberately NOT routed through Docker regardless of any sandbox flag: the sandbox container only
+ * ever mounts `cwd`, never Wrexlyn's own node_modules/document-kits, so NODE_PATH would point at
+ * nothing inside it — see runDocumentScriptOnHost's own comment.
+ */
+export interface RunDocumentScriptRequest {
+  id: string;
+  type: "run_document_script";
+  scriptPath: string;
+  cwd: string;
+  timeoutMs?: number;
+}
+
+export type ServiceRequest = ShellRequest | RunDocumentScriptRequest;
 
 export interface ShellResponse {
   id: string;
@@ -68,13 +87,50 @@ export async function runOne(req: ShellRequest): Promise<ShellResponse> {
   return { id: req.id, ok: result.ok, output: result.output };
 }
 
+/**
+ * Runs a document-generation script via `execFile(process.execPath, [scriptPath], ...)` — a real
+ * argv invocation, never a shell string, so a working directory or script path containing spaces
+ * (a real case, not hypothetical: this very repo's own path has one) never needs manual quoting.
+ * `process.execPath` (not the string "node") guarantees the exact same Node binary running this
+ * service is used, sidestepping any PATH ambiguity. NODE_PATH is set to Wrexlyn's own node_modules
+ * (so `require('pptxgenjs')`/`require('docx')`/`require('exceljs')` resolve even though the script
+ * physically lives inside the target project, not here) plus the top-level document-kits/ directory
+ * (so `require('wrexlyn-pptx-kit')` etc. resolve the same way) — both computed relative to this
+ * compiled module's own location, the same __dirname-walk-up pattern web/server.ts already uses for
+ * its static PUBLIC_DIR.
+ */
+export function runDocumentScriptOnHost(req: RunDocumentScriptRequest): Promise<ShellResponse> {
+  const timeout = req.timeoutMs && req.timeoutMs > 0 ? req.timeoutMs : DEFAULT_TIMEOUT_MS;
+  const nodeModulesDir = path.join(__dirname, "..", "node_modules");
+  const documentKitsDir = path.join(__dirname, "..", "document-kits");
+  const env = { ...process.env, NODE_PATH: [nodeModulesDir, documentKitsDir].join(path.delimiter) };
+
+  return new Promise((resolve) => {
+    execFile(process.execPath, [req.scriptPath], { cwd: req.cwd, env, timeout, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+      const combined = `${stdout}${stderr}`.trim();
+      const truncated = combined.length > MAX_OUTPUT ? combined.slice(0, MAX_OUTPUT) + "\n... (output truncated)" : combined;
+      if (error) {
+        const reason = (error as any).killed ? "timed out" : `exited with code ${(error as any).code}`;
+        resolve({ id: req.id, ok: false, output: `Script ${reason}.\n${truncated || "(no output)"}` });
+        return;
+      }
+      resolve({ id: req.id, ok: true, output: truncated || "(script produced no stdout output)" });
+    });
+  });
+}
+
+function isDocumentScriptRequest(req: ServiceRequest): req is RunDocumentScriptRequest {
+  return (req as RunDocumentScriptRequest).type === "run_document_script";
+}
+
 // Only runs the IPC listener when actually launched as the forked shell-service child — process.send
 // only exists on a process that was itself created via fork() with an IPC channel. This file is also
 // imported directly (never forked) by shellServiceClient.ts's tests for the shared request/response
-// types and to unit-test runOne() in-process, which must not start a live listener.
+// types and to unit-test runOne()/runDocumentScriptOnHost() in-process, which must not start a live
+// listener.
 if (typeof process.send === "function") {
-  process.on("message", async (req: ShellRequest) => {
-    const response = await runOne(req);
+  process.on("message", async (req: ServiceRequest) => {
+    const response = isDocumentScriptRequest(req) ? await runDocumentScriptOnHost(req) : await runOne(req);
     process.send!(response);
   });
   process.send({ type: "ready" });
