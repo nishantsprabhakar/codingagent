@@ -46,6 +46,41 @@ test("run_pptx_script: a real script requiring wrexlyn-pptx-kit produces a valid
   assert.ok(fs.existsSync(path.join(ctx.root, "deck.pptx")));
 });
 
+test("run_pptx_script: a real script exercising the chart/table/stats/timeline kit helpers produces a valid deck", async () => {
+  const ctx = mkTempRoot();
+  fs.writeFileSync(
+    path.join(ctx.root, "gen.cjs"),
+    [
+      `const { createDeckTheme, PptxGenJS } = require("wrexlyn-pptx-kit");`,
+      `const theme = createDeckTheme({ accentColor: "2FE6D9", mode: "dark" });`,
+      `const pres = new PptxGenJS();`,
+      ``,
+      `const chartSlide = pres.addSlide();`,
+      `chartSlide.background = { color: theme.bgColor };`,
+      `chartSlide.addChart(pres.ChartType.bar, [{ name: "Revenue", labels: ["2023", "2024"], values: [10, 20] }], Object.assign(theme.chartDefaults("categorical"), { x: 0.5, y: 1, w: 9, h: 4 }));`,
+      ``,
+      `const tableSlide = pres.addSlide();`,
+      `tableSlide.background = { color: theme.bgColor };`,
+      `tableSlide.addTable([theme.tableHeaderRow(["Item", "Amount"]), theme.tableBodyRow(["Widget", "10"], 0), theme.tableBodyRow(["Total", "30"], 1, { highlight: true })], { x: 0.5, y: 1, w: 9 });`,
+      ``,
+      `const statsSlide = pres.addSlide();`,
+      `statsSlide.background = { color: theme.bgColor };`,
+      `theme.renderStatsRow(statsSlide, [{ label: "ARR", caption: "$10M" }, { label: "NRR", caption: "128%" }], 0.5, 1.4, 9, 3.5, "large");`,
+      ``,
+      `const timelineSlide = pres.addSlide();`,
+      `timelineSlide.background = { color: theme.bgColor };`,
+      `theme.renderTimeline(timelineSlide, [{ label: "Plan" }, { label: "Build" }, { label: "Ship" }], 0.5, 1.4, 9, 3.5);`,
+      ``,
+      `pres.writeFile({ fileName: "deck.pptx" });`,
+    ].join("\n")
+  );
+
+  const result = await runPptxScriptTool.run({ scriptPath: "gen.cjs", path: "deck.pptx" }, ctx);
+  assert.equal(result.ok, true, result.output);
+  assert.equal(result.qualityGate?.ok, true);
+  assert.ok(fs.existsSync(path.join(ctx.root, "deck.pptx")));
+});
+
 test("run_pptx_script: rejects a scriptPath that doesn't end in .cjs before ever executing anything", async () => {
   const ctx = mkTempRoot();
   const result = await runPptxScriptTool.run({ scriptPath: "gen.js", path: "deck.pptx" }, ctx);
