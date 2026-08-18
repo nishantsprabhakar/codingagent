@@ -177,6 +177,33 @@ export function checkPptxQuality(slides: any[]): QualityCheckResult {
       }
     }
 
+    if (slide?.chart) {
+      const chart = slide.chart;
+      const titlePlaceholder = findPlaceholder(chart?.title);
+      if (titlePlaceholder) blocking.push(`Placeholder text "${titlePlaceholder}" found in the chart title on ${where}.`);
+      const categories: any[] = Array.isArray(chart?.categories) ? chart.categories : [];
+      const seriesArr: any[] = Array.isArray(chart?.series) ? chart.series : [];
+      seriesArr.forEach((s, si) => {
+        const namePlaceholder = findPlaceholder(s?.name);
+        if (namePlaceholder) blocking.push(`Placeholder text "${namePlaceholder}" found in a chart series name on ${where}.`);
+        const values: any[] = Array.isArray(s?.values) ? s.values : [];
+        if (categories.length && values.length !== categories.length) {
+          blocking.push(
+            `${where}: chart series ${si + 1} ("${s?.name ?? ""}") has ${values.length} value(s) but there are ${categories.length} categories — they must match.`
+          );
+        }
+      });
+      if (seriesArr.length === 0 || categories.length === 0) {
+        blocking.push(`${where}'s chart has no categories or no series — fill in real chart data or remove it.`);
+      }
+    }
+
+    // layout=timeline
+    for (const step of Array.isArray(slide?.steps) ? slide.steps : []) {
+      const placeholder = findPlaceholder(step?.label) ?? findPlaceholder(step?.caption);
+      if (placeholder) blocking.push(`Placeholder text "${placeholder}" found in a timeline step on ${where}.`);
+    }
+
     // layout=cover fields
     for (const field of [slide?.subtitle, slide?.description]) {
       const placeholder = findPlaceholder(field);

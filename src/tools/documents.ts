@@ -480,7 +480,12 @@ export const createPptxTool: ToolSpec = {
         "supports inline markup: **bold**, _italic_, __underline__, ~~strikethrough~~. Defaults to a dark, " +
         "restrained professional theme (near-black background, muted body text, bordered-card content panels, " +
         "a rotating color-coded badge per numbered item) — this is the deck's default look now, not a rare " +
-        "flourish, so lean into `cover`/`cards`/`kicker` rather than defaulting every slide to plain bullets.",
+        "flourish, so lean into `cover`/`cards`/`kicker` rather than defaulting every slide to plain bullets. " +
+        "Actively prefer the richer content types over plain bullets when the content calls for them: comparative " +
+        "or trend data → `chart`; a structured multi-column dataset → `table` (with `widths`/`highlightRows` when " +
+        "there's an obvious total/key row); a sequence of steps/phases → layout='timeline'; a handful of headline " +
+        "numbers → layout='stats'. 'Slide with 5 bullet points about X' is rarely the best answer to a request " +
+        "for real data or a process — reach for one of these instead.",
       parameters: {
         type: "object",
         properties: {
@@ -512,7 +517,7 @@ export const createPptxTool: ToolSpec = {
                 },
                 layout: {
                   type: "string",
-                  enum: ["title_bullets", "section", "two_column", "cover", "cards"],
+                  enum: ["title_bullets", "section", "two_column", "cover", "cards", "stats", "timeline"],
                   description:
                     "'title_bullets' (default): title + bullet list. 'section': a large centered title on an " +
                     "accent-colored background, for dividing the deck into sections. 'two_column': title + two " +
@@ -520,7 +525,11 @@ export const createPptxTool: ToolSpec = {
                     "a big title, subtitle, description, and a row of small stat labels (use with `tags`/`subtitle`/" +
                     "`description`/`stats`) — also fits a closing/CTA slide. 'cards': a row or stack of numbered, " +
                     "color-badged bordered boxes for enumerated points, options, or process steps (use with `cards`), " +
-                    "optionally paired with a `sidebar` callout panel.",
+                    "optionally paired with a `sidebar` callout panel. 'stats': a small number (2-5) of headline " +
+                    "figures shown as large callout boxes filling the slide — use for a handful of key metrics " +
+                    "(use with `stats`), a much bigger/bolder treatment than cover's compact stat row. 'timeline': " +
+                    "numbered steps connected by a horizontal line, for a process/sequence/roadmap (use with `steps`) " +
+                    "— prefer this over `cards` when the points are genuinely ordered/sequential, not just enumerated.",
                 },
                 bullets: {
                   type: "array",
@@ -544,10 +553,22 @@ export const createPptxTool: ToolSpec = {
                 description: { type: "string", description: "A short paragraph shown below the subtitle (layout=cover only)." },
                 stats: {
                   type: "array",
-                  description: "Small bordered label/caption boxes shown in a row (layout=cover only), e.g. {label: '6-STATE', caption: 'verification engine'}.",
+                  description: "Small bordered label/caption boxes shown in a row (layout=cover: a compact strip; layout=stats: large callouts filling the slide), e.g. {label: '6-STATE', caption: 'verification engine'}.",
                   items: {
                     type: "object",
                     properties: { label: { type: "string" }, caption: { type: "string" } },
+                  },
+                },
+                steps: {
+                  type: "array",
+                  description: "Numbered steps connected by a line, left to right (layout=timeline only). Each is {icon?, label, caption?} — `icon` is optional and uses the same vocabulary as the slide-level `icon` field.",
+                  items: {
+                    type: "object",
+                    properties: {
+                      icon: { type: "string", enum: Object.keys(ICON_GLYPHS) },
+                      label: { type: "string" },
+                      caption: { type: "string" },
+                    },
                   },
                 },
                 cards: {
@@ -593,6 +614,36 @@ export const createPptxTool: ToolSpec = {
                   properties: {
                     headers: { type: "array", items: { type: "string" } },
                     rows: { type: "array", items: { type: "array", items: {} } },
+                    widths: {
+                      type: "array",
+                      items: { type: "number" },
+                      description: "Optional per-column width in inches, one entry per column (must sum to roughly the table's available width — 9in, or 5.6in if `sidebar` is also set). Omit to split columns evenly.",
+                    },
+                    highlightRows: {
+                      type: "array",
+                      items: { type: "number" },
+                      description: "Optional 0-indexed row numbers (into `rows`) to highlight with an accent-tinted fill instead of the normal alternating stripe — use for a 'Total' or key-finding row.",
+                    },
+                  },
+                },
+                chart: {
+                  type: "object",
+                  description: "A native, PowerPoint-editable chart to place on this slide, below the title (overrides layout/bullets for this slide; can be paired with `sidebar`). Prefer this over a table or bullets whenever the content is comparative or trend data.",
+                  properties: {
+                    type: { type: "string", enum: ["bar", "line", "pie", "doughnut"], description: "'bar'/'line' for comparisons or trends across categories. 'pie'/'doughnut' for a part-to-whole breakdown — keep series to one for these two types." },
+                    categories: { type: "array", items: { type: "string" }, description: "The x-axis / slice labels, e.g. ['2023', '2024', '2025']." },
+                    series: {
+                      type: "array",
+                      description: "One or more data series, each with one value per category. Use exactly one series for 'pie'/'doughnut'.",
+                      items: {
+                        type: "object",
+                        properties: {
+                          name: { type: "string" },
+                          values: { type: "array", items: { type: "number" } },
+                        },
+                      },
+                    },
+                    title: { type: "string", description: "Optional chart title shown above the plot area." },
                   },
                 },
                 notes: { type: "string", description: "Speaker notes for this slide." },
@@ -766,6 +817,66 @@ export const createPptxTool: ToolSpec = {
       }
     }
 
+    /** Bordered label/caption boxes in a row — `"compact"` reproduces the cover layout's original
+     *  bottom-strip treatment exactly (unchanged geometry); `"large"` is the standalone `stats`
+     *  layout's bigger, slide-filling treatment. */
+    function renderStatsRow(slide: PptxGenJS.Slide, stats: any[], x: number, y: number, w: number, h: number, size: "compact" | "large"): void {
+      if (!stats.length) return;
+      const gap = size === "large" ? 0.2 : 0.16;
+      const boxW = (w - gap * (stats.length - 1)) / stats.length;
+      const boxH = size === "large" ? h : 0.78;
+      const labelSize = size === "large" ? 15 : 12.5;
+      const captionSize = size === "large" ? 12.5 : 10;
+      const flagW = size === "large" ? 0.06 : 0.045;
+      stats.forEach((s, i) => {
+        const sx = x + i * (boxW + gap);
+        slide.addShape("rect", { x: sx, y, w: boxW, h: boxH, fill: { color: cardBg }, line: { color: cardBorder, width: 0.75 } });
+        slide.addShape("rect", { x: sx, y, w: flagW, h: boxH, fill: { color: accent }, line: { type: "none" } });
+        const labelY = size === "large" ? y + boxH * 0.32 : y + 0.1;
+        slide.addText(String(s?.label ?? "").toUpperCase(), {
+          x: sx + 0.2, y: labelY, w: boxW - 0.32, h: 0.4, fontFace: BODY_FONT, fontSize: labelSize, bold: true, color: accent, valign: "top",
+        });
+        slide.addText(String(s?.caption ?? ""), {
+          x: sx + 0.2, y: labelY + 0.4, w: boxW - 0.32, h: boxH - (labelY - y) - 0.4, fontFace: BODY_FONT, fontSize: captionSize, color: mutedColor, valign: "top",
+        });
+      });
+    }
+
+    /** Numbered badge circles connected by a horizontal line — a process/sequence flow, distinct from
+     *  `cards`' freestanding boxes on purpose (no card background is drawn here). */
+    function renderTimeline(slide: PptxGenJS.Slide, steps: any[], x: number, y: number, w: number, h: number): void {
+      if (!steps.length) return;
+      const gap = 0.16;
+      const colW = (w - gap * (steps.length - 1)) / steps.length;
+      const badgeD = 0.56;
+      const badgeCy = y + badgeD / 2;
+      // Connector drawn first so each badge circle visually sits on top of the line at both ends.
+      if (steps.length > 1) {
+        const lineY = y + badgeD / 2;
+        const fromX = x + colW / 2;
+        const toX = x + (steps.length - 1) * (colW + gap) + colW / 2;
+        slide.addShape("line", { x: fromX, y: lineY, w: toX - fromX, h: 0, line: { color: cardBorder, width: 1.5 } });
+      }
+      steps.forEach((s, i) => {
+        const cx = x + i * (colW + gap);
+        const badgeColor = PPTX_BADGE_COLORS[i % PPTX_BADGE_COLORS.length];
+        const badgeX = cx + (colW - badgeD) / 2;
+        slide.addShape("ellipse", { x: badgeX, y, w: badgeD, h: badgeD, fill: { color: badgeBg }, line: { color: badgeColor, width: 1.5 } });
+        const glyph = typeof s?.icon === "string" ? ICON_GLYPHS[s.icon] : undefined;
+        slide.addText(glyph ?? String(i + 1), {
+          x: badgeX, y, w: badgeD, h: badgeD, align: "center", valign: "middle", fontFace: BODY_FONT, fontSize: glyph ? 18 : 15, bold: true, color: badgeColor,
+        });
+        slide.addText(String(s?.label ?? ""), {
+          x: cx, y: badgeCy + badgeD / 2 + 0.14, w: colW, h: 0.4, align: "center", fontFace: BODY_FONT, fontSize: 13.5, bold: true, color: titleColor,
+        });
+        if (s?.caption) {
+          slide.addText(String(s.caption), {
+            x: cx, y: badgeCy + badgeD / 2 + 0.5, w: colW, h: h - (badgeCy + badgeD / 2 + 0.5 - y), align: "center", valign: "top", fontFace: BODY_FONT, fontSize: 11, color: mutedColor,
+          });
+        }
+      });
+    }
+
     for (let slideIdx = 0; slideIdx < (args.slides ?? []).length; slideIdx++) {
       const spec = (args.slides ?? [])[slideIdx];
       const slide = pres.addSlide();
@@ -778,8 +889,14 @@ export const createPptxTool: ToolSpec = {
           ? "cover"
           : spec.layout === "cards"
           ? "cards"
+          : spec.layout === "stats"
+          ? "stats"
+          : spec.layout === "timeline"
+          ? "timeline"
           : spec.image
           ? "image"
+          : spec.chart
+          ? "chart"
           : spec.table
           ? "table"
           : spec.layout === "two_column"
@@ -844,17 +961,7 @@ export const createPptxTool: ToolSpec = {
           renderDotList(slide, bulletsAsDots, 0.5, bottomY, 9);
         } else {
           const stats: any[] = Array.isArray(spec.stats) ? spec.stats : [];
-          if (stats.length) {
-            const gap = 0.16;
-            const w = (9 - gap * (stats.length - 1)) / stats.length;
-            stats.forEach((s, i) => {
-              const sx = 0.5 + i * (w + gap);
-              slide.addShape("rect", { x: sx, y: bottomY, w, h: 0.78, fill: { color: cardBg }, line: { color: cardBorder, width: 0.75 } });
-              slide.addShape("rect", { x: sx, y: bottomY, w: 0.045, h: 0.78, fill: { color: accent }, line: { type: "none" } });
-              slide.addText(String(s?.label ?? "").toUpperCase(), { x: sx + 0.16, y: bottomY + 0.1, w: w - 0.28, h: 0.3, fontFace: BODY_FONT, fontSize: 12.5, bold: true, color: accent });
-              slide.addText(String(s?.caption ?? ""), { x: sx + 0.16, y: bottomY + 0.42, w: w - 0.28, h: 0.3, fontFace: BODY_FONT, fontSize: 10, color: mutedColor });
-            });
-          }
+          renderStatsRow(slide, stats, 0.5, bottomY, 9, 0.78, "compact");
         }
         if (spec.notes) slide.addNotes(String(spec.notes));
         continue;
@@ -893,7 +1000,13 @@ export const createPptxTool: ToolSpec = {
         });
       }
 
-      if (mode === "image") {
+      if (mode === "stats") {
+        const stats: any[] = Array.isArray(spec.stats) ? spec.stats : [];
+        renderStatsRow(slide, stats, 0.5, contentY, 9, CONTENT_BOTTOM - contentY, "large");
+      } else if (mode === "timeline") {
+        const steps: any[] = Array.isArray(spec.steps) ? spec.steps : [];
+        renderTimeline(slide, steps, 0.5, contentY, 9, CONTENT_BOTTOM - contentY);
+      } else if (mode === "image") {
         const loaded = loadImageFile(ctx.root, String(spec.image.path ?? ""), MAX_IMAGE_BYTES);
         if ("error" in loaded) return { ok: false, output: loaded.error };
         const y = contentY;
@@ -913,11 +1026,69 @@ export const createPptxTool: ToolSpec = {
             align: "center",
           });
         }
+      } else if (mode === "chart") {
+        const chartSpec = spec.chart ?? {};
+        const chartType: "bar" | "line" | "pie" | "doughnut" = chartSpec.type === "line" || chartSpec.type === "pie" || chartSpec.type === "doughnut" ? chartSpec.type : "bar";
+        const categories: string[] = Array.isArray(chartSpec.categories) ? chartSpec.categories.map((c: any) => String(c)) : [];
+        const seriesArr: any[] = Array.isArray(chartSpec.series) ? chartSpec.series : [];
+        const chartData: PptxGenJS.OptsChartData[] = seriesArr.map((s) => ({
+          name: String(s?.name ?? ""),
+          labels: categories,
+          values: (Array.isArray(s?.values) ? s.values : []).map((v: any) => Number(v) || 0),
+        }));
+        const hasSidebar = spec.sidebar && typeof spec.sidebar === "object";
+        const chartW = hasSidebar ? 5.6 : 9;
+        const isCircular = chartType === "pie" || chartType === "doughnut";
+        const circularOptions: Partial<PptxGenJS.IChartOpts> = {
+          showLegend: true,
+          legendPos: "r",
+          legendColor: mutedColor,
+          legendFontFace: BODY_FONT,
+          showPercent: true,
+          dataLabelColor: "FFFFFF",
+          dataLabelFontFace: BODY_FONT,
+        };
+        const categoricalOptions: Partial<PptxGenJS.IChartOpts> = {
+          showLegend: seriesArr.length > 1,
+          legendPos: "b",
+          legendColor: mutedColor,
+          legendFontFace: BODY_FONT,
+          showValue: true,
+          dataLabelPosition: "outEnd",
+          dataLabelColor: bodyColor,
+          dataLabelFontFace: BODY_FONT,
+          catAxisLabelColor: mutedColor,
+          catAxisLabelFontFace: BODY_FONT,
+          valAxisLabelColor: mutedColor,
+          valAxisLabelFontFace: BODY_FONT,
+          valGridLine: { color: cardBorder, size: 0.75 },
+          catGridLine: { style: "none" },
+        };
+        if (chartData.length) {
+          slide.addChart(pres.ChartType[chartType], chartData, {
+            x: 0.5,
+            y: contentY,
+            w: chartW,
+            h: CONTENT_BOTTOM - contentY,
+            chartColors: [accent, ...PPTX_BADGE_COLORS],
+            showTitle: !!chartSpec.title,
+            title: chartSpec.title ? String(chartSpec.title) : undefined,
+            titleColor,
+            titleFontFace: BODY_FONT,
+            ...(isCircular ? circularOptions : categoricalOptions),
+          } as PptxGenJS.IChartOpts);
+        }
+        if (hasSidebar) addSidebar(slide, spec.sidebar, 0.5 + chartW + 0.2, contentY, 9 - chartW - 0.2, CONTENT_BOTTOM - contentY);
       } else if (mode === "table") {
         const hasSidebar = spec.sidebar && typeof spec.sidebar === "object";
         const tableW = hasSidebar ? 5.6 : 9;
         const headers: any[] = spec.table.headers ?? [];
         const rows: any[][] = spec.table.rows ?? [];
+        const highlightRows: number[] = Array.isArray(spec.table.highlightRows) ? spec.table.highlightRows.map((n: any) => Number(n)) : [];
+        const highlightFill = isDark ? darkenHex(accent, 0.75) : lightenHex(accent, 0.75);
+        const colW: number[] | undefined = Array.isArray(spec.table.widths) && spec.table.widths.length === headers.length
+          ? spec.table.widths.map((n: any) => Number(n) || tableW / headers.length)
+          : undefined;
         const tableRows: PptxGenJS.TableRow[] = [];
         if (headers.length) {
           tableRows.push(
@@ -930,6 +1101,7 @@ export const createPptxTool: ToolSpec = {
                 text: isDark ? flat.text.toUpperCase() : flat.text,
                 options: {
                   bold: true,
+                  fontSize: 13.5,
                   color: isDark ? accent : "FFFFFF",
                   fill: { color: isDark ? cardBg : accent },
                   align: (normalizeCell(h).align as any) ?? "left",
@@ -939,6 +1111,7 @@ export const createPptxTool: ToolSpec = {
           );
         }
         rows.forEach((row, i) => {
+          const highlighted = highlightRows.includes(i);
           tableRows.push(
             row.map((cellVal) => {
               const cell = normalizeCell(cellVal);
@@ -948,9 +1121,10 @@ export const createPptxTool: ToolSpec = {
                 options: {
                   // A cell can't be partially bold here, so a bold span anywhere in the text promotes the
                   // whole cell — closer to what the model intended than showing raw "**" characters.
-                  bold: cell.bold || flat.anyBold || undefined,
+                  bold: highlighted || cell.bold || flat.anyBold || undefined,
+                  fontSize: 13,
                   color: bodyColor,
-                  fill: i % 2 === 1 ? { color: zebraColor } : { color: bgColor },
+                  fill: { color: highlighted ? highlightFill : i % 2 === 1 ? zebraColor : bgColor },
                   align: (cell.align as any) ?? "left",
                 },
               };
@@ -962,8 +1136,8 @@ export const createPptxTool: ToolSpec = {
             x: 0.5,
             y: contentY,
             w: tableW,
+            colW,
             fontFace: BODY_FONT,
-            fontSize: 13,
             border: { type: "solid", color: cardBorder, pt: 0.5 },
           });
         }
@@ -1107,17 +1281,19 @@ function checkPptxHasContent(slides: any[] | undefined): string | null {
         s.bullets.some((b: any) => normalizeListItem(b).text.trim().length > 0 || (b && typeof b === "object" && String(b.title ?? "").trim().length > 0))) ||
       (s.image && typeof s.image.path === "string" && s.image.path.trim().length > 0) ||
       (s.table && ((Array.isArray(s.table.headers) && s.table.headers.length > 0) || (Array.isArray(s.table.rows) && s.table.rows.length > 0))) ||
+      (s.chart && Array.isArray(s.chart.series) && s.chart.series.some((sr: any) => Array.isArray(sr?.values) && sr.values.length > 0)) ||
       (Array.isArray(s.columns) && s.columns.some((col: any) => Array.isArray(col) && col.length > 0)) ||
       (Array.isArray(s.tags) && s.tags.length > 0) ||
       (typeof s.subtitle === "string" && s.subtitle.trim().length > 0) ||
       (typeof s.description === "string" && s.description.trim().length > 0) ||
       (Array.isArray(s.stats) && s.stats.length > 0) ||
       (Array.isArray(s.cards) && s.cards.some((c: any) => String(c?.heading ?? "").trim().length > 0 || String(c?.text ?? "").trim().length > 0)) ||
+      (Array.isArray(s.steps) && s.steps.some((st: any) => String(st?.label ?? "").trim().length > 0)) ||
       (s.sidebar && typeof s.sidebar === "object" && (s.sidebar.title || s.sidebar.text || s.sidebar.quote))
   );
   if (!hasContent) {
-    return "Every slide is empty (no title, bullets, image, table, columns, cover fields, or cards) — this would " +
-      "create a blank presentation. Fill in the actual content, then call this tool again.";
+    return "Every slide is empty (no title, bullets, image, table, chart, columns, cover fields, cards, or steps) — " +
+      "this would create a blank presentation. Fill in the actual content, then call this tool again.";
   }
   return null;
 }
