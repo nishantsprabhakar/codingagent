@@ -19,8 +19,9 @@
 
 const path = require("path");
 const PptxGenJS = require("pptxgenjs");
-// richText.ts is compiled TS, not a plain-JS asset like this file — load the compiled output.
+// richText.ts/documentIR.ts are compiled TS, not plain-JS assets like this file — load the compiled output.
 const { parseInlineMarkup } = require(path.join(__dirname, "..", "dist", "tools", "richText.js"));
+const { darkenHex, lightenHex } = require(path.join(__dirname, "..", "dist", "documentIR.js"));
 
 const BODY_FONT = "Calibri";
 
@@ -103,7 +104,8 @@ function createDeckTheme(opts) {
   const accent = (opts.accentColor || "2FE6D9").replace(/^#/, "").toUpperCase();
   const sidebarBorder = palette.sidebarBorder || accent;
 
-  const theme = Object.assign({}, palette, { accent, sidebarBorder, badgeColors: BADGE_COLORS, bodyFont: BODY_FONT });
+  const badgeBg = isDark ? palette.sidebarBg : "FFFFFF";
+  const theme = Object.assign({}, palette, { accent, sidebarBorder, badgeBg, badgeColors: BADGE_COLORS, bodyFont: BODY_FONT });
 
   /** A small emoji glyph centered in a colored circle badge. `onAccentBg` inverts the badge (white
    *  circle, accent glyph) for section-divider slides whose background is already the accent color. */
@@ -190,6 +192,120 @@ function createDeckTheme(opts) {
       }
       cy += rowH;
     }
+  };
+
+  /** Base IChartOpts styling matching create_pptx's own chart presets — a script does
+   *  `slide.addChart(pres.ChartType.bar, data, Object.assign(theme.chartDefaults("categorical"), {x, y, w, h}))`,
+   *  then overrides/adds anything this deliberately-simple preset doesn't cover (combo series,
+   *  custom axis formatting, etc.) — full addChart/IChartOpts access is retained, this just seeds
+   *  the theme-consistent defaults. `kind`: "categorical" (bar/line) or "circular" (pie/doughnut). */
+  theme.chartDefaults = function (kind) {
+    const shared = {
+      chartColors: [accent, ...BADGE_COLORS],
+      titleColor: theme.titleColor,
+      titleFontFace: BODY_FONT,
+    };
+    if (kind === "circular") {
+      return Object.assign({}, shared, {
+        showLegend: true, legendPos: "r", legendColor: theme.mutedColor, legendFontFace: BODY_FONT,
+        showPercent: true, dataLabelColor: "FFFFFF", dataLabelFontFace: BODY_FONT,
+      });
+    }
+    return Object.assign({}, shared, {
+      showLegend: true, legendPos: "b", legendColor: theme.mutedColor, legendFontFace: BODY_FONT,
+      showValue: true, dataLabelPosition: "outEnd", dataLabelColor: theme.bodyColor, dataLabelFontFace: BODY_FONT,
+      catAxisLabelColor: theme.mutedColor, catAxisLabelFontFace: BODY_FONT,
+      valAxisLabelColor: theme.mutedColor, valAxisLabelFontFace: BODY_FONT,
+      valGridLine: { color: theme.cardBorder, size: 0.75 },
+      catGridLine: { style: "none" },
+    });
+    // Deliberately never sets barGrouping:"stacked" here — dataLabelPosition "outEnd" above corrupts
+    // a *stacked* bar/column chart (must be ctr/inEnd/inBase there). If a script needs a stacked
+    // chart, override dataLabelPosition explicitly rather than relying on this preset as-is.
+  };
+
+  /** pptxgenjs-ready header/body table row arrays reproducing create_pptx's own table styling, so a
+   *  script's addTable call looks consistent without reimplementing the shading/zebra logic. `cells`
+   *  is an array of plain strings; `tableBodyRow`'s `rowIndex` drives zebra striping and
+   *  `opts.highlight` overrides it with an accent-tinted fill (e.g. for a "Total" row). */
+  theme.tableHeaderRow = function (cells) {
+    return cells.map((c) => ({
+      text: isDark ? String(c ?? "").toUpperCase() : String(c ?? ""),
+      options: { bold: true, fontSize: 13.5, color: isDark ? accent : "FFFFFF", fill: { color: isDark ? theme.cardBg : accent } },
+    }));
+  };
+
+  theme.tableBodyRow = function (cells, rowIndex, opts) {
+    const highlight = opts && opts.highlight;
+    const highlightFill = isDark ? darkenHex(accent, 0.75) : lightenHex(accent, 0.75);
+    return cells.map((c) => ({
+      text: String(c ?? ""),
+      options: {
+        fontSize: 13,
+        bold: highlight || undefined,
+        color: theme.bodyColor,
+        fill: { color: highlight ? highlightFill : rowIndex % 2 === 1 ? theme.zebraColor : theme.bgColor },
+      },
+    }));
+  };
+
+  /** Bordered label/caption boxes in a row — `"compact"` matches the `cover` layout's bottom-strip
+   *  treatment; `"large"` fills the given box with bigger, bolder callouts for a standalone stats
+   *  slide. Mirrors create_pptx's own renderStatsRow exactly. */
+  theme.renderStatsRow = function (slide, stats, x, y, w, h, size) {
+    if (!stats || !stats.length) return;
+    const gap = size === "large" ? 0.2 : 0.16;
+    const boxW = (w - gap * (stats.length - 1)) / stats.length;
+    const boxH = size === "large" ? h : 0.78;
+    const labelSize = size === "large" ? 15 : 12.5;
+    const captionSize = size === "large" ? 12.5 : 10;
+    const flagW = size === "large" ? 0.06 : 0.045;
+    stats.forEach((s, i) => {
+      const sx = x + i * (boxW + gap);
+      slide.addShape("rect", { x: sx, y, w: boxW, h: boxH, fill: { color: theme.cardBg }, line: { color: theme.cardBorder, width: 0.75 } });
+      slide.addShape("rect", { x: sx, y, w: flagW, h: boxH, fill: { color: accent }, line: { type: "none" } });
+      const labelY = size === "large" ? y + boxH * 0.32 : y + 0.1;
+      slide.addText(String((s && s.label) || "").toUpperCase(), {
+        x: sx + 0.2, y: labelY, w: boxW - 0.32, h: 0.4, fontFace: BODY_FONT, fontSize: labelSize, bold: true, color: accent, valign: "top",
+      });
+      slide.addText(String((s && s.caption) || ""), {
+        x: sx + 0.2, y: labelY + 0.4, w: boxW - 0.32, h: boxH - (labelY - y) - 0.4, fontFace: BODY_FONT, fontSize: captionSize, color: theme.mutedColor, valign: "top",
+      });
+    });
+  };
+
+  /** Numbered badge circles connected by a horizontal line — a process/sequence flow, deliberately
+   *  without a card background (unlike `cards`) so it reads as a connected flow, not freestanding
+   *  boxes. Mirrors create_pptx's own renderTimeline exactly. */
+  theme.renderTimeline = function (slide, steps, x, y, w, h) {
+    if (!steps || !steps.length) return;
+    const gap = 0.16;
+    const colW = (w - gap * (steps.length - 1)) / steps.length;
+    const badgeD = 0.56;
+    const badgeCy = y + badgeD / 2;
+    if (steps.length > 1) {
+      const fromX = x + colW / 2;
+      const toX = x + (steps.length - 1) * (colW + gap) + colW / 2;
+      slide.addShape("line", { x: fromX, y: y + badgeD / 2, w: toX - fromX, h: 0, line: { color: theme.cardBorder, width: 1.5 } });
+    }
+    steps.forEach((s, i) => {
+      const cx = x + i * (colW + gap);
+      const badgeColor = BADGE_COLORS[i % BADGE_COLORS.length];
+      const badgeX = cx + (colW - badgeD) / 2;
+      slide.addShape("ellipse", { x: badgeX, y, w: badgeD, h: badgeD, fill: { color: theme.badgeBg }, line: { color: badgeColor, width: 1.5 } });
+      const glyph = s && typeof s.icon === "string" ? ICON_GLYPHS[s.icon] : undefined;
+      slide.addText(glyph || String(i + 1), {
+        x: badgeX, y, w: badgeD, h: badgeD, align: "center", valign: "middle", fontFace: BODY_FONT, fontSize: glyph ? 18 : 15, bold: true, color: badgeColor,
+      });
+      slide.addText(String((s && s.label) || ""), {
+        x: cx, y: badgeCy + badgeD / 2 + 0.14, w: colW, h: 0.4, align: "center", fontFace: BODY_FONT, fontSize: 13.5, bold: true, color: theme.titleColor,
+      });
+      if (s && s.caption) {
+        slide.addText(String(s.caption), {
+          x: cx, y: badgeCy + badgeD / 2 + 0.5, w: colW, h: h - (badgeCy + badgeD / 2 + 0.5 - y), align: "center", valign: "top", fontFace: BODY_FONT, fontSize: 11, color: theme.mutedColor,
+        });
+      }
+    });
   };
 
   return theme;
