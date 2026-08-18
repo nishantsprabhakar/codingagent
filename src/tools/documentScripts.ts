@@ -103,14 +103,23 @@ export const runPptxScriptTool: ToolSpec = {
       description:
         "Execute a Node.js (.cjs) script that builds a PowerPoint deck with pptxgenjs, for decks with substantial " +
         "content (roughly more than 8 slides) where create_pptx's single-JSON-call approach risks exceeding the " +
-        "model's own output token limit. Write the script first with write_file (must end in .cjs). In the script: " +
+        "model's own output token limit — or whenever a deck needs a chart/table/layout richer than create_pptx's " +
+        "JSON schema exposes. Write the script first with write_file (must end in .cjs). In the script: " +
         "require('pptxgenjs') for the raw library, or require('wrexlyn-pptx-kit') for Wrexlyn's curated dark-theme " +
         "helpers: createDeckTheme({accentColor, mode}) returns a theme object whose properties (theme.bgColor, " +
         "theme.titleColor, etc.) and methods — theme.addIconBadge(slide, icon, x, y, diameter), theme.addSidebar(...), " +
-        "theme.renderDotList(...) — provide the same color palette, icon badges, and shrink-to-fit sidebar text " +
-        "create_pptx itself uses. Call these as theme.methodName(...), never as bare functions — only pptxRuns and " +
-        "createDeckTheme are top-level exports of the kit; the rest are methods on the theme object it returns. " +
-        "Both the kit and pptxgenjs resolve without any npm install. " +
+        "theme.renderDotList(...), theme.chartDefaults('categorical'|'circular') (base IChartOpts styling to merge " +
+        "into your own addChart(type, data, {...theme.chartDefaults(kind), x, y, w, h}) call), " +
+        "theme.tableHeaderRow(cells)/theme.tableBodyRow(cells, rowIndex, {highlight}) (styled row arrays for your own " +
+        "addTable call), theme.renderStatsRow(slide, stats, x, y, w, h, 'compact'|'large'), " +
+        "theme.renderTimeline(slide, steps, x, y, w, h) — provide the same color palette, icon badges, chart/table " +
+        "styling, and infographic layouts create_pptx itself uses. Call these as theme.methodName(...), never as " +
+        "bare functions — only pptxRuns and createDeckTheme are top-level exports of the kit; the rest are methods " +
+        "on the theme object it returns. Both the kit and pptxgenjs resolve without any npm install. " +
+        "Chart gotchas (only relevant if you go beyond theme.chartDefaults' preset): on a STACKED bar/column chart, " +
+        "dataLabelPosition must be 'ctr'/'inEnd'/'inBase', never 'outEnd' (corrupts the file). A combo chart using " +
+        "secondaryValAxis/secondaryCatAxis needs BOTH valAxes and catAxes set with two entries each, or PowerPoint " +
+        "discards the chart as corrupt. Hex colors are always plain 6-digit, never '#'-prefixed or with alpha. " +
         "End the script with pres.writeFile({fileName: '<path>'}) writing exactly the `path` given below. This tool " +
         "is high risk (runs arbitrary code) and does not support --sandbox (always runs on the host).",
       parameters: {
