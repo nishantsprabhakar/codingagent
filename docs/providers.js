@@ -315,12 +315,16 @@ const PROVIDER_META = {
   },
   gemini: {
     label: "Google Gemini",
-    fallbackModel: "gemini-2.5-flash",
+    // gemini-2.5-flash itself was confirmed dead live on 2026-08-20 -- Google's own 404 body said
+    // "no longer available to new users ... use models/gemini-3.6-flash" -- so the fallback (used
+    // only if the live discoverModel call below fails) has to track that, same as every other
+    // hardcoded fallback in this file: a last resort, not something expected to age well on its own.
+    fallbackModel: "gemini-3.6-flash",
     needsKey: true,
     note: 'Free key (no credit card) at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.',
     discoverModel: async (apiKey) => {
       const ids = await fetchModelIds("https://generativelanguage.googleapis.com/v1beta/openai/models", apiKey);
-      return pickModel(ids, ["gemini-2.5-flash", "gemini-flash", "2.0-flash", "flash"], "gemini-2.5-flash");
+      return pickModel(ids, ["gemini-3.6-flash", "gemini-3-flash", "gemini-flash", "flash"], "gemini-3.6-flash");
     },
     stream: (messages, apiKey, model, onDelta) =>
       openAiCompatibleStream("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", apiKey, model, messages, onDelta),
