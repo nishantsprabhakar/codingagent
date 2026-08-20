@@ -128,6 +128,7 @@
     busy: false,
     toolCards: new Map(),
     thinkingRow: null,
+    retryRow: null,
     pendingPermissionId: null,
     currentRoot: "",
     recentFolders: [],
@@ -448,6 +449,9 @@
       case "usage_update":
         state.usage = { promptTokens: msg.promptTokens, completionTokens: msg.completionTokens, totalTokens: msg.totalTokens };
         renderUsageBadge();
+        break;
+      case "retry_notice":
+        showRetryNotice(msg);
         break;
       case "session_search_results":
         if (msg.query === state.sessionSearchQuery) renderSessionSearchResults(msg.results);
@@ -956,6 +960,28 @@
       state.thinkingRow.remove();
       state.thinkingRow = null;
     }
+    if (!isThinking && state.retryRow) {
+      state.retryRow.remove();
+      state.retryRow = null;
+    }
+  }
+
+  /** A provider is retrying after a 429/5xx -- surfaces why a model call is taking a while instead
+   *  of looking hung. Cleared alongside the thinking row once the call finally resolves/fails. */
+  function showRetryNotice(info) {
+    const seconds = Math.ceil(info.waitMs / 1000);
+    const text = `${info.provider} rate-limited (${info.status}) — retrying in ${seconds}s (attempt ${info.attempt}/${info.maxRetries + 1})...`;
+    if (state.retryRow) {
+      state.retryRow.textContent = text;
+      return;
+    }
+    clearEmptyState();
+    const row = document.createElement("div");
+    row.className = "retry-row";
+    row.textContent = text;
+    el.chatLog.appendChild(row);
+    state.retryRow = row;
+    scrollToBottom();
   }
 
   function interruptPendingToolCards() {

@@ -1301,6 +1301,8 @@ body::before {
 
 .thinking-row { display: flex; align-items: center; gap: 8px; color: var(--text-faint); font-size: 15px; padding: 2px 0; }
 
+.retry-row { color: var(--text-faint); font-size: 13px; font-style: italic; padding: 2px 0; }
+
 .session-changed-banner {
   display: flex;
   align-items: center;
