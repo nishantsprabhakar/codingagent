@@ -760,7 +760,15 @@ export class Agent {
                 heartbeat();
                 this.reporter.assistantDelta(chunk);
               },
-              abortController.signal
+              abortController.signal,
+              (info) => {
+                // A provider's own 429/5xx backoff sleep happens before any response streams back,
+                // so no onDelta chunk ever fires to reset this deadline — without this, a legitimate,
+                // bounded retry wait (up to 90s from a Retry-After header) can itself trip the idle
+                // timeout and abort the whole turn, exactly the failure this is meant to prevent.
+                heartbeat();
+                this.reporter.retryNotice(info);
+              }
             ),
           MODEL_IDLE_TIMEOUT_MS,
           "model call"

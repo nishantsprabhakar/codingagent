@@ -3,9 +3,9 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { ChatMessage, ToolDefinition, ChatCompletionResult } from "../types";
+import type { ChatMessage, ToolDefinition, ChatCompletionResult, RetryNotice } from "../types";
 import { consumeSseStream } from "./sseStream";
-import { computeRetryDelayMs } from "./retryPolicy";
+import { computeRetryDelayMs, describeRetryExhausted } from "./retryPolicy";
 
 const BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -17,7 +17,8 @@ export async function chatCompletion(
   maxRetries = 5,
   onDelta?: (chunk: string) => void,
   temperature?: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onRetry?: (info: RetryNotice) => void
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
@@ -64,16 +65,8 @@ export async function chatCompletion(
 
       if (res.status === 429 || res.status >= 500) {
         const waitMs = computeRetryDelayMs(res.status, res.headers.get("retry-after"), attempt);
-        lastError =
-          res.status === 429
-            ? new Error(
-                `OpenRouter rate-limited this request (429) for "${model}". This is OpenRouter's own free-tier ` +
-                  "quota for that specific model (shared across all anonymous/free users, not tracked by this " +
-                  "app), not a local setting that needs resetting — it clears on OpenRouter's own schedule, " +
-                  "typically daily. If it keeps happening, switch to a different free model or provider from the " +
-                  "model picker."
-              )
-            : new Error(`OpenRouter API returned ${res.status}`);
+        lastError = new Error(describeRetryExhausted("OpenRouter", model, res.status));
+        onRetry?.({ provider: "OpenRouter", status: res.status, attempt: attempt + 1, maxRetries, waitMs });
         await sleep(waitMs);
         continue;
       }

@@ -8,7 +8,7 @@
  * shape. Unlike the other provider files, baseUrl isn't known until the user sets it in Settings, so this can't
  * be a fixed `createOpenAiCompatibleProvider(config)` closure — it takes baseUrl per call instead.
  */
-import type { ChatMessage, ToolDefinition, ChatCompletionResult } from "../types";
+import type { ChatMessage, ToolDefinition, ChatCompletionResult, RetryNotice } from "../types";
 import { runOpenAiCompatibleChatCompletion } from "./openaiCompatible";
 
 export function chatCompletion(
@@ -20,7 +20,8 @@ export function chatCompletion(
   maxRetries = 5,
   onDelta?: (chunk: string) => void,
   temperature?: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onRetry?: (info: RetryNotice) => void
 ): Promise<ChatCompletionResult> {
   return runOpenAiCompatibleChatCompletion(
     { baseUrl, label: "Custom provider", apiKeyEnvHint: "the Base URL/API key set in Settings > API Keys > Custom / Local Model" },
@@ -31,6 +32,7 @@ export function chatCompletion(
     maxRetries,
     onDelta,
     temperature,
-    signal
+    signal,
+    onRetry
   );
 }

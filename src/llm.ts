@@ -3,7 +3,7 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { ChatMessage, ToolDefinition, ChatCompletionResult, LlmConfig, LlmProvider } from "./types";
+import type { ChatMessage, ToolDefinition, ChatCompletionResult, LlmConfig, LlmProvider, RetryNotice } from "./types";
 import * as kilo from "./providers/kilo";
 import * as groq from "./providers/groq";
 import * as openrouter from "./providers/openrouter";
@@ -77,24 +77,25 @@ export async function chatCompletion(
   tools: ToolDefinition[],
   config: LlmConfig,
   onDelta?: OnDelta,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onRetry?: (info: RetryNotice) => void
 ): Promise<ChatCompletionResult> {
   const safeMessages = sanitizeMessagesForProvider(messages, config.provider);
 
   if (config.provider === "kilo") {
-    return kilo.chatCompletion(safeMessages, tools, config.model, undefined, onDelta, config.temperature, signal);
+    return kilo.chatCompletion(safeMessages, tools, config.model, undefined, onDelta, config.temperature, signal, onRetry);
   }
 
   if (config.provider === "custom") {
     if (!config.baseUrl) {
       throw new Error(`custom provider selected but no base URL was configured (--base-url, or Settings > API Keys > Custom / Local Model).`);
     }
-    return custom.chatCompletion(safeMessages, tools, config.model, config.apiKey ?? "", config.baseUrl, undefined, onDelta, config.temperature, signal);
+    return custom.chatCompletion(safeMessages, tools, config.model, config.apiKey ?? "", config.baseUrl, undefined, onDelta, config.temperature, signal, onRetry);
   }
 
   const entry = KEYED_PROVIDERS[config.provider];
   if (!config.apiKey) {
     throw new Error(`${config.provider} provider selected but no API key was supplied (--api-key or ${entry.envHint}).`);
   }
-  return entry.chatCompletion(safeMessages, tools, config.model, config.apiKey, undefined, onDelta, config.temperature, signal);
+  return entry.chatCompletion(safeMessages, tools, config.model, config.apiKey, undefined, onDelta, config.temperature, signal, onRetry);
 }

@@ -3,7 +3,7 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { Reporter, TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome, TokenUsage } from "../types";
+import type { Reporter, TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome, TokenUsage, RetryNotice } from "../types";
 import type { ConfirmFn, PermissionDecision } from "../permissions";
 import type { ServerMessage } from "./protocol";
 
@@ -73,6 +73,10 @@ export class WebSocketReporter implements Reporter {
 
   usageUpdate(totals: TokenUsage): void {
     this.send({ type: "usage_update", ...totals });
+  }
+
+  retryNotice(info: RetryNotice): void {
+    this.send({ type: "retry_notice", ...info });
   }
 }
 

@@ -8,9 +8,9 @@
  * stream format — differing only in base URL and how they reject a bad key.
  * This factory is that shared client; each provider file is just its config.
  */
-import type { ChatMessage, ToolDefinition, ChatCompletionResult } from "../types";
+import type { ChatMessage, ToolDefinition, ChatCompletionResult, RetryNotice } from "../types";
 import { consumeSseStream } from "./sseStream";
-import { computeRetryDelayMs } from "./retryPolicy";
+import { computeRetryDelayMs, describeRetryExhausted } from "./retryPolicy";
 
 export interface OpenAiCompatibleConfig {
   /** Full chat-completions endpoint URL. */
@@ -41,9 +41,10 @@ export function createOpenAiCompatibleProvider(config: OpenAiCompatibleConfig) {
     maxRetries = 5,
     onDelta?: (chunk: string) => void,
     temperature?: number,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onRetry?: (info: RetryNotice) => void
   ): Promise<ChatCompletionResult> =>
-    runOpenAiCompatibleChatCompletion(config, messages, tools, model, apiKey, maxRetries, onDelta, temperature, signal);
+    runOpenAiCompatibleChatCompletion(config, messages, tools, model, apiKey, maxRetries, onDelta, temperature, signal, onRetry);
 }
 
 /**
@@ -60,7 +61,8 @@ export async function runOpenAiCompatibleChatCompletion(
   maxRetries = 5,
   onDelta?: (chunk: string) => void,
   temperature?: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onRetry?: (info: RetryNotice) => void
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
@@ -102,7 +104,8 @@ export async function runOpenAiCompatibleChatCompletion(
 
       if (res.status === 429 || res.status >= 500) {
         const waitMs = computeRetryDelayMs(res.status, res.headers.get("retry-after"), attempt);
-        lastError = new Error(`${config.label} API returned ${res.status}`);
+        lastError = new Error(describeRetryExhausted(config.label, model, res.status));
+        onRetry?.({ provider: config.label, status: res.status, attempt: attempt + 1, maxRetries, waitMs });
         await sleep(waitMs);
         continue;
       }

@@ -4,7 +4,7 @@
  * See LICENSE for details.
  */
 import type { PermissionDecision } from "../permissions";
-import type { TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome, TokenUsage } from "../types";
+import type { TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome, TokenUsage, RetryNotice } from "../types";
 import type { SessionMeta, SessionSearchResult } from "../session";
 import type { FileRestoreResult } from "../workspaceSnapshot";
 import type { McpServerStatus } from "../mcp";
@@ -38,6 +38,7 @@ export type ServerMessage =
   | { type: "parallel_run_merged"; ok: boolean; message: string }
   | { type: "session_changed_elsewhere"; sessionId: string }
   | ({ type: "usage_update" } & TokenUsage)
+  | ({ type: "retry_notice" } & RetryNotice)
   | { type: "session_search_results"; query: string; results: SessionSearchResult[] };
 
 export type ClientMessage =

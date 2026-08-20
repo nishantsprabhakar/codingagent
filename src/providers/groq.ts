@@ -3,9 +3,9 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { ChatMessage, ToolDefinition, ChatCompletionResult } from "../types";
+import type { ChatMessage, ToolDefinition, ChatCompletionResult, RetryNotice } from "../types";
 import { consumeSseStream } from "./sseStream";
-import { computeRetryDelayMs } from "./retryPolicy";
+import { computeRetryDelayMs, describeRetryExhausted } from "./retryPolicy";
 
 const BASE_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -17,7 +17,8 @@ export async function chatCompletion(
   maxRetries = 5,
   onDelta?: (chunk: string) => void,
   temperature?: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onRetry?: (info: RetryNotice) => void
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
@@ -48,7 +49,8 @@ export async function chatCompletion(
 
       if (res.status === 429 || res.status >= 500) {
         const waitMs = computeRetryDelayMs(res.status, res.headers.get("retry-after"), attempt);
-        lastError = new Error(`Groq API returned ${res.status}`);
+        lastError = new Error(describeRetryExhausted("Groq", model, res.status));
+        onRetry?.({ provider: "Groq", status: res.status, attempt: attempt + 1, maxRetries, waitMs });
         await sleep(waitMs);
         continue;
       }

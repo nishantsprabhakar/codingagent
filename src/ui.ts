@@ -3,7 +3,7 @@
  * Unauthorized copying, modification, or distribution is prohibited.
  * See LICENSE for details.
  */
-import type { Reporter, TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome, TokenUsage } from "./types";
+import type { Reporter, TaskItem, HistoryItem, RiskLevel, VerificationResult, TransactionOutcome, TokenUsage, RetryNotice } from "./types";
 
 const CODES = {
   reset: "\x1b[0m",
@@ -162,6 +162,17 @@ export class ConsoleReporter implements Reporter {
 
   usageUpdate(totals: TokenUsage): void {
     this.lastUsage = totals;
+  }
+
+  retryNotice(info: RetryNotice): void {
+    const seconds = Math.ceil(info.waitMs / 1000);
+    this.stopSpinner();
+    console.log(
+      color.dim(
+        `  ${info.provider} rate-limited this request (${info.status}) — retrying in ${seconds}s (attempt ${info.attempt}/${info.maxRetries + 1})...`
+      )
+    );
+    this.startSpinner();
   }
 
   error(text: string): void {

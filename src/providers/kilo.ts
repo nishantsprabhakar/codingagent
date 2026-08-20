@@ -12,11 +12,19 @@
  * real OpenAI-shaped streamed tool_calls with no Authorization header at all. Anonymous access is
  * capped at 200 requests/hour per IP (per Kilo's docs) — no key means no way to raise that.
  */
-import type { ChatMessage, ToolDefinition, ChatCompletionResult } from "../types";
+import type { ChatMessage, ToolDefinition, ChatCompletionResult, RetryNotice } from "../types";
 import { consumeSseStream } from "./sseStream";
-import { computeRetryDelayMs } from "./retryPolicy";
+import { computeRetryDelayMs, describeRetryExhausted, createMinIntervalGate } from "./retryPolicy";
 
 const BASE_URL = "https://api.kilo.ai/api/gateway/chat/completions";
+
+/** Deconflicts simultaneous bursts against kilo's 200 req/hour-per-IP cap — shared across every
+ *  anonymous Kilo user, not just this app's own usage, and with no key there's no way to raise it.
+ *  A single module-level gate means concurrent requests from this process (e.g. several attempts
+ *  in a Best-of-N parallel run, or multiple browser sessions) queue with a minimum spacing instead
+ *  of all firing at once. Deliberately not a full requests-per-hour limiter — see retryPolicy.ts's
+ *  own doc comment on createMinIntervalGate. */
+const kiloGate = createMinIntervalGate(3000);
 
 export async function chatCompletion(
   messages: ChatMessage[],
@@ -25,11 +33,13 @@ export async function chatCompletion(
   maxRetries = 5,
   onDelta?: (chunk: string) => void,
   temperature?: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onRetry?: (info: RetryNotice) => void
 ): Promise<ChatCompletionResult> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    await kiloGate();
     try {
       const res = await fetch(BASE_URL, {
         method: "POST",
@@ -49,7 +59,8 @@ export async function chatCompletion(
 
       if (res.status === 429 || res.status >= 500) {
         const waitMs = computeRetryDelayMs(res.status, res.headers.get("retry-after"), attempt);
-        lastError = new Error(`Kilo API returned ${res.status}`);
+        lastError = new Error(describeRetryExhausted("kilo", model, res.status));
+        onRetry?.({ provider: "kilo", status: res.status, attempt: attempt + 1, maxRetries, waitMs });
         await sleep(waitMs);
         continue;
       }

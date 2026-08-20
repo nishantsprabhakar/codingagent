@@ -293,6 +293,19 @@ export type HistoryItem =
       rollbackAvailable: boolean;
     };
 
+/** Fired just before a provider sleeps to retry a 429/5xx response — lets a Reporter surface why a
+ *  model call is taking a while instead of looking hung, and lets the caller reset any idle-timeout
+ *  watchdog that would otherwise mistake an intentional, bounded backoff wait for a stuck connection. */
+export interface RetryNotice {
+  /** Display label, e.g. "kilo", "Groq", "OpenRouter". */
+  provider: string;
+  status: number;
+  /** 1-based current attempt number. */
+  attempt: number;
+  maxRetries: number;
+  waitMs: number;
+}
+
 /**
  * Abstracts how agent activity is surfaced to a human: the CLI renders it to
  * stdout with ANSI colors, the web UI serializes it over a WebSocket.
@@ -328,4 +341,7 @@ export interface Reporter {
    *  (see usageLedger.ts, the durable source of truth this mirrors) — lets a UI show live cost/usage
    *  instead of only the after-the-fact exported spreadsheet. */
   usageUpdate(totals: TokenUsage): void;
+  /** A model call is retrying after a 429/5xx — see RetryNotice. A no-op is fine for reporters with
+   *  no notion of live progress (eval harness, a parallel-run attempt's own reporter). */
+  retryNotice(info: RetryNotice): void;
 }

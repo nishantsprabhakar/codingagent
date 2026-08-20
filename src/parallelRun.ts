@@ -109,6 +109,10 @@ class TaggedReporter implements Reporter {
     // Every attempt's own model calls are still recorded in the durable usage ledger regardless
     // (see usageLedger.ts) -- there's just no per-attempt live counter in the parallel-run UI yet.
   }
+  retryNotice(): void {
+    // No per-attempt retry indicator in the comparison UI yet -- the shared kilo pacing gate
+    // (retryPolicy.ts) still applies regardless, so concurrent attempts stay deconflicted.
+  }
 }
 
 interface AttemptState {
