@@ -14,17 +14,19 @@
  * page's deployed origin) — it's server-to-server only, so a browser blocks
  * it outright. There is no way to use it from a static page with no backend.
  *
- * Pollinations (text.pollinations.ai) is the no-key default: re-verified
- * 2026-08-09 from a real browser against the deployed GitHub Pages origin.
- * Plain chat (no tools) now passes both CORS and the Turnstile bot-check
- * that previously blocked it. Its anonymous tier is still not fully
- * reliable, though, in a different way — the same request flipped between
- * 200 and 402 "budget too low" seconds apart in testing, and only one
- * model is exposed anonymously (openai-fast, a reasoning model that
- * sometimes streams its answer in a `reasoning` delta field instead of
- * `content`). pollinationsStream() below handles both quirks. If it 402s,
- * the UI should point the visitor at picking a keyed provider instead of
- * retrying forever.
+ * Pollinations (text.pollinations.ai) is the no-key quick-start option, but its reliability has
+ * gotten meaningfully worse since it was first added, not better. Re-verified 2026-08-09: still
+ * passes CORS and the Turnstile bot-check that used to block it. Re-verified again 2026-08-20
+ * (reported "not working" by a real user): its response body now directly states this legacy
+ * anonymous endpoint is being deprecated in favor of enter.pollinations.ai, and five back-to-back
+ * live requests during that check returned 402, 429 ("Queue full ... max: 1"), 200, 429, 200 — a
+ * genuinely high failure rate now, not an occasional one. Only one model is exposed anonymously
+ * (openai-fast, a reasoning model that sometimes streams its answer in a `reasoning` delta field
+ * instead of `content`). pollinationsStream() below now retries 402 the same as 429/5xx (that same
+ * test showed a 402 clearing up on its own within seconds), which meaningfully raises the odds of
+ * a single click succeeding without the visitor seeing an error at all — but it's still presented
+ * as a fallback, not the primary path, since Kilo can't be used here (see above) and Pollinations'
+ * own anonymous tier is the one being wound down, not something a client-side retry can fully fix.
  *
  * Note: this only holds for plain fetch() requests exactly as written
  * below. If you ever swap in the official OpenAI JS SDK, its extra
@@ -118,13 +120,22 @@ function sleep(ms) {
  * there is no key. Buffers reasoning deltas separately from content deltas
  * and only falls back to showing reasoning text if content never arrives
  * by the end of the stream (avoids live-streaming raw chain-of-thought
- * while a real answer is still coming). Retries a couple of times on
- * 429/5xx (the anonymous tier is rate-limited), but fails fast with an
- * actionable "pick another provider" message on anything else non-2xx
- * (402 budget exhaustion, 403 Turnstile, etc.) — those are policy
- * rejections, not transient errors worth retrying.
+ * while a real answer is still coming).
+ *
+ * As of 2026-08-20, Pollinations is actively deprecating this legacy
+ * anonymous endpoint (its own error body says so directly, pointing at
+ * enter.pollinations.ai as the migration path) and the practical effect is
+ * a genuinely high failure rate now, not the occasional rate-limit this
+ * comment used to describe — five back-to-back live test requests during
+ * this fix returned 402 ("Payment Required"), 429 ("Queue full for IP: ...
+ * 1 requests already queued (max: 1)"), 200, 429, and 200. Critically, a
+ * 402 that fails now often succeeds seconds later on its own (confirmed by
+ * that same test) — so 402 is retried below exactly like 429/5xx, not
+ * treated as an immediate hard failure the way it used to be. Only a
+ * genuinely non-transient rejection (403 Turnstile, anything else) still
+ * fails fast with an actionable "pick another provider" message.
  */
-async function pollinationsStream(messages, onDelta, maxRetries = 2) {
+async function pollinationsStream(messages, onDelta, maxRetries = 3) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const res = await fetch("https://text.pollinations.ai/openai", {
       method: "POST",
@@ -132,20 +143,16 @@ async function pollinationsStream(messages, onDelta, maxRetries = 2) {
       body: JSON.stringify({ model: "openai", messages, stream: true }),
     });
 
-    if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
-      await sleep(2000 * (attempt + 1));
+    if ((res.status === 402 || res.status === 429 || res.status >= 500) && attempt < maxRetries) {
+      await sleep(1500 * (attempt + 1));
       continue;
     }
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      // Covers 402 (anonymous budget exhausted), 403 (Cloudflare Turnstile —
-      // observed to depend on the calling origin, so this can appear from
-      // some hosts/networks and not others), and anything else non-2xx.
-      // None of these are worth retrying — same steer as a hard failure.
       throw new Error(
-        `Pollinations couldn't complete this request (${res.status}). Its free anonymous tier is shared and can ` +
-          "become temporarily unavailable — pick another provider above and paste in a free API key instead; " +
-          `Groq or Gemini take under a minute to set up. (${text.slice(0, 200)})`
+        `Pollinations couldn't complete this request after retrying (${res.status}). Its free anonymous tier is ` +
+          "being wound down by Pollinations itself and now fails on a large share of requests — pick another " +
+          `provider above and paste in a free API key instead; Groq takes under a minute to set up. (${text.slice(0, 200)})`
       );
     }
 
@@ -284,9 +291,10 @@ const PROVIDER_META = {
     fallbackModel: "openai-fast",
     needsKey: false,
     note:
-      "Free, anonymous, no signup — but shared and rate-limited, so it can occasionally say it's out of budget. " +
-      'If that happens, switch to <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a> ' +
-      "or another provider above and paste in a free key.",
+      "Free, anonymous, no signup — but Pollinations is actively winding this tier down, so it now fails on a " +
+      "large share of requests (this page retries automatically, which helps, but can't fully fix a provider " +
+      'shutting its own free tier down). <a href="https://console.groq.com/keys" target="_blank" rel="noopener">' +
+      "Groq</a> above is the reliable free option — about a minute to grab a key.",
     // Pollinations exposes exactly one anonymous model -- nothing to discover, no list endpoint needed.
     discoverModel: async () => "openai-fast",
     stream: (messages, apiKey, model, onDelta) => pollinationsStream(messages, onDelta),

@@ -90,8 +90,46 @@ construction since there's exactly one resolved model used for both display and 
   (`20260810` → `20260820`) so the fix actually reaches visitors' browsers instead of sitting
   behind a cached copy of the old files.
 
+## Follow-up (same day): Pollinations reported "not working"
+
+A user report that Pollinations specifically ("not working") plus a repeat of "replace with
+kilo" prompted two things: re-confirming kilo's CORS block a third time (identical result — still
+zero `Access-Control-Allow-*` headers on a fresh preflight against the real demo origin; this is
+not something a client-side change can route around, so it stays out of `PROVIDER_META`), and
+actually diagnosing Pollinations rather than assuming the existing "occasionally unavailable"
+framing still held.
+
+Five back-to-back live requests (`curl`, spoofing `Origin: https://nishantsprabhakar.github.io` to
+match the real deployed origin) returned 402, 429 ("Queue full for IP: ... 1 requests already
+queued (max: 1)"), 200, 429, 200 — and the 402 response body states outright that this legacy
+anonymous endpoint is being deprecated in favor of `enter.pollinations.ai`. That's a materially
+higher failure rate than "occasionally," and explains the report directly.
+
+The actionable finding: a 402 that fails now often succeeds again within a couple of seconds (the
+same test's own alternating pattern proves it), so `pollinationsStream()`'s previous behavior —
+treating 402 as an immediate, non-retryable hard failure — was leaving successes on the table.
+Fixed to retry 402 exactly like 429/5xx (bumped `maxRetries` 2 → 3 to match the now-higher failure
+rate), which meaningfully raises the odds a single click succeeds without the visitor ever seeing
+an error. This does not fully fix Pollinations — no client-side retry can compensate for a provider
+actively shutting its own free tier down — so the UI copy (the quick-start button label and the
+provider note) was rewritten to state that plainly instead of the now-inaccurate "occasionally
+unavailable," and to point at Groq (already the default, already dynamically model-resolved) as
+the reliable option.
+
+Live-tested the retry behavior itself in a real (non-production-origin) browser context and hit a
+different, environment-specific issue: Cloudflare Turnstile returned a flat 403 for every attempt
+from `http://localhost:4392`, which the retry logic correctly does *not* retry (403 was never in
+scope — it's Turnstile's bot-check, not a capacity signal, and the original comment already noted
+Turnstile's behavior depends on the calling origin). This is a local-testing artifact, not evidence
+about the real deployed origin: the `curl` tests that established the 402-clears-up-on-retry
+finding explicitly spoofed the real production `Origin` header and never saw a 403. Stated plainly
+rather than glossed over: the retry-on-402 logic is grounded in real evidence from the production
+origin; it was not re-confirmed end-to-end from a real browser hitting that same production origin
+(this repo has no way to do that outside the actual deployed GitHub Pages environment).
+
 ## Commits
 
-`docs/providers.js` (discovery mechanism + fixed the Gemini model-name mismatch),
-`docs/app.js` (async resolution wiring), `docs/demo.html` (cache-bust bump), this doc. Push only
-after explicit confirmation, per standing practice.
+`docs/providers.js` (discovery mechanism + fixed the Gemini model-name mismatch + retry-on-402 +
+honest reliability copy), `docs/app.js` (async resolution wiring), `docs/demo.html` (cache-bust
+bumps, quick-start button copy), this doc. Push only after explicit confirmation, per standing
+practice.
