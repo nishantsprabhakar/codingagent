@@ -260,6 +260,7 @@
       <a class="navlink" href="#phase-stack"><span class="num">01A</span>Phases 1&ndash;13</a>
       <a class="navlink" href="#reliability"><span class="num">02</span>Reliability runtime</a>
       <a class="navlink" href="#documents"><span class="num">03</span>Document generation</a>
+      <a class="navlink" href="#script-generation"><span class="num">03A</span>Script-based generation</a>
       <a class="navlink" href="#architecture"><span class="num">04</span>Architecture</a>
       <a class="navlink" href="#providers"><span class="num">05</span>Model providers</a>
       <a class="navlink" href="#access"><span class="num">06</span>Access &amp; install</a>
@@ -400,12 +401,36 @@
       </div>
       <div class="grid-3">
         <div class="card"><h3>Word</h3><p>Inline <strong>bold</strong>/<em>italic</em>/underline/strike, numbered &amp; nested lists, real images sized from their own aspect ratio, a genuine auto-updating table of contents, per-cell table formatting, custom accent color.</p></div>
-        <div class="card"><h3>PowerPoint</h3><p>Section-divider and two-column layouts, in-slide tables and images, nested bullets — and deliberately <em>no</em> decorative accent-stripe under every title, the single most recognizable tell of an AI-generated deck.</p></div>
+        <div class="card"><h3>PowerPoint</h3><p>Native, PowerPoint-editable charts, high-end tables, and two infographic-native layouts — not just section-divider and two-column text. Deliberately <em>no</em> decorative accent-stripe under every title, the single most recognizable tell of an AI-generated deck.</p></div>
         <div class="card"><h3>Excel</h3><p>Live, recalculating formulas rather than baked-in numbers, per-column currency/percent/date formats, merged cells, autofilter.</p></div>
       </div>
       <div class="prose" style="margin-top:20px;">
-        <p class="dim">Every one of these was verified by unzipping the actual generated file and asserting on its real OOXML — bold runs present, numbering XML present, image relationships registered — not just "the call didn't throw."</p>
+        <p>The PowerPoint generator went through a second pass specifically to stop producing plain title-and-bullets slides when the content is actually a chart, a comparison, a process, or a headline metric:</p>
       </div>
+      <div class="grid-2">
+        <div class="card"><h3><span class="tick">&check;</span>Native charts, not screenshots</h3><p>Bar, line, pie and doughnut charts render through pptxgenjs's real <code class="inline">addChart()</code> — an actual, PowerPoint-native chart object the audience can click into and re-theme, not a rasterized image pretending to be one. Bar/line charts get themed axis and gridline styling with value labels; pie/doughnut charts get a legend and percentage labels — two different presets, because a bar chart's and a pie chart's readable defaults genuinely differ.</p></div>
+        <div class="card"><h3><span class="tick">&check;</span>High-end tables</h3><p>Per-column width control instead of an automatic even split, and a highlighted-row option for the one line that matters — a &ldquo;Total&rdquo; row, a key finding — rendered in an accent-tinted fill instead of the ordinary alternating stripe.</p></div>
+        <div class="card"><h3><span class="tick">&check;</span>Stats layout</h3><p>A handful of headline numbers as large, bordered callout boxes filling the slide — promoted out of the cover layout's compact bottom-strip treatment into its own standalone layout, for a slide whose entire job is three or four big metrics.</p></div>
+        <div class="card"><h3><span class="tick">&check;</span>Timeline layout</h3><p>Numbered steps connected by a line — a genuinely different visual from the existing card-grid layout, deliberately without a card background behind each step, so a process or roadmap reads as a connected flow rather than a row of boxes.</p></div>
+      </div>
+      <div class="prose" style="margin-top:20px;">
+        <p class="dim">Every one of these was verified by unzipping the actual generated file and asserting on its real OOXML — bold runs present, numbering XML present, image relationships registered, a real <code class="inline">ppt/charts/chart1.xml</code> part present for a chart slide, a highlighted row's fill color present and distinct from the zebra pattern — not just "the call didn't throw."</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="script-generation">
+      <div class="chapter-head"><span class="chapter-num">03A</span><h2>Script-based generation for large documents</h2></div>
+      <div class="prose">
+        <p class="lede">Every provider caps a single completion at 8,000 tokens. Describing an entire 20-slide deck, a long report, or a large spreadsheet as one JSON tool-call argument routinely exceeds that limit mid-argument — the model has to regenerate the whole thing from scratch, which is exactly the "times out most of the time" experience large documents used to produce.</p>
+        <p>Past a size threshold (roughly 8 slides, 40 blocks, or 200 spreadsheet rows), Wrexlyn now has the model write a compact Node.js script instead of one giant JSON call — using loops and variables to express repetitive structure far more compactly than fully expanded JSON ever could, the same idea behind tools like code2office. Below that threshold, the original single-call tools remain the simpler, correct choice.</p>
+      </div>
+      <div class="stepline">
+        <div class="step"><span class="idx">01</span><div class="body"><h4>Real module scope, not a text preamble</h4><p>The generated script physically lives in the user's own project, not Wrexlyn's install directory — so a bare <code class="inline">require('pptxgenjs')</code> wouldn't normally resolve. Rather than concatenating helper source code in front of the model's script (rejected: identifier collisions with the model's own variables are a hard syntax error, and it shifts every line number in a stack trace the model needs to debug against), the script executes with <code class="inline">NODE_PATH</code> pointed at Wrexlyn's own module directory — real, separate module scope, correct independent line numbers, no concatenation.</p></div></div>
+        <div class="step"><span class="idx">02</span><div class="body"><h4>The same isolation as shell execution</h4><p>Script execution is a new "run arbitrary code" surface with the same shape of risk as the shell tool, so it routes through the identical forked-child-process isolation rather than adding a second code-execution path in the main, network-facing process. Unconditionally classified high risk — a script is genuine code execution, not document assembly from data already visible in the tool call — so it can never be set to standing "always allow," no matter what.</p></div></div>
+        <div class="step"><span class="idx">03</span><div class="body"><h4>A curated kit, not a blank slate</h4><p>Small, plain-JavaScript helper packages port the highest-value design DNA out of the JSON-based generators — theme palette, icon badges, the new chart presets, shrink-to-fit text sizing — so a hand-written script produces a deck that still looks like a Wrexlyn deck instead of reinventing styling from scratch.</p></div></div>
+        <div class="step"><span class="idx">04</span><div class="body"><h4>Same quality gate, applied to the rendered file</h4><p>A script has no JSON args to pre-check, so the gate re-opens the file that actually landed on disk afterward — the same placeholder-text and empty-structure checks &sect;12 describes, just running post-render instead of pre-render. A failure feeds back into the same retry loop, in the same turn.</p></div></div>
+      </div>
+      <div class="callout">This is additive, not a replacement — a short deck still goes through the simpler, one-call JSON path. The script path exists specifically for the size of document where that path was failing.</div>
     </section>
 
     <section class="chapter" id="architecture">
@@ -425,6 +450,9 @@
       </div>
       <div class="prose" style="margin-top:20px;">
         <p class="dim">Requests are also kept lean on purpose: a round where every action already passed its own document quality gate (&sect;12) skips the independent-critic call for that round rather than spending a second model round-trip to catch a class of mistake the deterministic check already caught for free — fewer requests per turn, and fewer 429s as a direct result.</p>
+      </div>
+      <div class="callout">
+        <strong>Rate-limit handling is a correctness feature, not just a nicety.</strong> A retried 429/5xx honors the provider's own <code class="inline">Retry-After</code> header with jittered exponential backoff as a fallback, and — the fix that actually mattered — that backoff wait now resets the same idle-timeout watchdog that would otherwise mistake an intentional, bounded wait for a stuck connection and abort the entire turn. The default, keyless provider additionally gets a small pacing gate so several concurrent agent instances (a Best-of-N parallel run, several open sessions) don't all burst against its shared, per-IP rate cap at once. Every provider now throws the same self-explanatory, actionable message on an exhausted retry, instead of three of the four just saying "API returned 429."
       </div>
     </section>
 
