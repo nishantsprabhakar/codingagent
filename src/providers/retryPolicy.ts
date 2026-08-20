@@ -44,3 +44,48 @@ export function computeRetryDelayMs(status: number, retryAfterHeader: string | n
   const capMs = status === 429 ? 60_000 : 20_000;
   return jitteredBackoffMs(2000, attempt, capMs);
 }
+
+/**
+ * Builds the message thrown once a provider has exhausted its retries on a 429/5xx — one shared,
+ * self-explanatory version instead of each provider file writing its own (historically only
+ * openrouter.ts bothered; kilo/groq/openaiCompatible just threw a terse "X API returned 429").
+ * A 429 gets the actionable framing (it's the provider's own quota, not a local setting, and it
+ * clears on the provider's own schedule); a 5xx gets a shorter "transient, already retried" note.
+ */
+export function describeRetryExhausted(providerLabel: string, model: string, status: number): string {
+  if (status === 429) {
+    return (
+      `${providerLabel} rate-limited this request (429)${model ? ` for "${model}"` : ""}. This is ` +
+      `${providerLabel}'s own rate/quota limit (shared across free-tier users where applicable, not a ` +
+      "local setting that needs resetting) — it clears on the provider's own schedule. If it keeps " +
+      "happening, switch to a different free model or provider from the model picker."
+    );
+  }
+  return `${providerLabel} API returned ${status} — a transient server-side issue that was already retried automatically.`;
+}
+
+function sleepPolicy(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Serializes calls with a minimum spacing between them — deconflicts simultaneous bursts (e.g.
+ * several concurrently-running agent instances, as in a Best-of-N parallel run, all hitting the
+ * same keyless/shared-cap provider at once) without acting as a full requests-per-hour limiter.
+ * Each call to the returned `acquire()` resolves only after at least `minIntervalMs` has passed
+ * since the previous caller's turn began, queuing fairly in call order.
+ */
+export function createMinIntervalGate(minIntervalMs: number): () => Promise<void> {
+  let queue: Promise<void> = Promise.resolve();
+  let nextAvailableAt = 0;
+
+  return function acquire(): Promise<void> {
+    const turn = queue.then(async () => {
+      const waitMs = Math.max(0, nextAvailableAt - Date.now());
+      if (waitMs > 0) await sleepPolicy(waitMs);
+      nextAvailableAt = Date.now() + minIntervalMs;
+    });
+    queue = turn;
+    return turn;
+  };
+}
