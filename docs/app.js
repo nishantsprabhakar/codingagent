@@ -160,7 +160,7 @@
 
   el.providerSelect.addEventListener("change", renderProviderNote);
 
-  el.startBtn.addEventListener("click", () => {
+  el.startBtn.addEventListener("click", async () => {
     const provider = el.providerSelect.value;
     const meta = PROVIDER_META[provider];
     const apiKey = el.apiKeyInput.value.trim();
@@ -169,16 +169,31 @@
       return;
     }
     el.setupError.textContent = "";
-    setup = { provider, apiKey };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(setup));
-    startChat();
+    await beginChat(provider, apiKey);
   });
 
-  el.quickstartBtn.addEventListener("click", () => {
-    setup = { provider: "pollinations", apiKey: "" };
+  el.quickstartBtn.addEventListener("click", async () => {
+    await beginChat("pollinations", "");
+  });
+
+  /** Resolves the provider's currently-available model (live list, cached, or a last-resort hardcoded
+   *  fallback — see resolveModel() in providers.js) before entering the chat, so the model shown and the
+   *  model actually sent in every request are always the same, real, working id. */
+  async function beginChat(provider, apiKey) {
+    const prevLabel = el.startBtn.textContent;
+    el.startBtn.disabled = true;
+    el.startBtn.textContent = "Checking available models…";
+    let model;
+    try {
+      model = await resolveModel(provider, apiKey);
+    } finally {
+      el.startBtn.disabled = false;
+      el.startBtn.textContent = prevLabel;
+    }
+    setup = { provider, apiKey, model };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(setup));
     startChat();
-  });
+  }
 
   el.changeSetupLink.addEventListener("click", () => {
     el.chatShell.classList.remove("active");
@@ -190,7 +205,7 @@
   function startChat() {
     el.gate.hidden = true;
     el.chatShell.classList.add("active");
-    el.chatMetaProvider.textContent = `${PROVIDER_META[setup.provider].label} · ${PROVIDER_META[setup.provider].model}`;
+    el.chatMetaProvider.textContent = `${PROVIDER_META[setup.provider].label} · ${setup.model}`;
     el.composerInput.focus();
   }
 
@@ -272,7 +287,7 @@
     let acc = "";
     try {
       const meta = PROVIDER_META[setup.provider];
-      await meta.stream(messages, setup.apiKey, (chunk) => {
+      await meta.stream(messages, setup.apiKey, setup.model, (chunk) => {
         hideThinking();
         acc += chunk;
         if (!assistantBubble) assistantBubble = appendMessage("assistant", "");

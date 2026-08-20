@@ -8,6 +8,12 @@
  * doesn't have. Every provider claim here should be checked with an
  * actual browser request, not just curl — they can behave differently.
  *
+ * Kilo (the main app's zero-key default) was tried and rejected for this
+ * page specifically: its gateway sends no Access-Control-Allow-Origin at
+ * all (re-verified live, 2026-08-20, via a real preflight against this
+ * page's deployed origin) — it's server-to-server only, so a browser blocks
+ * it outright. There is no way to use it from a static page with no backend.
+ *
  * Pollinations (text.pollinations.ai) is the no-key default: re-verified
  * 2026-08-09 from a real browser against the deployed GitHub Pages origin.
  * Plain chat (no tools) now passes both CORS and the Turnstile bot-check
@@ -24,6 +30,19 @@
  * below. If you ever swap in the official OpenAI JS SDK, its extra
  * `x-stainless-*` headers break Gemini's CORS preflight specifically
  * (not the other providers) — stick to raw fetch for this file.
+ *
+ * Model IDs are resolved live, not hardcoded — see "Dynamic model
+ * discovery" below. Groq deprecated the previously-hardcoded
+ * llama-3.3-70b-versatile in June 2026 (for free/developer-tier usage),
+ * which silently broke this page's default until this fix: a hardcoded
+ * model string has no way to notice its own provider retired it. Each
+ * `resolveModel()` fetches that provider's own live /models list (all five
+ * keyed providers' list endpoints were confirmed, 2026-08-20, to send
+ * Access-Control-Allow-Origin — a separate check from the chat endpoint's
+ * own CORS above) and picks a currently-available chat model from it. A
+ * hardcoded `fallbackModel` is kept purely as a last resort if that live
+ * lookup itself fails (network hiccup, CORS regression, key not entered
+ * yet) — never as the normal path.
  */
 const WREXLYN_SYSTEM_PROMPT =
   "You are Wrexlyn, an AI assistant created by Nishant Prabhakar. This is the browser-only chat demo — you have " +
@@ -175,6 +194,71 @@ async function pollinationsStream(messages, onDelta, maxRetries = 2) {
   }
 }
 
+// ---------- Dynamic model discovery ----------
+// A hardcoded model id has no way to notice its own provider deprecated it — that's exactly what broke this
+// page's Groq default in June 2026. Each provider's own /models list is the source of truth for what's actually
+// callable right now; resolveModel() below fetches it live and picks a match, falling back to a hardcoded id
+// only if that live lookup itself fails.
+
+async function fetchModelIds(url, apiKey) {
+  const res = await fetch(url, { headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {} });
+  if (!res.ok) throw new Error(`models list returned ${res.status}`);
+  const data = await res.json();
+  const list = Array.isArray(data.data) ? data.data : Array.isArray(data.models) ? data.models : [];
+  return list.map((m) => String(m.id || m.name || "").replace(/^models\//, "")).filter(Boolean);
+}
+
+/** Picks the first id containing any of `preferred` (checked in order), else the first id in the list, else
+ *  `fallback` — never throws, since "nothing matched" still needs a usable model to try. */
+function pickModel(ids, preferred, fallback) {
+  for (const pref of preferred) {
+    const hit = ids.find((id) => id.toLowerCase().includes(pref));
+    if (hit) return hit;
+  }
+  return ids[0] || fallback;
+}
+
+const MODEL_CACHE_KEY = "wrexlyn_model_cache_v1";
+const MODEL_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h -- long enough to avoid a list fetch on every visit, short
+// enough that a fresh deprecation clears itself out on the next day's visit instead of needing a code deploy.
+
+function readModelCache(provider) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(MODEL_CACHE_KEY) || "{}");
+    const entry = cache[provider];
+    if (entry && Date.now() - entry.ts < MODEL_CACHE_TTL_MS) return entry.model;
+  } catch {
+    // corrupt cache -- fall through to a fresh lookup
+  }
+  return null;
+}
+
+function writeModelCache(provider, model) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(MODEL_CACHE_KEY) || "{}");
+    cache[provider] = { model, ts: Date.now() };
+    localStorage.setItem(MODEL_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // localStorage full/unavailable -- resolution still works, just re-fetches next time
+  }
+}
+
+/** Resolves a provider's model once (live list -> cache), remembering the result so repeat sends in the same
+ *  chat and repeat visits within MODEL_CACHE_TTL_MS don't re-fetch the list on every message. */
+async function resolveModel(providerId, apiKey) {
+  const meta = PROVIDER_META[providerId];
+  const cached = readModelCache(providerId);
+  if (cached) return cached;
+  let model;
+  try {
+    model = await meta.discoverModel(apiKey);
+  } catch {
+    model = meta.fallbackModel;
+  }
+  writeModelCache(providerId, model);
+  return model;
+}
+
 const PROVIDER_META = {
   // Default (first = pre-selected in the dropdown). Pollinations is more convenient (no key at all) but its free
   // anonymous tier has proven unreliable in testing (intermittent 402/403s) — Groq trades one minute of signup
@@ -182,58 +266,81 @@ const PROVIDER_META = {
   // start below the form, and further down this list for anyone who wants it as their saved default anyway.
   groq: {
     label: "Groq",
-    model: "llama-3.3-70b-versatile",
+    fallbackModel: "openai/gpt-oss-120b", // Groq's own migration target for the deprecated llama-3.3-70b-versatile
     needsKey: true,
     note: 'Free key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>.',
-    stream: (messages, apiKey, onDelta) =>
-      openAiCompatibleStream("https://api.groq.com/openai/v1/chat/completions", apiKey, "llama-3.3-70b-versatile", messages, onDelta),
+    discoverModel: async (apiKey) => {
+      const ids = await fetchModelIds("https://api.groq.com/openai/v1/models", apiKey);
+      // Groq's /models list also includes non-chat models (whisper transcription, guard/moderation, tts) --
+      // exclude those before picking, or a chat request could land on a model that can't answer one.
+      const chatIds = ids.filter((id) => !/whisper|guard|moderation|tts/i.test(id));
+      return pickModel(chatIds, ["gpt-oss-120b", "gpt-oss", "qwen3", "llama-3.1", "llama"], "openai/gpt-oss-120b");
+    },
+    stream: (messages, apiKey, model, onDelta) =>
+      openAiCompatibleStream("https://api.groq.com/openai/v1/chat/completions", apiKey, model, messages, onDelta),
   },
   pollinations: {
     label: "Pollinations (free, no key)",
-    model: "openai-fast",
+    fallbackModel: "openai-fast",
     needsKey: false,
     note:
       "Free, anonymous, no signup — but shared and rate-limited, so it can occasionally say it's out of budget. " +
       'If that happens, switch to <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a> ' +
       "or another provider above and paste in a free key.",
-    stream: (messages, apiKey, onDelta) => pollinationsStream(messages, onDelta),
+    // Pollinations exposes exactly one anonymous model -- nothing to discover, no list endpoint needed.
+    discoverModel: async () => "openai-fast",
+    stream: (messages, apiKey, model, onDelta) => pollinationsStream(messages, onDelta),
   },
   openrouter: {
     label: "OpenRouter",
-    model: "openai/gpt-oss-20b:free",
+    fallbackModel: "openai/gpt-oss-20b:free",
     needsKey: true,
     note: 'Free key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> — pick a ":free" model to avoid needing credits.',
-    stream: (messages, apiKey, onDelta) =>
-      openAiCompatibleStream("https://openrouter.ai/api/v1/chat/completions", apiKey, "openai/gpt-oss-20b:free", messages, onDelta),
+    // OpenRouter's model catalog is public -- no key needed to list it, confirmed via Access-Control-Allow-Origin: *.
+    discoverModel: async () => {
+      const ids = await fetchModelIds("https://openrouter.ai/api/v1/models");
+      const free = ids.filter((id) => id.endsWith(":free"));
+      return pickModel(free, ["gpt-oss", "llama", "qwen"], "openai/gpt-oss-20b:free");
+    },
+    stream: (messages, apiKey, model, onDelta) =>
+      openAiCompatibleStream("https://openrouter.ai/api/v1/chat/completions", apiKey, model, messages, onDelta),
   },
   gemini: {
     label: "Google Gemini",
-    model: "gemini-3.5-flash",
+    fallbackModel: "gemini-2.5-flash",
     needsKey: true,
     note: 'Free key (no credit card) at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.',
-    stream: (messages, apiKey, onDelta) =>
-      openAiCompatibleStream(
-        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-        apiKey,
-        "gemini-2.5-flash",
-        messages,
-        onDelta
-      ),
+    discoverModel: async (apiKey) => {
+      const ids = await fetchModelIds("https://generativelanguage.googleapis.com/v1beta/openai/models", apiKey);
+      return pickModel(ids, ["gemini-2.5-flash", "gemini-flash", "2.0-flash", "flash"], "gemini-2.5-flash");
+    },
+    stream: (messages, apiKey, model, onDelta) =>
+      openAiCompatibleStream("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", apiKey, model, messages, onDelta),
   },
   cerebras: {
     label: "Cerebras",
-    model: "llama-3.3-70b",
+    fallbackModel: "llama-3.3-70b",
     needsKey: true,
     note: 'Free key (no credit card) at <a href="https://cloud.cerebras.ai" target="_blank" rel="noopener">cloud.cerebras.ai</a>.',
-    stream: (messages, apiKey, onDelta) =>
-      openAiCompatibleStream("https://api.cerebras.ai/v1/chat/completions", apiKey, "llama-3.3-70b", messages, onDelta),
+    discoverModel: async (apiKey) => {
+      const ids = await fetchModelIds("https://api.cerebras.ai/v1/models", apiKey);
+      return pickModel(ids, ["llama-3.3-70b", "llama-3.1-70b", "llama"], "llama-3.3-70b");
+    },
+    stream: (messages, apiKey, model, onDelta) =>
+      openAiCompatibleStream("https://api.cerebras.ai/v1/chat/completions", apiKey, model, messages, onDelta),
   },
   mistral: {
     label: "Mistral",
-    model: "mistral-small-latest",
+    fallbackModel: "mistral-small-latest",
     needsKey: true,
     note: 'Free key at <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a> (phone verification required).',
-    stream: (messages, apiKey, onDelta) =>
-      openAiCompatibleStream("https://api.mistral.ai/v1/chat/completions", apiKey, "mistral-small-latest", messages, onDelta),
+    discoverModel: async (apiKey) => {
+      const ids = await fetchModelIds("https://api.mistral.ai/v1/models", apiKey);
+      // Mistral's "-latest" aliases are themselves a rolling pointer -- prefer keeping that alias over pinning
+      // to whatever dated snapshot id the list also exposes, so this stays current without a fresh pick each time.
+      return pickModel(ids, ["mistral-small-latest", "small-latest", "mistral-small"], "mistral-small-latest");
+    },
+    stream: (messages, apiKey, model, onDelta) =>
+      openAiCompatibleStream("https://api.mistral.ai/v1/chat/completions", apiKey, model, messages, onDelta),
   },
 };
