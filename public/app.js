@@ -1974,6 +1974,7 @@
     { id: "sunset", name: "Sunset", swatch: ["#120a0d", "#fb923c", "#f472b6"] },
     { id: "midnight", name: "Midnight", swatch: ["#070a12", "#5b8def", "#7dd3fc"] },
     { id: "daylight", name: "Daylight", swatch: ["#f6f7f9", "#2563eb", "#7c3aed"] },
+    { id: "paper", name: "Paper", swatch: ["#ffffff", "#111827", "#64748b"] },
   ];
 
   function applyTheme(themeId) {

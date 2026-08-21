@@ -171,6 +171,64 @@
   animation-name: bg-glow-breathe-subtle;
 }
 
+/* ---------- Paper theme: stark white, ink-black accent, a giant "W" watermark ---------- */
+
+:root[data-theme="paper"] {
+  --bg: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-panel: #fafafa;
+  --bg-hover: #f0f0f2;
+  --border: #dcdfe4;
+  --border-soft: #ebedf0;
+  --text: #14161a;
+  --text-dim: #4a4f58;
+  --text-faint: #8b909a;
+  --accent-rgb: 17, 24, 39;
+  --accent: #111827;
+  --accent-soft: rgba(17, 24, 39, 0.08);
+  --accent-2-rgb: 100, 116, 139;
+  --accent-2: #64748b;
+  --success: #16a34a;
+  --success-soft: rgba(22, 163, 74, 0.1);
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.1);
+  --warn: #b45309;
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08);
+  --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.1);
+  --shadow-lg: 0 20px 60px rgba(16, 24, 40, 0.16);
+}
+[data-theme="paper"] .sidebar,
+[data-theme="paper"] .artifact-panel,
+[data-theme="paper"] #code-panel {
+  background: var(--bg-panel);
+  backdrop-filter: none;
+}
+/* The animated space/planet scene (background.js's #bg-canvas) and the ambient accent glow both
+   read as decorative flourish that fights a stark white/ink page instead of complementing it —
+   dropped entirely rather than just dimmed, the way the other light theme (daylight) dims them. */
+[data-theme="paper"] #bg-canvas { display: none; }
+[data-theme="paper"] body::before { display: none; }
+/* The brand watermark: a huge, low-opacity "W" sitting behind the actual UI. .sidebar/.main and the
+   side panels above are all given real (non-transparent) backgrounds, so this only actually shows
+   through the chat log's own empty space — "prominent" without ever competing with real content or
+   text contrast, since nothing readable ever sits directly on top of it at full strength. */
+[data-theme="paper"] body::after {
+  content: "W";
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -46%);
+  z-index: 0;
+  pointer-events: none;
+  font-family: "Orbitron", var(--sans);
+  font-weight: 800;
+  font-size: min(52vw, 820px);
+  line-height: 1;
+  color: rgba(var(--accent-rgb), 0.055);
+  user-select: none;
+  white-space: nowrap;
+}
+
 /* ---------- Focus-visible base (all themes) ----------
    Previously only the tactical theme had a designed focus ring (a neon box-shadow on a handful of
    selectors) — everything else fell back to the browser default outline, which is inconsistent
@@ -384,25 +442,18 @@ summary:focus-visible {
 [data-theme="tactical"] .hud-diagnostic .hud-diag-busy { color: var(--accent); }
 [data-theme="tactical"] .hud-diagnostic .hud-diag-fail { color: var(--danger); }
 
-/* Full-viewport pixel-grid + scanline overlays, dormant outside this theme. The grid is two
-   layers sharing one drift animation: sparse bright-green "main squares" (the emphasized layer)
-   plus the original fine lines at their original dim opacity underneath — so only the major
-   squares read as bright, everything else stays as it was, just now also moving. Both grid tiers
-   and the scanline drift/sweep continuously instead of sitting static. */
+/* Full-viewport pixel-grid + scanline overlays, dormant outside this theme. */
 #tactical-grid, #tactical-scanline { display: none; }
 [data-theme="tactical"] #tactical-grid {
   display: block;
   position: fixed;
-  inset: -40px;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(var(--grid-rgb), 0.6) 1.5px, transparent 1.5px),
-    linear-gradient(90deg, rgba(var(--grid-rgb), 0.6) 1.5px, transparent 1.5px),
     linear-gradient(rgba(var(--grid-rgb), 0.12) 1px, transparent 1px),
     linear-gradient(90deg, rgba(var(--grid-rgb), 0.12) 1px, transparent 1px);
-  background-size: 160px 160px, 160px 160px, 40px 40px, 40px 40px;
-  animation: tactical-grid-drift 5s linear infinite;
+  background-size: 28px 28px;
 }
 [data-theme="tactical"] #tactical-scanline {
   display: block;
@@ -413,36 +464,12 @@ summary:focus-visible {
   mix-blend-mode: plus-lighter;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(var(--grid-rgb), 0.16) 0px,
-    rgba(var(--grid-rgb), 0.16) 1px,
+    rgba(0, 240, 255, 0.035) 0px,
+    rgba(0, 240, 255, 0.035) 1px,
     transparent 1px,
     transparent 3px
   );
-  animation: tactical-scan 0.9s linear infinite, tactical-scan-pulse 0.9s ease-in-out infinite;
-}
-/* Extra: a wide, brighter sweep band that passes down the whole screen every couple seconds — the
-   "scanning" motion reads most clearly, on top of the fine repeating scanline texture above. */
-[data-theme="tactical"] body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  mix-blend-mode: plus-lighter;
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    rgba(var(--grid-rgb), 0.1) 45%,
-    rgba(var(--grid-rgb), 0.22) 50%,
-    rgba(var(--grid-rgb), 0.1) 55%,
-    transparent 100%
-  );
-  background-size: 100% 240%;
-  animation: tactical-sweep 2.2s linear infinite;
-}
-@keyframes tactical-grid-drift {
-  from { background-position: 0 0, 0 0, 0 0, 0 0; }
-  to { background-position: 160px 160px, 160px 160px, 40px 40px, 40px 40px; }
+  animation: tactical-scan 3.2s linear infinite;
 }
 @keyframes tactical-scan {
   from { background-position-y: 0; }
@@ -3150,7 +3177,12 @@ body::before {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    /* 0s, not 0.01ms: transitions (unlike animations) resolve correctly at exactly zero duration —
+       they just jump straight to the end value on the same frame, with no risk of a skipped final
+       keyframe. This matters because `transition-property`'s initial value is "all": forcing even
+       a tiny nonzero duration here makes literally every property change on every element in the
+       app implicitly transition-eligible, not just the ones that declared a transition on purpose. */
+    transition-duration: 0s !important;
     scroll-behavior: auto !important;
   }
 }
