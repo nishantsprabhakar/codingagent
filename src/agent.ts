@@ -54,6 +54,7 @@ import type {
   ProjectMemory,
   ToolSpec,
   TokenUsage,
+  LlmProvider,
 } from "./types";
 
 const MAX_TOOL_ITERATIONS = 30;
@@ -63,6 +64,17 @@ const MAX_CRITIC_CALLS = 5;
 const MAX_CRITIQUE_ACTION_CHARS = 800;
 /** No chunk and no completion for this long means the provider is stuck, not just slow — give up rather than hang forever. */
 const MODEL_IDLE_TIMEOUT_MS = 90_000;
+/**
+ * "custom" covers self-hosted/local servers (e.g. Ollama on CPU-only hardware), which can take several
+ * times longer than a cloud API to produce a first token on a real turn — the full system prompt plus
+ * ~18 tool schemas is a much larger prefill than a quick manual test suggests. 90s reliably aborts a
+ * genuine local turn mid-flight; give it more room before assuming it's actually stuck.
+ */
+const CUSTOM_PROVIDER_IDLE_TIMEOUT_MS = 300_000;
+
+function modelIdleTimeoutMs(provider: LlmProvider): number {
+  return provider === "custom" ? CUSTOM_PROVIDER_IDLE_TIMEOUT_MS : MODEL_IDLE_TIMEOUT_MS;
+}
 
 /** Tool calls whose `path` argument should surface in the "Created Files" panel. */
 const FILE_PRODUCING_TOOLS = new Set([
@@ -770,7 +782,7 @@ export class Agent {
                 this.reporter.retryNotice(info);
               }
             ),
-          MODEL_IDLE_TIMEOUT_MS,
+          modelIdleTimeoutMs(this.llmConfig.provider),
           "model call"
         );
       } catch (err: any) {
