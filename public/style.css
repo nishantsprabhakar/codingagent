@@ -384,18 +384,22 @@ summary:focus-visible {
 [data-theme="tactical"] .hud-diagnostic .hud-diag-busy { color: var(--accent); }
 [data-theme="tactical"] .hud-diagnostic .hud-diag-fail { color: var(--danger); }
 
-/* Full-viewport pixel-grid + scanline overlays, dormant outside this theme. */
+/* Full-viewport pixel-grid + scanline overlays, dormant outside this theme. Both are green
+   (--grid-rgb, not the theme's cyan --accent) and both drift continuously — the grid on a slow
+   diagonal pan, the scanline sweeping down and pulsing brighter — instead of the grid sitting
+   fully static and the scanline barely visible at 0.035 opacity. */
 #tactical-grid, #tactical-scanline { display: none; }
 [data-theme="tactical"] #tactical-grid {
   display: block;
   position: fixed;
-  inset: 0;
+  inset: -28px;
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(var(--grid-rgb), 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--grid-rgb), 0.12) 1px, transparent 1px);
+    linear-gradient(rgba(var(--grid-rgb), 0.28) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--grid-rgb), 0.28) 1px, transparent 1px);
   background-size: 28px 28px;
+  animation: tactical-grid-drift 14s linear infinite;
 }
 [data-theme="tactical"] #tactical-scanline {
   display: block;
@@ -406,16 +410,48 @@ summary:focus-visible {
   mix-blend-mode: plus-lighter;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(0, 240, 255, 0.035) 0px,
-    rgba(0, 240, 255, 0.035) 1px,
+    rgba(var(--grid-rgb), 0.16) 0px,
+    rgba(var(--grid-rgb), 0.16) 1px,
     transparent 1px,
     transparent 3px
   );
-  animation: tactical-scan 3.2s linear infinite;
+  animation: tactical-scan 2.2s linear infinite, tactical-scan-pulse 2.2s ease-in-out infinite;
+}
+/* Extra: a wide, brighter sweep band that passes down the whole screen every few seconds — the
+   "scanning" motion read most clearly, on top of the fine repeating scanline texture above. */
+[data-theme="tactical"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  mix-blend-mode: plus-lighter;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(var(--grid-rgb), 0.1) 45%,
+    rgba(var(--grid-rgb), 0.22) 50%,
+    rgba(var(--grid-rgb), 0.1) 55%,
+    transparent 100%
+  );
+  background-size: 100% 240%;
+  animation: tactical-sweep 5s linear infinite;
+}
+@keyframes tactical-grid-drift {
+  from { background-position: 0 0; }
+  to { background-position: 28px 28px; }
 }
 @keyframes tactical-scan {
   from { background-position-y: 0; }
   to { background-position-y: 120px; }
+}
+@keyframes tactical-scan-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+@keyframes tactical-sweep {
+  from { background-position-y: -140%; }
+  to { background-position-y: 100%; }
 }
 
 [data-theme="tactical"] .msg-code,
