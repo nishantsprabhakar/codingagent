@@ -384,22 +384,25 @@ summary:focus-visible {
 [data-theme="tactical"] .hud-diagnostic .hud-diag-busy { color: var(--accent); }
 [data-theme="tactical"] .hud-diagnostic .hud-diag-fail { color: var(--danger); }
 
-/* Full-viewport pixel-grid + scanline overlays, dormant outside this theme. Both are green
-   (--grid-rgb, not the theme's cyan --accent) and both drift continuously — the grid on a slow
-   diagonal pan, the scanline sweeping down and pulsing brighter — instead of the grid sitting
-   fully static and the scanline barely visible at 0.035 opacity. */
+/* Full-viewport pixel-grid + scanline overlays, dormant outside this theme. The grid is two
+   layers sharing one drift animation: sparse bright-green "main squares" (the emphasized layer)
+   plus the original fine lines at their original dim opacity underneath — so only the major
+   squares read as bright, everything else stays as it was, just now also moving. Both grid tiers
+   and the scanline drift/sweep continuously instead of sitting static. */
 #tactical-grid, #tactical-scanline { display: none; }
 [data-theme="tactical"] #tactical-grid {
   display: block;
   position: fixed;
-  inset: -28px;
+  inset: -40px;
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(var(--grid-rgb), 0.28) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--grid-rgb), 0.28) 1px, transparent 1px);
-  background-size: 28px 28px;
-  animation: tactical-grid-drift 14s linear infinite;
+    linear-gradient(rgba(var(--grid-rgb), 0.6) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(var(--grid-rgb), 0.6) 1.5px, transparent 1.5px),
+    linear-gradient(rgba(var(--grid-rgb), 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--grid-rgb), 0.12) 1px, transparent 1px);
+  background-size: 160px 160px, 160px 160px, 40px 40px, 40px 40px;
+  animation: tactical-grid-drift 5s linear infinite;
 }
 [data-theme="tactical"] #tactical-scanline {
   display: block;
@@ -415,10 +418,10 @@ summary:focus-visible {
     transparent 1px,
     transparent 3px
   );
-  animation: tactical-scan 2.2s linear infinite, tactical-scan-pulse 2.2s ease-in-out infinite;
+  animation: tactical-scan 0.9s linear infinite, tactical-scan-pulse 0.9s ease-in-out infinite;
 }
-/* Extra: a wide, brighter sweep band that passes down the whole screen every few seconds — the
-   "scanning" motion read most clearly, on top of the fine repeating scanline texture above. */
+/* Extra: a wide, brighter sweep band that passes down the whole screen every couple seconds — the
+   "scanning" motion reads most clearly, on top of the fine repeating scanline texture above. */
 [data-theme="tactical"] body::after {
   content: "";
   position: fixed;
@@ -435,11 +438,11 @@ summary:focus-visible {
     transparent 100%
   );
   background-size: 100% 240%;
-  animation: tactical-sweep 5s linear infinite;
+  animation: tactical-sweep 2.2s linear infinite;
 }
 @keyframes tactical-grid-drift {
-  from { background-position: 0 0; }
-  to { background-position: 28px 28px; }
+  from { background-position: 0 0, 0 0, 0 0, 0 0; }
+  to { background-position: 160px 160px, 160px 160px, 40px 40px, 40px 40px; }
 }
 @keyframes tactical-scan {
   from { background-position-y: 0; }
