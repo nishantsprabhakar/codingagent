@@ -31,6 +31,7 @@
     "exceljs": "^4.4.0",
     "glob": "^10.4.5",
     "jszip": "^3.10.1",
+    "mammoth": "^1.12.1",
     "pdf-parse": "^2.4.5",
     "pptxgenjs": "^4.0.1",
     "puppeteer": "^25.6.0",

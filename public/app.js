@@ -2648,7 +2648,14 @@
         const tr = document.createElement("tr");
         for (const cell of row) {
           const td = document.createElement("td");
-          td.textContent = cell;
+          td.textContent = cell.text;
+          if (cell.colspan) td.colSpan = cell.colspan;
+          if (cell.rowspan) td.rowSpan = cell.rowspan;
+          if (cell.bold) td.style.fontWeight = "700";
+          if (cell.italic) td.style.fontStyle = "italic";
+          if (cell.color) td.style.color = `#${cell.color}`;
+          if (cell.fill) td.style.background = `#${cell.fill}`;
+          if (cell.align) td.style.textAlign = cell.align;
           tr.appendChild(td);
         }
         table.appendChild(tr);
@@ -2659,32 +2666,99 @@
     return wrap;
   }
 
-  function renderDocxPreview(paragraphs) {
+  function renderDocxPreview(html) {
     const wrap = document.createElement("div");
     wrap.className = "artifact-preview-docx";
-    for (const text of paragraphs) {
-      const p = document.createElement("p");
-      p.textContent = text;
-      wrap.appendChild(p);
-    }
+    wrap.innerHTML = html;
     return wrap;
   }
 
-  function renderPptxPreview(slides) {
-    const wrap = document.createElement("div");
-    slides.forEach((lines, i) => {
-      const slide = document.createElement("div");
-      slide.className = "artifact-preview-pptx-slide";
-      const title = document.createElement("div");
-      title.className = "artifact-preview-pptx-slide-title";
-      title.textContent = `Slide ${i + 1}`;
-      slide.appendChild(title);
-      for (const line of lines) {
-        const p = document.createElement("p");
-        p.textContent = line;
-        slide.appendChild(p);
+  // A run's `sizePt` is a real point size against the deck's native slide width (e.g. 960pt) —
+  // rendering that literally as CSS "pt" would look comically oversized once the same slide is
+  // shown at, say, 350px wide in the sidebar panel. `cqw` (container query width) units scale
+  // with however large `.pptx-slide-canvas` actually renders, so 1cqw = 1% of the canvas's own
+  // width regardless of viewport size — converting pt to "percent of slide width" and rendering
+  // that many cqw keeps text proportionally sized exactly like the original slide.
+  function ptToCqw(sizePt, slideWidthPt) {
+    return (sizePt / slideWidthPt) * 100;
+  }
+
+  function pptxParagraphToHtml(paragraph, slideWidthPt) {
+    return paragraph.runs
+      .map((run) => {
+        let text = escapeHtml(run.text);
+        if (run.bold) text = `<strong>${text}</strong>`;
+        if (run.italic) text = `<em>${text}</em>`;
+        if (run.underline) text = `<u>${text}</u>`;
+        const style = [];
+        if (run.color) style.push(`color:#${run.color}`);
+        style.push(`font-size:${ptToCqw(run.sizePt || 18, slideWidthPt).toFixed(3)}cqw`);
+        return `<span style="${style.join(";")}">${text}</span>`;
+      })
+      .join("");
+  }
+
+  const PPTX_ALIGN = { l: "left", ctr: "center", r: "right", just: "justify" };
+
+  function renderPptxShape(shape, slideWidthPt) {
+    const el2 = document.createElement("div");
+    el2.className = "pptx-shape";
+    el2.style.left = `${shape.x}%`;
+    el2.style.top = `${shape.y}%`;
+    el2.style.width = `${shape.w}%`;
+    el2.style.height = `${shape.h}%`;
+
+    if (shape.kind === "image") {
+      const img = document.createElement("img");
+      img.src = shape.src;
+      el2.appendChild(img);
+      return el2;
+    }
+
+    if (shape.kind === "table") {
+      el2.classList.add("pptx-shape-table");
+      el2.style.fontSize = `${ptToCqw(14, slideWidthPt).toFixed(3)}cqw`;
+      const table = document.createElement("table");
+      for (const row of shape.rows) {
+        const tr = document.createElement("tr");
+        for (const cellText of row) {
+          const td = document.createElement("td");
+          td.textContent = cellText;
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
       }
-      wrap.appendChild(slide);
+      el2.appendChild(table);
+      return el2;
+    }
+
+    // text
+    if (shape.fill) el2.style.background = `#${shape.fill}`;
+    if (shape.radius === "ellipse") el2.style.borderRadius = "50%";
+    else if (shape.radius === "round") el2.style.borderRadius = "12%";
+    el2.innerHTML = shape.paragraphs
+      .map((p) => `<div class="pptx-shape-para" style="text-align:${PPTX_ALIGN[p.align] || "left"}">${pptxParagraphToHtml(p, slideWidthPt)}</div>`)
+      .join("");
+    return el2;
+  }
+
+  function renderPptxPreview(preview) {
+    const wrap = document.createElement("div");
+    wrap.className = "pptx-slide-deck";
+    preview.slides.forEach((slide, i) => {
+      const frame = document.createElement("div");
+      frame.className = "pptx-slide-frame";
+      const canvas = document.createElement("div");
+      canvas.className = "pptx-slide-canvas";
+      canvas.style.aspectRatio = `${preview.slideWidthPt} / ${preview.slideHeightPt}`;
+      if (slide.background) canvas.style.background = `#${slide.background}`;
+      for (const shape of slide.shapes) canvas.appendChild(renderPptxShape(shape, preview.slideWidthPt));
+      const label = document.createElement("div");
+      label.className = "pptx-slide-label";
+      label.textContent = `${i + 1}`;
+      frame.appendChild(canvas);
+      frame.appendChild(label);
+      wrap.appendChild(frame);
     });
     return wrap;
   }
@@ -2732,9 +2806,9 @@
         if (preview.kind === "xlsx") {
           el.artifactPanelContent.appendChild(renderXlsxPreview(preview.sheets));
         } else if (preview.kind === "docx") {
-          el.artifactPanelContent.appendChild(renderDocxPreview(preview.paragraphs));
+          el.artifactPanelContent.appendChild(renderDocxPreview(preview.html));
         } else if (preview.kind === "pptx") {
-          el.artifactPanelContent.appendChild(renderPptxPreview(preview.slides));
+          el.artifactPanelContent.appendChild(renderPptxPreview(preview));
         } else {
           el.artifactPanelContent.innerHTML = `<div class="artifact-panel-error">No preview available: ${escapeHtml(preview.reason || "unsupported file")}</div>`;
         }

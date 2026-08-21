@@ -1877,24 +1877,26 @@ body::before {
   color: var(--text-faint, var(--text-dim));
 }
 
-.artifact-preview-docx p,
-.artifact-preview-pptx-slide { margin: 0 0 10px; line-height: 1.6; white-space: pre-wrap; }
-
-.artifact-preview-pptx-slide {
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
+/* Real Word-page look: a white card regardless of app theme (matches the actual paper-white
+   Word/Docs canvas a real preview would show, not the app's own dark/light palette). */
+.artifact-preview-docx {
+  background: #ffffff;
+  color: #1f2328;
+  border-radius: 6px;
+  padding: 32px 40px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
+  font-family: Calibri, "Segoe UI", var(--sans);
+  line-height: 1.55;
+  max-width: 100%;
 }
-
-.artifact-preview-pptx-slide-title {
-  font-family: var(--mono);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-faint, var(--text-dim));
-  margin-bottom: 6px;
+.artifact-preview-docx :first-child { margin-top: 0; }
+.artifact-preview-docx h1, .artifact-preview-docx h2, .artifact-preview-docx h3 { color: #111827; line-height: 1.25; }
+.artifact-preview-docx table { border-collapse: collapse; margin: 10px 0; }
+.artifact-preview-docx table td, .artifact-preview-docx table th {
+  border: 1px solid #d1d5db;
+  padding: 4px 8px;
 }
+.artifact-preview-docx img { max-width: 100%; }
 
 .artifact-preview-table-wrap { overflow: auto; max-width: 100%; }
 
@@ -1922,6 +1924,63 @@ body::before {
   letter-spacing: 0.05em;
   color: var(--text-faint, var(--text-dim));
   margin: 14px 0 6px;
+}
+
+/* ---------- Real pptx slide reconstruction ---------- */
+
+.pptx-slide-deck { display: flex; flex-direction: column; gap: 18px; }
+
+.pptx-slide-frame { display: flex; flex-direction: column; gap: 4px; }
+
+/* A real slide canvas — white by default (overridden inline per-slide when the deck sets an
+   explicit background), fixed aspect ratio derived from the deck's own slide size in points. */
+.pptx-slide-canvas {
+  position: relative;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  /* Lets shape text use `cqw` units (see renderPptxShape in app.js) so font sizes scale with
+     however large this canvas actually renders, instead of the literal point size looking
+     comically oversized when a 960pt-wide slide is shown in a ~350px sidebar panel. */
+  container-type: inline-size;
+}
+
+.pptx-slide-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint, var(--text-dim));
+  text-align: right;
+}
+
+.pptx-shape {
+  position: absolute;
+  overflow: hidden;
+  box-sizing: border-box;
+  color: #1f2328;
+  font-family: Calibri, "Segoe UI", var(--sans);
+}
+
+.pptx-shape img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+.pptx-shape-para {
+  padding: 2px 4px;
+  line-height: 1.25;
+  word-wrap: break-word;
+}
+
+.pptx-shape-table { display: flex; align-items: stretch; }
+.pptx-shape-table table {
+  width: 100%;
+  height: fit-content;
+  border-collapse: collapse;
+  font-size: 0.8em;
+  background: #ffffff;
+}
+.pptx-shape-table td {
+  border: 1px solid #9ca3af;
+  padding: 3px 6px;
 }
 
 /* ---------- Permission modal ---------- */
