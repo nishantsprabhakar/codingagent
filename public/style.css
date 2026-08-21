@@ -140,7 +140,7 @@
   --border-soft: #e7e9ee;
   --text: #161a20;
   --text-dim: #4b5566;
-  --text-faint: #8891a0;
+  --text-faint: #667080; /* darkened from #8891a0 — measured 2.97:1 against --bg, failing WCAG AA; now 5.01:1 */
   --accent-rgb: 37, 99, 235;
   --accent: #2563eb;
   --accent-soft: rgba(37, 99, 235, 0.1);
@@ -164,6 +164,15 @@
   background: var(--bg-panel);
   backdrop-filter: none;
 }
+/* .topbar's base rule is a hardcoded rgba(13,17,23,0.7) near-black, tuned for the dark themes —
+   on a light theme it blends down to only a mid-grey (~rgb(83,86,91)), and light-mode text tokens
+   (--text/--text-dim/--text-faint, all dark colors meant for a white ground) render at well under
+   2:1 contrast on top of it. This is why the cwd path, token badges, and icon buttons in the topbar
+   were unreadable even after --text-faint itself was fixed for its *real* (white) background. */
+[data-theme="daylight"] .topbar {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px) saturate(1.2);
+}
 /* The ambient glow's keyframes drive `opacity` directly (0.55-1), so a plain `opacity` override on
    this selector would just get overwritten every frame — override the alpha channels themselves and
    swap in a lower-amplitude keyframe (defined further down, near bg-glow-breathe) instead. */
@@ -173,6 +182,11 @@
     radial-gradient(circle at 85% 100%, rgba(var(--accent-2-rgb), 0.045), transparent 45%);
   animation-name: bg-glow-breathe-subtle;
 }
+/* .icon-btn's default border is --border, which on light grounds only reaches ~1.3:1 contrast —
+   well under the 3:1 WCAG 1.4.11 minimum for UI component boundaries, so buttons like Settings
+   read as barely-there. Strengthened just for this theme rather than raising --border globally
+   (which is also used for subtler dividers that don't need to double as button affordances). */
+[data-theme="daylight"] .icon-btn { border-color: #8390a6; }
 
 /* ---------- Paper theme: stark white, ink-black accent, a giant "W" watermark ---------- */
 
@@ -185,7 +199,7 @@
   --border-soft: #ebedf0;
   --text: #14161a;
   --text-dim: #4a4f58;
-  --text-faint: #8b909a;
+  --text-faint: #6a6f79; /* darkened from #8b909a — measured 3.20:1 against --bg, failing WCAG AA; now 5.04:1 */
   --accent-rgb: 17, 24, 39;
   --accent: #111827;
   --accent-soft: rgba(17, 24, 39, 0.08);
@@ -211,6 +225,13 @@
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(20px) saturate(1.4);
 }
+/* Same fix as daylight's .topbar override (see its comment): the base rule's hardcoded near-black
+   background blends to only a mid-grey here too, leaving the cwd path/badges/icon buttons on top
+   of it at well under 2:1 contrast against Paper's dark-on-white text tokens. */
+[data-theme="paper"] .topbar {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(16px) saturate(1.3);
+}
 [data-theme="paper"] .msg-assistant .bubble {
   background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(14px) saturate(1.3);
@@ -225,6 +246,8 @@
    dropped entirely rather than just dimmed, the way the other light theme (daylight) dims them. */
 [data-theme="paper"] #bg-canvas { display: none; }
 [data-theme="paper"] body::before { display: none; }
+/* Same --border/icon-btn contrast shortfall as daylight (see its comment) — measured ~1.3:1 here too. */
+[data-theme="paper"] .icon-btn { border-color: #8b95a6; }
 /* The brand watermark: a huge "W" sitting behind the actual UI, in the system font stack (the same
    -apple-system/system-ui keyword the rest of the app already uses — the standards-based way to
    pick up San Francisco on Apple hardware without bundling or claiming the font itself) rather than
