@@ -1912,6 +1912,11 @@ body::before {
 .recent-folders {
   max-height: 180px;
   overflow-y: auto;
+  /* Explicit, not left to default: per spec, setting only overflow-y forces overflow-x to compute
+     as "auto" too (a scroll container can't clip one axis without the other becoming a scroll
+     axis) — without this, a long path exceeding the item's own ellipsis width added an unwanted
+     horizontal scrollbar to the whole list instead of just truncating that one row. */
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1975,11 +1980,19 @@ body::before {
   cursor: pointer;
   font-size: 14px;
   color: var(--text-dim);
+  /* text-overflow has no effect on a flex container itself (it only applies to block boxes) — the
+     row used to just hard-clip a long name with no ellipsis at all. The ellipsis now lives on the
+     name span below, which is the part that actually needs to truncate. */
+}
+.folder-browser-item:hover { background: var(--bg-hover); color: var(--text); }
+.folder-browser-item-icon { flex-shrink: 0; }
+.folder-browser-item-name {
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.folder-browser-item:hover { background: var(--bg-hover); color: var(--text); }
 
 .folder-browser-empty {
   padding: 10px 8px;

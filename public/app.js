@@ -1730,7 +1730,7 @@
         const row = document.createElement("div");
         row.className = "folder-browser-item";
         row.title = entry.path;
-        row.innerHTML = `<span>&#128193;</span><span>${escapeHtml(entry.name)}</span>`;
+        row.innerHTML = `<span class="folder-browser-item-icon">&#128193;</span><span class="folder-browser-item-name">${escapeHtml(entry.name)}</span>`;
         row.addEventListener("click", () => browseTo(entry.path));
         el.folderBrowserList.appendChild(row);
       }
