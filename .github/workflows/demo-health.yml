@@ -1,0 +1,25 @@
+name: Demo provider health check
+
+# Catches the exact class of thing that has silently broken the browser demo three times already
+# (a hardcoded fallback model or endpoint URL going stale) before a user reports it. See
+# scripts/check-demo-providers.js's own doc comment for what this does and doesn't cover.
+on:
+  schedule:
+    - cron: "17 6 * * *" # once a day, off the hour to avoid GitHub's exact-hour scheduling pile-up
+  push:
+    branches: [main]
+    paths:
+      - "docs/providers.js"
+      - "scripts/check-demo-providers.js"
+      - "scripts/demo-provider-endpoints.js"
+  workflow_dispatch: {} # manual "run now" from the Actions tab
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+      - run: node scripts/check-demo-providers.js

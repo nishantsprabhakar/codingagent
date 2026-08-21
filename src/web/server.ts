@@ -33,6 +33,7 @@ import { STARTER_SKILLS } from "../starterSkills";
 import { redact, logError } from "../errors";
 import { listTransactions } from "../transactionLog";
 import { listEvidenceWithConflicts } from "../tools/evidence";
+import { buildArtifactPreview } from "../artifactPreview";
 
 const VALID_PROVIDERS: LlmProvider[] = ["kilo", ...API_KEY_PROVIDERS];
 
@@ -484,6 +485,7 @@ function handleHttp(
   if (url.pathname === "/api/tree") return handleTree(url, res, root);
   if (url.pathname === "/api/file") return handleFile(url, res, root);
   if (url.pathname === "/api/download") return handleDownload(url, res, root);
+  if (url.pathname === "/api/artifact-preview") return handleArtifactPreview(url, res, root);
   if (url.pathname === "/api/upload" && req.method === "POST") return handleUpload(req, url, res, root);
   if (url.pathname === "/api/models") return void handleModels(res, url.searchParams.get("provider") || provider);
   if (url.pathname === "/api/browse") return handleBrowse(url, res);
@@ -771,6 +773,34 @@ function handleFile(url: URL, res: http.ServerResponse, root: string): void {
 function isBinaryBuffer(buf: Buffer): boolean {
   const sample = buf.subarray(0, 8000);
   return sample.includes(0);
+}
+
+const MAX_PREVIEW_PARSE_BYTES = 15 * 1024 * 1024;
+
+function handleArtifactPreview(url: URL, res: http.ServerResponse, root: string): void {
+  const relPath = url.searchParams.get("path");
+  if (!relPath) return sendJson(res, 400, { error: "missing path" });
+
+  let filePath: string;
+  try {
+    filePath = resolveInRoot(root, relPath);
+  } catch (err: any) {
+    return sendJson(res, 400, { error: err.message });
+  }
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return sendJson(res, 404, { error: "file not found" });
+  }
+  const stat = fs.statSync(filePath);
+  if (stat.size > MAX_PREVIEW_PARSE_BYTES) {
+    return sendJson(res, 200, { path: relPath, preview: { kind: "unsupported", reason: `file too large to preview (${stat.size} bytes)` } });
+  }
+
+  const ext = path.extname(filePath).slice(1).toLowerCase();
+  const buf = fs.readFileSync(filePath);
+  buildArtifactPreview(buf, ext)
+    .then((preview) => sendJson(res, 200, { path: relPath, preview: preview ?? { kind: "unsupported", reason: `no preview available for .${ext}` } }))
+    .catch((err: any) => sendJson(res, 200, { path: relPath, preview: { kind: "unsupported", reason: err.message ?? String(err) } }));
 }
 
 function handleDownload(url: URL, res: http.ServerResponse, root: string): void {

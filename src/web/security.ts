@@ -16,6 +16,11 @@ import type * as http from "http";
  * avoid a flash of the wrong theme, and a nonce lets it do that without a blanket 'unsafe-inline', which
  * would reopen exactly the XSS surface this header exists to close. Google Fonts is the one legitimate
  * cross-origin asset this app loads, so style-src/font-src carve out just those two hosts rather than 'self'.
+ *
+ * img-src/frame-src both carve out blob: alongside 'self'/data: — the artifact preview panel fetches a
+ * file's bytes as an authenticated blob (an <img>/<iframe> can't carry the Authorization header the API
+ * requires, so a bare same-origin URL doesn't work) and renders it via URL.createObjectURL, which produces
+ * a blob: URL. Without this, the browser silently drops the image/PDF load as a CSP violation.
  */
 export function applySecureHeaders(res: http.ServerResponse, scriptNonce: string): void {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -24,7 +29,7 @@ export function applySecureHeaders(res: http.ServerResponse, scriptNonce: string
   res.setHeader(
     "Content-Security-Policy",
     `default-src 'self'; script-src 'self' 'nonce-${scriptNonce}'; style-src 'self' https://fonts.googleapis.com; ` +
-      `font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ws: wss:`
+      `font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; frame-src 'self' blob:; connect-src 'self' ws: wss:`
   );
 }
 

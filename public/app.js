@@ -16,6 +16,12 @@
     cwdLabel: document.getElementById("cwd-label"),
     projectCard: document.getElementById("project-card"),
     projectCardName: document.getElementById("project-card-name"),
+    projectsSection: document.getElementById("projects-section"),
+    projectsCount: document.getElementById("projects-count"),
+    projectsList: document.getElementById("projects-list"),
+    skillLibrarySidebarSection: document.getElementById("skill-library-sidebar-section"),
+    skillLibrarySidebarCount: document.getElementById("skill-library-sidebar-count"),
+    skillLibrarySidebarList: document.getElementById("skill-library-sidebar-list"),
     modelBadge: document.getElementById("model-badge"),
     yoloBadge: document.getElementById("yolo-badge"),
     chatLog: document.getElementById("chat-log"),
@@ -25,6 +31,11 @@
     codePanelTitle: document.getElementById("code-panel-title"),
     codePanelContent: document.getElementById("code-panel-content"),
     codePanelClose: document.getElementById("code-panel-close"),
+    artifactPanel: document.getElementById("artifact-panel"),
+    artifactPanelTitle: document.getElementById("artifact-panel-title"),
+    artifactPanelContent: document.getElementById("artifact-panel-content"),
+    artifactPanelClose: document.getElementById("artifact-panel-close"),
+    artifactPanelDownload: document.getElementById("artifact-panel-download"),
     permOverlay: document.getElementById("permission-overlay"),
     permTool: document.getElementById("permission-tool"),
     permLabel: document.getElementById("permission-label"),
@@ -341,6 +352,8 @@
         el.cwdLabel.textContent = msg.root;
         el.cwdLabel.title = msg.root;
         updateProjectCard(msg.root);
+        renderProjectsSection();
+        loadSkillLibrarySidebar();
         updateModelBadge();
         el.yoloBadge.hidden = !msg.yolo;
         // The server always follows "init" with fresh "history"/"tasks" for
@@ -351,6 +364,7 @@
         hudReset();
         renderCreatedFiles([]);
         el.codePanel.hidden = true;
+        closeArtifactPanel();
         showEmptyState(rootChanged ? "Switched project folder." : "Ready when you are.");
         loadTree(el.fileTree, ".");
         state.usage = null;
@@ -500,6 +514,92 @@
     const name = root.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || root;
     el.projectCardName.textContent = name;
     el.projectCardName.title = root;
+  }
+
+  // ---------- Projects section (quick-switch across recent project folders) ----------
+
+  function projectDisplayName(root) {
+    return root.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || root;
+  }
+
+  function renderProjectsSection() {
+    const others = state.recentFolders.filter((f) => f !== state.currentRoot);
+    el.projectsSection.hidden = others.length === 0;
+    el.projectsCount.textContent = others.length ? String(others.length) : "";
+    el.projectsList.innerHTML = "";
+
+    for (const folder of others) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "project-row";
+      row.title = folder;
+      row.innerHTML = `
+        <span class="project-row-icon">&#128193;</span>
+        <span class="project-row-name">${escapeHtml(projectDisplayName(folder))}</span>
+        <span class="project-row-path">${escapeHtml(folder)}</span>
+      `;
+      row.addEventListener("click", () => send({ type: "switch_folder", path: folder }));
+      el.projectsList.appendChild(row);
+    }
+
+    const browseRow = document.createElement("button");
+    browseRow.type = "button";
+    browseRow.className = "project-row project-row-browse";
+    browseRow.innerHTML = `<span class="project-row-icon">&#128269;</span><span class="project-row-name">Browse for another…</span>`;
+    browseRow.addEventListener("click", openFolderModal);
+    el.projectsList.appendChild(browseRow);
+  }
+
+  // ---------- Skill Library sidebar section (Claude Code's .claude/skills/, shown interactively) ----------
+
+  async function loadSkillLibrarySidebar() {
+    let skills = [];
+    try {
+      const res = await apiFetch("/api/skill-library");
+      skills = (await res.json()).skills || [];
+    } catch {
+      skills = [];
+    }
+
+    el.skillLibrarySidebarSection.hidden = skills.length === 0;
+    el.skillLibrarySidebarCount.textContent = skills.length ? String(skills.length) : "";
+    el.skillLibrarySidebarList.innerHTML = "";
+
+    for (const skill of skills) {
+      const card = document.createElement("details");
+      card.className = "skill-library-card";
+      card.innerHTML = `
+        <summary class="skill-library-card-summary">
+          <span class="skill-library-card-icon">&#10024;</span>
+          <span class="skill-library-card-text">
+            <span class="skill-library-card-name">${escapeHtml(skill.name)}</span>
+            <span class="skill-library-card-desc">${escapeHtml(skill.description)}</span>
+          </span>
+        </summary>
+        <div class="skill-library-card-body">
+          <div class="skill-library-card-loading">Loading SKILL.md…</div>
+        </div>
+      `;
+      let loaded = false;
+      card.addEventListener("toggle", async () => {
+        if (!card.open || loaded) return;
+        loaded = true;
+        const body = card.querySelector(".skill-library-card-body");
+        try {
+          const res = await apiFetch(`/api/file?path=${encodeURIComponent(`.claude/skills/${skill.path}/SKILL.md`)}`);
+          const data = await res.json();
+          const content = data.binary ? "(binary — can't preview)" : data.content ?? data.error ?? "(empty)";
+          const pre = document.createElement("pre");
+          pre.className = "skill-library-card-content";
+          pre.textContent = content;
+          body.innerHTML = "";
+          body.appendChild(pre);
+        } catch {
+          body.innerHTML = `<div class="skill-library-card-loading">Failed to load SKILL.md.</div>`;
+        }
+      });
+      el.skillLibrarySidebarList.appendChild(card);
+    }
   }
 
   // ---------- Live activity HUD (percentage ring + live feed) ----------
@@ -1379,6 +1479,26 @@
       e.preventDefault();
       sendUserMessage();
     }
+  });
+  // Pasting a screenshot/image (e.g. Win+Shift+S then Ctrl+V) attaches it the same way
+  // drag-and-drop upload does, instead of doing nothing or dumping a broken inline blob.
+  el.composerInput.addEventListener("paste", (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageFiles = [];
+    for (const item of items) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+    if (!imageFiles.length) return;
+    e.preventDefault();
+    imageFiles.forEach((file, i) => {
+      const ext = file.type.split("/")[1] || "png";
+      const named = file.name && file.name !== "image.png" ? file.name : `pasted-image-${Date.now()}${i ? `-${i}` : ""}.${ext}`;
+      uploadFile(new File([file], named, { type: file.type }));
+    });
   });
 
   // ---------- Chats (sessions) ----------
@@ -2497,6 +2617,138 @@
     el.codePanel.hidden = true;
   });
 
+  // ---------- Artifact preview panel (left side) ----------
+
+  const PREVIEWABLE_IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "ico"]);
+  let artifactPanelObjectUrl = null;
+
+  function closeArtifactPanel() {
+    el.artifactPanel.hidden = true;
+    el.artifactPanelContent.innerHTML = "";
+    if (artifactPanelObjectUrl) {
+      URL.revokeObjectURL(artifactPanelObjectUrl);
+      artifactPanelObjectUrl = null;
+    }
+  }
+
+  function renderXlsxPreview(sheets) {
+    const wrap = document.createElement("div");
+    for (const sheet of sheets) {
+      if (sheets.length > 1) {
+        const label = document.createElement("div");
+        label.className = "artifact-preview-sheet-name";
+        label.textContent = sheet.name;
+        wrap.appendChild(label);
+      }
+      const tableWrap = document.createElement("div");
+      tableWrap.className = "artifact-preview-table-wrap";
+      const table = document.createElement("table");
+      table.className = "artifact-preview-table";
+      for (const row of sheet.rows) {
+        const tr = document.createElement("tr");
+        for (const cell of row) {
+          const td = document.createElement("td");
+          td.textContent = cell;
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      tableWrap.appendChild(table);
+      wrap.appendChild(tableWrap);
+    }
+    return wrap;
+  }
+
+  function renderDocxPreview(paragraphs) {
+    const wrap = document.createElement("div");
+    wrap.className = "artifact-preview-docx";
+    for (const text of paragraphs) {
+      const p = document.createElement("p");
+      p.textContent = text;
+      wrap.appendChild(p);
+    }
+    return wrap;
+  }
+
+  function renderPptxPreview(slides) {
+    const wrap = document.createElement("div");
+    slides.forEach((lines, i) => {
+      const slide = document.createElement("div");
+      slide.className = "artifact-preview-pptx-slide";
+      const title = document.createElement("div");
+      title.className = "artifact-preview-pptx-slide-title";
+      title.textContent = `Slide ${i + 1}`;
+      slide.appendChild(title);
+      for (const line of lines) {
+        const p = document.createElement("p");
+        p.textContent = line;
+        slide.appendChild(p);
+      }
+      wrap.appendChild(slide);
+    });
+    return wrap;
+  }
+
+  async function openArtifactPreview(relPath) {
+    el.artifactPanel.hidden = false;
+    el.artifactPanelTitle.textContent = relPath;
+    el.artifactPanelTitle.title = relPath;
+    el.artifactPanelDownload.onclick = () => downloadFile(relPath);
+    el.artifactPanelContent.innerHTML = '<div class="artifact-panel-loading">Loading preview…</div>';
+    if (artifactPanelObjectUrl) {
+      URL.revokeObjectURL(artifactPanelObjectUrl);
+      artifactPanelObjectUrl = null;
+    }
+
+    const name = relPath.split("/").pop();
+    const ext = name.split(".").pop().toLowerCase();
+
+    try {
+      if (PREVIEWABLE_IMAGE_EXTS.has(ext) || ext === "pdf") {
+        const res = await apiFetch(`/api/download?path=${encodeURIComponent(relPath)}`);
+        if (!res.ok) throw new Error(res.statusText);
+        const blob = await res.blob();
+        artifactPanelObjectUrl = URL.createObjectURL(blob);
+        el.artifactPanelContent.innerHTML = "";
+        if (ext === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = artifactPanelObjectUrl;
+          el.artifactPanelContent.appendChild(iframe);
+        } else {
+          const img = document.createElement("img");
+          img.src = artifactPanelObjectUrl;
+          img.alt = name;
+          el.artifactPanelContent.appendChild(img);
+        }
+        return;
+      }
+
+      if (ext === "xlsx" || ext === "docx" || ext === "pptx") {
+        const res = await apiFetch(`/api/artifact-preview?path=${encodeURIComponent(relPath)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        const preview = data.preview;
+        el.artifactPanelContent.innerHTML = "";
+        if (preview.kind === "xlsx") {
+          el.artifactPanelContent.appendChild(renderXlsxPreview(preview.sheets));
+        } else if (preview.kind === "docx") {
+          el.artifactPanelContent.appendChild(renderDocxPreview(preview.paragraphs));
+        } else if (preview.kind === "pptx") {
+          el.artifactPanelContent.appendChild(renderPptxPreview(preview.slides));
+        } else {
+          el.artifactPanelContent.innerHTML = `<div class="artifact-panel-error">No preview available: ${escapeHtml(preview.reason || "unsupported file")}</div>`;
+        }
+        return;
+      }
+
+      el.artifactPanelContent.innerHTML = '<div class="artifact-panel-error">No preview available for this file type — use the download button instead.</div>';
+    } catch (err) {
+      el.artifactPanelContent.innerHTML = `<div class="artifact-panel-error">Failed to load preview: ${escapeHtml(err.message || String(err))}</div>`;
+    }
+  }
+
+  el.artifactPanelClose.addEventListener("click", closeArtifactPanel);
+
   // ---------- Created files (written/generated by the agent this chat) ----------
 
   async function downloadFile(relPath) {
@@ -2552,11 +2804,11 @@
         <span class="created-file-download" title="Download">&#8681;</span>
       `;
       row.addEventListener("click", () => {
+        list.querySelectorAll(".created-file-row.active").forEach((r) => r.classList.remove("active"));
+        row.classList.add("active");
         if (isBinary) {
-          downloadFile(relPath);
+          openArtifactPreview(relPath);
         } else {
-          list.querySelectorAll(".created-file-row.active").forEach((r) => r.classList.remove("active"));
-          row.classList.add("active");
           openFile(relPath);
         }
       });
@@ -2575,6 +2827,7 @@
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     if (!el.codePanel.hidden) el.codePanel.hidden = true;
+    if (!el.artifactPanel.hidden) closeArtifactPanel();
     if (!el.folderOverlay.hidden) el.folderOverlay.hidden = true;
     if (!el.modelOverlay.hidden) el.modelOverlay.hidden = true;
     if (!el.themeOverlay.hidden) el.themeOverlay.hidden = true;

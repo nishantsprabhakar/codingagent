@@ -107,11 +107,31 @@ export function lightenHex(hex: string, factor = 0.82): string {
   return (channel(0) + channel(2) + channel(4)).toUpperCase();
 }
 
+/** Perceived-luminance check (ITU-R BT.601 weights) — used to decide whether a fill color needs
+ *  white or dark text on top of it to stay readable. */
+export function isDarkHex(hex: string): boolean {
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 < 140;
+}
+
 /** Derives the light-blue-style header fill + dark text pair for table headers: the fixed default
  *  tint when no accentColor was given, or a tint derived from the custom accent so it stays visually
- *  coherent with the rest of the document. */
-export function headerBandColors(customAccent: string | undefined, accentDark: string): { fill: string; text: string } {
-  return customAccent ? { fill: lightenHex(customAccent), text: accentDark } : { fill: DOCX_HEADER_LIGHT_FILL, text: DOCX_HEADER_LIGHT_TEXT };
+ *  coherent with the rest of the document.
+ *
+ *  `allowDark` (xlsx only — see createXlsxTool) opts into keeping a genuinely dark custom accent as
+ *  a dark fill with white text, instead of always lightening it. docx deliberately never passes this:
+ *  its header band sits inside a printable, light-themed page, so lightening stays the right default
+ *  there even for a dark brand color. */
+export function headerBandColors(
+  customAccent: string | undefined,
+  accentDark: string,
+  options?: { allowDark?: boolean }
+): { fill: string; text: string } {
+  if (!customAccent) return { fill: DOCX_HEADER_LIGHT_FILL, text: DOCX_HEADER_LIGHT_TEXT };
+  if (options?.allowDark && isDarkHex(customAccent)) return { fill: customAccent, text: "FFFFFF" };
+  return { fill: lightenHex(customAccent), text: accentDark };
 }
 
 export function optionalHexColor(input: unknown): string | undefined {

@@ -57,6 +57,14 @@
       </div>
     </button>
 
+    <details id="projects-section" class="sidebar-collapsible" hidden>
+      <summary class="sidebar-section-title sidebar-collapsible-summary">
+        <span>Projects</span>
+        <span id="projects-count" class="sidebar-count-badge"></span>
+      </summary>
+      <div id="projects-list" class="projects-list"></div>
+    </details>
+
     <div class="sidebar-section-title sidebar-section-title-row">
       <span>Chats</span>
       <button id="new-chat-btn" class="new-chat-btn" title="New chat">+ New</button>
@@ -77,7 +85,30 @@
     <div class="sidebar-section-title">Files</div>
     <div id="file-tree" class="file-tree"></div>
 
+    <details id="skill-library-sidebar-section" class="sidebar-collapsible" hidden>
+      <summary class="sidebar-section-title sidebar-collapsible-summary">
+        <span>Skill Library</span>
+        <span id="skill-library-sidebar-count" class="sidebar-count-badge"></span>
+      </summary>
+      <div class="skill-library-sidebar-intro">
+        Reusable, documented skills from this project's <code>.claude/skills/</code> — Claude Code reads these
+        automatically. Expand one to see what it does.
+      </div>
+      <div id="skill-library-sidebar-list" class="skill-library-sidebar-list"></div>
+    </details>
+
     <div class="sidebar-footer">&copy; 2026 Nishant Prabhakar. All rights reserved.</div>
+  </aside>
+
+  <aside id="artifact-panel" class="artifact-panel" hidden>
+    <div class="artifact-panel-header">
+      <span id="artifact-panel-title" class="artifact-panel-title"></span>
+      <div class="artifact-panel-actions">
+        <button id="artifact-panel-download" class="icon-btn" title="Download">&#8681;</button>
+        <button id="artifact-panel-close" class="icon-btn" title="Close">&times;</button>
+      </div>
+    </div>
+    <div id="artifact-panel-content" class="artifact-panel-content"></div>
   </aside>
 
   <main class="main">

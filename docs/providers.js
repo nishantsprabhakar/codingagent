@@ -266,6 +266,9 @@ async function resolveModel(providerId, apiKey) {
   return model;
 }
 
+// scripts/check-demo-providers.js (run on a schedule by .github/workflows/demo-health.yml) mirrors
+// each provider's modelsUrl/fallbackModel below in scripts/demo-provider-endpoints.js — update both
+// in the same commit if you change a URL or fallback id here, or the health check goes stale silently.
 const PROVIDER_META = {
   // Default (first = pre-selected in the dropdown). Pollinations is more convenient (no key at all) but its free
   // anonymous tier has proven unreliable in testing (intermittent 402/403s) — Groq trades one minute of signup

@@ -26,8 +26,15 @@ function toFormulaAwareCellValue(v) {
   return v;
 }
 
+/** Picks the header fill+text pair for a given accent, matching create_xlsx's own dark-header
+ *  behavior: a genuinely dark custom accent becomes a dark fill with white text instead of always
+ *  being lightened. Pass the result as `headerBand` to styleHeaderRow. */
+function pickHeaderBand(customAccent, accentDark) {
+  return ir.headerBandColors(customAccent, accentDark, { allowDark: true });
+}
+
 /** Bold header row, colored fill, thin borders, and a frozen top row — the same look
- *  create_xlsx applies by default. `headerBand` is `{fill, text}` (see headerBandColors below). */
+ *  create_xlsx applies by default. `headerBand` is `{fill, text}` (see pickHeaderBand above). */
 function styleHeaderRow(sheet, headerRow, headerBand) {
   headerRow.font = { bold: true, color: { argb: `FF${headerBand.text}` } };
   headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${headerBand.fill}` } };
@@ -62,8 +69,10 @@ module.exports = {
   styleHeaderRow,
   applyDataRowStyle,
   autoColumnWidth,
+  pickHeaderBand,
   darkenHex: ir.darkenHex,
   lightenHex: ir.lightenHex,
+  isDarkHex: ir.isDarkHex,
   headerBandColors: ir.headerBandColors,
   optionalHexColor: ir.optionalHexColor,
 };

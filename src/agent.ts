@@ -312,7 +312,10 @@ function systemPrompt(root: string, projectContext: string, globalInstructions: 
     "  'inEnd'/'inBase', never 'outEnd' (corrupts the file); a combo chart using secondaryValAxis/secondaryCatAxis",
     "  needs BOTH valAxes and catAxes set with two entries each, or PowerPoint discards the chart as corrupt. For",
     "  docx: docxRuns/orderedListNumbering/createToc/LETTER_SIZE_DXA are all top-level exports. For xlsx:",
-    "  toFormulaAwareCellValue/styleHeaderRow/applyDataRowStyle are all top-level exports too.",
+    "  toFormulaAwareCellValue/styleHeaderRow/applyDataRowStyle are all top-level exports too. Use",
+    "  pickHeaderBand(customAccent, accentDark) to get styleHeaderRow's headerBand argument — it automatically",
+    "  switches to a dark fill with white text when accentColor is a dark custom color, instead of always",
+    "  lightening it, so a dark brand color doesn't render as unreadable dark-on-light.",
     "- These three tools always ask for confirmation (classified high risk — a script is genuine code execution,",
     "  not just document assembly) and never run inside --sandbox (the sandboxed container has no access to the",
     "  libraries/kits these scripts need) — always on the host, --sandbox or not. After execution, the same kind",
@@ -387,6 +390,13 @@ export class Agent {
   private needsVerification = false;
   /** Content signature of touched files after the last repair attempt, to detect a repair loop making no progress. */
   private lastRepairSignature: string | null = null;
+  /** Signature ("toolName(args)" pairs, sorted) of the previous round's tool calls, to detect the model calling
+   *  the exact same tool(s) with identical arguments repeatedly — a distinct failure mode from the repair-loop
+   *  stuck-detection above: no verification/repair is involved, just the model itself not making progress (e.g.
+   *  repeatedly calling recall_skill with a name that never matches). Reset at the start of every turn. */
+  private lastToolCallSignature: string | null = null;
+  /** How many consecutive rounds lastToolCallSignature has repeated — 0 means the most recent round was new. */
+  private repeatedToolCallRounds = 0;
   /** Same-session evidence conflicts (see tools/evidence.ts) found during the current transaction, flushed into
    *  tx.contract.checks by finalizeTransaction and cleared at the start of every turn. */
   private pendingEvidenceConflicts: EvidenceConflict[] = [];
@@ -745,6 +755,8 @@ export class Agent {
     };
     this.needsVerification = false;
     this.lastRepairSignature = null;
+    this.lastToolCallSignature = null;
+    this.repeatedToolCallRounds = 0;
     this.pendingEvidenceConflicts = [];
     this.lastCritiquedActionIndex = 0;
     this.stopRequested = false;
@@ -950,6 +962,33 @@ export class Agent {
       // dispatched are allowed to finish and their results are kept, but no further iteration starts.
       if (this.stopRequested) {
         this.stoppedByUser();
+        return;
+      }
+
+      // Stuck-tool-loop detection: the model calling the exact same tool(s) with identical arguments
+      // three rounds running, with no verification/repair cycle in between to explain it (that has its
+      // own detector above) — a real failure mode found live with a small local model repeatedly
+      // calling recall_skill with a name that never matched, burning the full MAX_TOOL_ITERATIONS
+      // budget before giving up. Ending the turn here instead is strictly better: same outcome (no
+      // progress made), far fewer wasted model calls, and a clear reason instead of a generic
+      // "stopped after N tool calls" message.
+      const toolCallSignature = result.toolCalls.map((tc) => `${tc.name}(${tc.arguments})`).sort().join(" | ");
+      if (toolCallSignature && toolCallSignature === this.lastToolCallSignature) {
+        this.repeatedToolCallRounds++;
+      } else {
+        this.repeatedToolCallRounds = 0;
+      }
+      this.lastToolCallSignature = toolCallSignature;
+
+      if (this.repeatedToolCallRounds >= 2) {
+        const names = result.toolCalls.map((tc) => tc.name).join(", ");
+        const message =
+          `Stuck: called ${names} with identical arguments 3 rounds in a row with no progress — stopping ` +
+          `instead of exhausting the full tool-call budget on a repeat that clearly isn't converging.`;
+        this.reporter.error(message);
+        this.historyLog.push({ type: "error", text: message });
+        this.finalizeTransaction("failed");
+        this.persist();
         return;
       }
     }

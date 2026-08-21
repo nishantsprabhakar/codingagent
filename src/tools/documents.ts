@@ -1410,7 +1410,7 @@ export const createXlsxTool: ToolSpec = {
     const customAccent = optionalHexColor(args.accentColor);
     const accent = customAccent ?? DEFAULT_ACCENT_HEX;
     const accentDark = customAccent ? darkenHex(accent) : DEFAULT_ACCENT_DARK_HEX;
-    const headerBand = headerBandColors(customAccent, accentDark);
+    const headerBand = headerBandColors(customAccent, accentDark, { allowDark: true });
 
     const filePath = resolveInRoot(ctx.root, args.path);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
