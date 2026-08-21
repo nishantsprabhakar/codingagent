@@ -26,6 +26,33 @@
   --radius: 10px;
   --mono: "SFMono-Regular", "JetBrains Mono", Consolas, "Liberation Mono", Menlo, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+
+  /* Motion — three durations covering every ordinary UI transition (hover/focus/select at the fast
+     end, panel/modal/expand transitions at the slow end), one shared easing curve that decelerates
+     into rest without any overshoot/bounce. Themes may still opt individual selectors out (see
+     tactical's `transition: none !important` block below) but nothing new should invent its own
+     duration or curve outside this scale. */
+  --dur-fast: 120ms;
+  --dur-base: 160ms;
+  --dur-slow: 220ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* A visible-on-any-background focus ring: the outline color is the theme accent, the box-shadow
+     underneath is a soft halo of the same hue so the ring reads clearly on both the light and dark
+     themes without needing per-theme overrides. */
+  --focus-ring: 0 0 0 3px rgba(var(--accent-rgb), 0.35);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+
+  /* Code/output surfaces (tool output, permission command preview, skill-library raw content,
+     inline code blocks) intentionally stay dark-terminal-styled in every theme, including the
+     light one — but that means their TEXT color can never come from the theme's own --text-dim
+     (which is dark in the light theme, and would be unreadable on a dark surface), so it needs
+     its own always-light pairing instead. */
+  --code-bg: #090c11;
+  --code-text: #c7ccd6;
 }
 
 /* ---------- Themes ---------- */
@@ -97,6 +124,80 @@
   --accent-2-rgb: 125, 211, 252;
   --accent-2: #7dd3fc;
 }
+
+/* A genuine light theme — every other named theme here is a dark palette with a different accent
+   hue; this is the one exception, built to hold proper WCAG AA contrast on light surfaces rather
+   than just inverting the dark tokens (a naive invert crushes contrast on pale accent colors). */
+:root[data-theme="daylight"] {
+  --bg: #f6f7f9;
+  --bg-elevated: #ffffff;
+  --bg-panel: #ffffff;
+  --bg-hover: #eef1f5;
+  --border: #d8dce3;
+  --border-soft: #e7e9ee;
+  --text: #161a20;
+  --text-dim: #4b5566;
+  --text-faint: #8891a0;
+  --accent-rgb: 37, 99, 235;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --accent-2-rgb: 124, 58, 237;
+  --accent-2: #7c3aed;
+  --success: #059669;
+  --success-soft: rgba(5, 150, 105, 0.1);
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.1);
+  --warn: #b45309;
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08);
+  --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.1);
+  --shadow-lg: 0 20px 60px rgba(16, 24, 40, 0.16);
+}
+/* Frosted surfaces (sidebar backdrop-filter, ambient glows) are tuned for dark backgrounds —
+   on a light theme they either wash out or invert into a muddy look, so give them a real
+   opaque surface and drop the glow instead of trying to reuse the dark-theme treatment. */
+[data-theme="daylight"] .sidebar,
+[data-theme="daylight"] .artifact-panel,
+[data-theme="daylight"] #code-panel {
+  background: var(--bg-panel);
+  backdrop-filter: none;
+}
+/* The ambient glow's keyframes drive `opacity` directly (0.55-1), so a plain `opacity` override on
+   this selector would just get overwritten every frame — override the alpha channels themselves and
+   swap in a lower-amplitude keyframe (defined further down, near bg-glow-breathe) instead. */
+[data-theme="daylight"] body::before {
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(var(--accent-rgb), 0.05), transparent 45%),
+    radial-gradient(circle at 85% 100%, rgba(var(--accent-2-rgb), 0.045), transparent 45%);
+  animation-name: bg-glow-breathe-subtle;
+}
+
+/* ---------- Focus-visible base (all themes) ----------
+   Previously only the tactical theme had a designed focus ring (a neon box-shadow on a handful of
+   selectors) — everything else fell back to the browser default outline, which is inconsistent
+   across elements and easy to lose against a dark background. This gives every interactive control
+   the same ring in every theme; tactical's own :focus-visible rule above is more specific (it
+   carries the [data-theme="tactical"] attribute selector) so it still wins there unchanged. */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+/* Controls that already carry their own focus treatment (composer/folder inputs get a border-color
+   change; text areas that sit flush against a panel edge where an outline would clip) keep only the
+   box-shadow halo so the two treatments don't visually compete. */
+.composer-input:focus-visible,
+.folder-input:focus-visible,
+.settings-textarea:focus-visible,
+.session-search-input:focus-visible {
+  outline: none;
+}
+/* Mouse/touch clicks never get the ring (only real keyboard/AT focus does) — :focus-visible already
+   handles this in every browser this app targets, so no `:focus { outline: none }` reset is needed. */
 
 /* ---------- Tactical Cockpit theme ---------- */
 
@@ -379,10 +480,16 @@ body::before {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  body::before {
-    animation: none;
-    opacity: 0.85;
+/* Same breathing motion, lower amplitude — a full-intensity glow reads as a much louder effect on
+   a white background than a dark one, so daylight gets a calmer version instead of the same curve. */
+@keyframes bg-glow-breathe-subtle {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
   }
 }
 
@@ -620,12 +727,18 @@ body::before {
   align-items: center;
   justify-content: center;
   border-radius: 5px;
+  border: none;
+  background: none;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
   color: var(--text-faint);
   opacity: 0;
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
   font-size: 15.5px;
 }
-.session-item:hover .session-item-delete { opacity: 1; }
+.session-item:hover .session-item-delete,
+.session-item-delete:focus-visible { opacity: 1; }
 .session-item-delete:hover { background: var(--danger-soft); color: var(--danger); }
 
 .session-list-empty {
@@ -938,8 +1051,18 @@ body::before {
 .tree-node.open > .tree-row > .tree-caret { transform: rotate(90deg); }
 
 .tree-icon { flex-shrink: 0; opacity: 0.85; }
-.tree-children { margin-left: 14px; border-left: 1px solid var(--border-soft); padding-left: 4px; display: none; }
-.tree-node.open > .tree-children { display: block; }
+.tree-children {
+  margin-left: 14px;
+  border-left: 1px solid var(--border-soft);
+  padding-left: 4px;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--dur-slow) var(--ease);
+}
+/* An effectively-unbounded cap rather than height:auto (which can't be transitioned) — big enough
+   that no real folder's contents ever get clipped by it, so this is purely an animation mechanism,
+   not a scroll/size limit (the file tree's own scrolling still comes from #file-tree itself). */
+.tree-node.open > .tree-children { max-height: 100000px; }
 
 /* ---------- Created files ---------- */
 
@@ -984,12 +1107,18 @@ body::before {
   align-items: center;
   justify-content: center;
   border-radius: 5px;
+  border: none;
+  background: none;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
   color: var(--text-faint);
   opacity: 0;
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
   font-size: 13px;
 }
-.created-file-row:hover .created-file-download { opacity: 1; }
+.created-file-row:hover .created-file-download,
+.created-file-download:focus-visible { opacity: 1; }
 .created-file-download:hover { background: var(--accent-soft); color: var(--accent); }
 
 /* ---------- Collapsible sidebar sections (Projects, Skill Library) ---------- */
@@ -1134,12 +1263,12 @@ body::before {
 .skill-library-card-content {
   margin: 8px 0 0;
   padding: 8px;
-  background: #090c11;
+  background: var(--code-bg);
   border-radius: 6px;
   font-family: var(--mono);
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-dim);
+  color: var(--code-text);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 260px;
@@ -1384,6 +1513,7 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  position: relative;
 }
 
 .chat-log > * { max-width: 860px; width: 100%; margin: 0 auto; padding: 0 24px; }
@@ -1410,9 +1540,49 @@ body::before {
 .empty-state-title { font-size: 17.5px; color: var(--text-dim); font-weight: 600; }
 .empty-state-sub { font-size: 15px; }
 
-.msg { display: flex; }
+.msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  /* Fades in from a few px down on append — subtle enough not to distract mid-conversation, but
+     enough to make new messages (including each streamed one, appended once as a finished bubble)
+     read as "just arrived" rather than snapping into place. */
+  animation: msg-enter var(--dur-slow) var(--ease);
+}
 .msg-user { justify-content: flex-end; }
 .msg-assistant { justify-content: flex-start; }
+
+@keyframes msg-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Copy button sits as a flex sibling of the bubble (not absolutely positioned over it) so it can
+   never overlap message text at any bubble width — it just reserves a small, fixed gap next to
+   every message and fades in on hover/focus. */
+.msg-copy-btn {
+  flex-shrink: 0;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.msg:hover .msg-copy-btn,
+.msg-copy-btn:focus-visible {
+  opacity: 1;
+}
+.msg-copy-btn:hover { background: var(--bg-hover); color: var(--text); }
+.msg-copy-btn.msg-copy-btn-done { opacity: 1; color: var(--success); }
 
 .bubble {
   max-width: 82%;
@@ -1428,7 +1598,10 @@ body::before {
   background: linear-gradient(135deg, #1c5866, var(--accent) 340%);
   background: rgba(var(--accent-rgb), 0.14);
   border: 1px solid rgba(var(--accent-rgb), 0.3);
-  color: #d6f7fd;
+  /* var(--text), not a hardcoded light color — the old fixed #d6f7fd only worked by accident on
+     dark themes; against the light theme's pale bg + a low-opacity accent tint, light-on-light
+     text was nearly invisible. */
+  color: var(--text);
   border-bottom-right-radius: 3px;
 }
 
@@ -1445,14 +1618,20 @@ body::before {
 .msg-inline-code {
   font-family: var(--mono);
   font-size: 0.92em;
-  background: rgba(255, 255, 255, 0.08);
+  /* A neutral mid-gray tint rather than a white-alpha overlay — white-alpha only reads as a tint
+     against a dark surface (on the light theme's pale bubble backgrounds it nearly disappears);
+     mid-gray at this opacity darkens a light surface and lightens a dark one, so it stays visible
+     in either direction. */
+  background: rgba(127, 127, 127, 0.18);
+  color: var(--text);
   padding: 1px 5px;
   border-radius: 4px;
 }
 .msg-code {
   font-family: var(--mono);
   font-size: 15px;
-  background: #090c11;
+  background: var(--code-bg);
+  color: var(--code-text);
   border: 1px solid var(--border-soft);
   border-radius: 8px;
   padding: 10px 12px;
@@ -1464,7 +1643,9 @@ body::before {
 .msg-error .bubble {
   background: var(--danger-soft);
   border: 1px solid rgba(248, 113, 113, 0.35);
-  color: #ffd2d2;
+  /* var(--danger), not a fixed light pink — that only reads against a dark bubble background; the
+     theme's own --danger is already tuned to stay legible on --danger-soft in every theme. */
+  color: var(--danger);
 }
 
 .thinking-row { display: flex; align-items: center; gap: 8px; color: var(--text-faint); font-size: 15px; padding: 2px 0; }
@@ -1582,26 +1763,85 @@ body::before {
 
 .tool-label { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.tool-status { font-size: 13px; flex-shrink: 0; }
+.tool-status {
+  font-size: 13px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 .tool-status.ok { color: var(--success); }
 .tool-status.fail { color: var(--danger); }
+/* A denied permission is the user's own deliberate choice, not a system failure — giving it its
+   own amber tone (matching --warn, the same hue used for medium-risk badges) instead of the same
+   red as a genuine error helps tell "you said no" apart from "this broke" at a glance. */
+.tool-status.rejected { color: var(--warn); }
+
 .tool-status.pending { color: var(--text-faint); }
+.tool-status.pending::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: status-dot-pulse 1.4s ease-in-out infinite;
+}
+@keyframes status-dot-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+/* Brief pop-in the instant a tool call resolves, so the status change itself draws the eye instead
+   of just silently swapping text/color. */
+.tool-status.ok,
+.tool-status.fail,
+.tool-status.rejected {
+  animation: status-resolve-pop var(--dur-slow) var(--ease);
+}
+@keyframes status-resolve-pop {
+  0% { transform: scale(0.85); opacity: 0.5; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
 
 .tool-caret { color: var(--text-faint); font-size: 10.5px; transition: transform 0.15s ease; }
 .tool-card.open .tool-caret { transform: rotate(90deg); }
 
 .tool-card-body {
-  display: none;
+  /* box-sizing:border-box means padding/border count toward max-height's cap, so max-height:0
+     genuinely collapses the whole box to nothing (no residual gap from the padding) — the same
+     fixed 0 -> 340px transition can then just animate `max-height` alone. */
+  box-sizing: border-box;
   border-top: 1px solid var(--border-soft);
   padding: 10px 12px;
-  max-height: 340px;
-  overflow: auto;
-  background: #090c11;
+  max-height: 0;
+  overflow: hidden;
+  background: var(--code-bg);
+  transition: max-height var(--dur-slow) var(--ease);
 }
 
-.tool-card.open .tool-card-body { display: block; }
+.tool-card.open .tool-card-body {
+  max-height: 340px;
+  overflow: auto;
+}
 
-.tool-output { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text-dim); }
+.tool-card-body-toolbar { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+
+.tool-copy-btn {
+  font-size: 11.5px;
+  font-family: var(--sans);
+  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.tool-copy-btn:hover { color: var(--text); border-color: var(--border); background: var(--bg-hover); }
+.tool-copy-btn.tool-copy-btn-done { color: var(--success); border-color: var(--success); }
+
+.tool-output { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--code-text); }
 .diff-add { color: var(--success); }
 .diff-del { color: var(--danger); }
 
@@ -1761,10 +2001,42 @@ body::before {
   color: var(--danger);
 }
 
+/* Always out-of-flow (never a grid item competing with .app's explicit column template) — visible
+   and interactive only inside the mobile breakpoint below, where the sidebar becomes an off-canvas
+   drawer that needs a dimming scrim behind it. */
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .chat-log.drag-over {
   outline: 2px dashed var(--accent);
   outline-offset: -8px;
   background: rgba(var(--accent-rgb), 0.05);
+  transition: background var(--dur-fast) var(--ease), outline-color var(--dur-fast) var(--ease);
+}
+.chat-log.drag-over::after {
+  content: "Drop to upload";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+  background: var(--bg);
+  opacity: 0.92;
+  animation: drag-hint-in var(--dur-fast) var(--ease);
+}
+@keyframes drag-hint-in {
+  from { opacity: 0; }
+  to { opacity: 0.92; }
 }
 
 .send-btn {
@@ -1994,7 +2266,19 @@ body::before {
   align-items: center;
   justify-content: center;
   z-index: 50;
+  /* Entrance/exit is driven by the .overlay-visible/.overlay-closing classes that
+     initOverlayAnimations() (app.js) toggles automatically whenever any code sets this element's
+     `hidden` property — every existing `el.xOverlay.hidden = true/false` call site keeps working
+     unchanged, it just now gets a fade instead of an instant pop. */
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease);
 }
+.overlay.overlay-visible { opacity: 1; }
+/* Keeps the overlay actually painted (instead of the generic [hidden]{display:none!important} a
+   few rules up) for as long as it's mid-close, so the opacity transition triggered by JS removing
+   .overlay-visible has something to animate instead of vanishing the instant `hidden` is set. See
+   initOverlayAnimations() in app.js. */
+.overlay.overlay-closing[hidden] { display: flex !important; }
 
 .permission-modal {
   width: min(560px, 92vw);
@@ -2003,9 +2287,12 @@ body::before {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(251, 191, 36, 0.08);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(251, 191, 36, 0.08);
   padding: 20px;
+  transform: scale(0.96) translateY(6px);
+  transition: transform var(--dur-base) var(--ease);
 }
+.overlay.overlay-visible .permission-modal { transform: none; }
 
 .permission-modal-wide { width: min(640px, 94vw); }
 
@@ -2153,6 +2440,17 @@ body::before {
 .settings-tab:hover { color: var(--text); }
 .settings-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
+/* No JS involved: a CSS `animation` (unlike `transition`) restarts on its own whenever an element
+   goes from display:none to displayed, which is exactly what showSettingsTab() does by toggling
+   `hidden` — so simply declaring this here gives every tab switch a soft cross-fade for free. */
+.settings-panel {
+  animation: settings-panel-in var(--dur-base) var(--ease);
+}
+@keyframes settings-panel-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .settings-panel-actions {
   display: flex;
   align-items: center;
@@ -2169,7 +2467,7 @@ body::before {
 }
 .settings-hint code {
   font-family: var(--mono);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(127, 127, 127, 0.18);
   padding: 1px 5px;
   border-radius: 4px;
 }
@@ -2638,7 +2936,7 @@ body::before {
 .permission-preview {
   margin: 0 0 16px;
   padding: 12px;
-  background: #090c11;
+  background: var(--code-bg);
   border: 1px solid var(--border-soft);
   border-radius: 8px;
   font-family: var(--mono);
@@ -2648,7 +2946,7 @@ body::before {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--text-dim);
+  color: var(--code-text);
 }
 
 .permission-actions { display: flex; justify-content: flex-end; gap: 8px; }
@@ -2669,6 +2967,44 @@ body::before {
 .btn:hover { transform: translateY(-1px); }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #06232a; }
 .btn-secondary { background: var(--bg-panel); color: var(--text); }
+
+/* ---------- Toasts ---------- */
+
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--sans);
+  max-width: min(420px, 90vw);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition: opacity var(--dur-base) var(--ease), transform var(--dur-base) var(--ease);
+}
+.toast.toast-visible { opacity: 1; transform: translateY(0) scale(1); }
+.toast-error { border-color: rgba(248, 113, 113, 0.4); }
+.toast-icon { flex-shrink: 0; font-size: 15px; }
+.toast-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn-danger { color: var(--danger); }
 .btn-danger:hover { background: var(--danger-soft); border-color: rgba(248, 113, 113, 0.4); }
 
@@ -2686,9 +3022,18 @@ body::before {
     inset: 0 30% 0 0;
     z-index: 40;
     transform: translateX(-100%);
-    transition: transform 0.2s ease;
+    transition: transform var(--dur-base) var(--ease);
   }
   .sidebar.open { transform: translateX(0); }
+  .sidebar-scrim {
+    z-index: 39;
+    background: rgba(0, 0, 0, 0.5);
+    transition: opacity var(--dur-base) var(--ease);
+  }
+  .app:has(.sidebar.open) .sidebar-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
   .mobile-toggle {
     display: flex;
     position: fixed;
@@ -2737,5 +3082,23 @@ body::before {
   .icon-btn {
     width: 40px;
     height: 40px;
+  }
+}
+
+/* ---------- Reduced motion ---------- */
+
+/* Collapses every animation/transition in the app — the ~15 pre-existing ones (pulse/bounce/blink/
+   scan/etc.) plus everything added in this pass — down to effectively instant, rather than trying
+   to remember to add a reduced-motion variant next to every future animation. `animation-duration`
+   at 0.01ms (not 0) still lets the element settle on its final keyframe value instead of freezing
+   mid-cycle at an arbitrary frame, and `!important` + the universal selector beats any single
+   more-specific rule declared elsewhere (e.g. the daylight theme's own `animation-name` override),
+   so this one block is the actual last word regardless of where else a duration got set. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

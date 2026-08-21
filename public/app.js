@@ -25,6 +25,8 @@
     modelBadge: document.getElementById("model-badge"),
     yoloBadge: document.getElementById("yolo-badge"),
     chatLog: document.getElementById("chat-log"),
+    toastContainer: document.getElementById("toast-container"),
+    sidebarScrim: document.getElementById("sidebar-scrim"),
     composerInput: document.getElementById("composer-input"),
     sendBtn: document.getElementById("send-btn"),
     codePanel: document.getElementById("code-panel"),
@@ -224,6 +226,67 @@
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
+  }
+
+  // ---------- Toasts ----------
+
+  const TOAST_ICONS = { info: "ℹ", success: "✓", error: "⚠" };
+
+  /** Transient, non-blocking confirmation — used for things a user acted on (copy, upload) that
+   *  don't need a permanent line in the chat log the way an uploaded-file record or an error does. */
+  function showToast(message, kind = "success") {
+    const toast = document.createElement("div");
+    toast.className = `toast${kind === "error" ? " toast-error" : ""}`;
+    toast.innerHTML = `<span class="toast-icon">${TOAST_ICONS[kind] || TOAST_ICONS.info}</span><span class="toast-text"></span>`;
+    toast.querySelector(".toast-text").textContent = message;
+    el.toastContainer.appendChild(toast);
+    requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add("toast-visible")));
+    setTimeout(() => {
+      toast.classList.remove("toast-visible");
+      toast.addEventListener("transitionend", () => toast.remove(), { once: true });
+      setTimeout(() => toast.remove(), 300); // fallback if transitionend doesn't fire (e.g. reduced motion)
+    }, 2200);
+  }
+
+  /** Copies `text` to the clipboard and gives the triggering button a brief checkmark + toast,
+   *  shared by the chat-bubble and tool-output copy buttons. */
+  async function copyTextWithFeedback(text, btn, doneClass) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Copied to clipboard");
+      if (btn) {
+        const original = btn.innerHTML;
+        btn.innerHTML = "&#10003;";
+        if (doneClass) btn.classList.add(doneClass);
+        setTimeout(() => {
+          btn.innerHTML = original;
+          if (doneClass) btn.classList.remove(doneClass);
+        }, 1200);
+      }
+    } catch {
+      showToast("Copy failed — clipboard access was denied", "error");
+    }
+  }
+
+  /** Adds a small copy-to-clipboard button as a flex sibling of `row`'s `.bubble` — reads the
+   *  bubble's live text at click time (not a captured snapshot) so it still copies correctly even
+   *  if the row is a still-streaming assistant message. */
+  function attachCopyButton(row) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "msg-copy-btn";
+    btn.title = "Copy message";
+    btn.setAttribute("aria-label", "Copy message");
+    btn.innerHTML = "&#128203;";
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const bubble = row.querySelector(".bubble");
+      if (!bubble) return;
+      const clone = bubble.cloneNode(true);
+      clone.querySelectorAll(".stream-caret").forEach((n) => n.remove());
+      copyTextWithFeedback(clone.textContent, btn, "msg-copy-btn-done");
+    });
+    row.appendChild(btn);
   }
 
   function clearEmptyState() {
@@ -916,6 +979,7 @@
     bubble.className = "bubble";
     bubble.textContent = text;
     row.appendChild(bubble);
+    attachCopyButton(row);
     el.chatLog.appendChild(row);
     scrollToBottom();
   }
@@ -977,6 +1041,7 @@
     bubble.className = "bubble";
     bubble.innerHTML = renderMarkdown(text);
     row.appendChild(bubble);
+    attachCopyButton(row);
     el.chatLog.appendChild(row);
     scrollToBottom();
   }
@@ -995,6 +1060,7 @@
       const bubble = document.createElement("div");
       bubble.className = "bubble";
       row.appendChild(bubble);
+      attachCopyButton(row);
       el.chatLog.appendChild(row);
       state.streamingBubble = { bubble, text: "" };
     }
@@ -1088,7 +1154,7 @@
     for (const card of state.toolCards.values()) {
       const status = card.querySelector(".tool-status");
       if (status && status.classList.contains("pending")) {
-        status.textContent = "interrupted";
+        status.textContent = "◼ interrupted";
         status.className = "tool-status fail";
       }
     }
@@ -1113,10 +1179,20 @@
         <span class="tool-status pending">running…</span>
         <span class="tool-caret">&#9656;</span>
       </div>
-      <div class="tool-card-body"><pre class="tool-output">Waiting for result…</pre></div>
+      <div class="tool-card-body">
+        <div class="tool-card-body-toolbar">
+          <button type="button" class="tool-copy-btn">Copy</button>
+        </div>
+        <pre class="tool-output">Waiting for result…</pre>
+      </div>
     `;
     card.querySelector(".tool-card-header").addEventListener("click", () => {
       card.classList.toggle("open");
+    });
+    const copyBtn = card.querySelector(".tool-copy-btn");
+    copyBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      copyTextWithFeedback(card.querySelector(".tool-output").textContent, copyBtn, "tool-copy-btn-done");
     });
 
     el.chatLog.appendChild(card);
@@ -1124,13 +1200,19 @@
     scrollToBottom();
   }
 
+  // Matches the exact phrase agent.ts uses for every denied permission (it already relies on this
+  // same regex itself, e.g. to decide outcome/blocked-commands memory) — so a user declining a
+  // permission prompt reads as "declined", not the same generic "failed" as an unrelated tool error.
+  const DENIED_PERMISSION_RE = /denied permission/i;
+
   function updateToolCard(id, output, ok) {
     const card = state.toolCards.get(id);
     if (!card) return;
 
     const status = card.querySelector(".tool-status");
-    status.textContent = ok ? "done" : "failed";
-    status.className = `tool-status ${ok ? "ok" : "fail"}`;
+    const rejected = !ok && DENIED_PERMISSION_RE.test(output);
+    status.textContent = ok ? "✓ done" : rejected ? "⊘ declined" : "✕ failed";
+    status.className = `tool-status ${ok ? "ok" : rejected ? "rejected" : "fail"}`;
 
     const pre = card.querySelector(".tool-output");
     pre.textContent = output;
@@ -1446,6 +1528,7 @@
     el.sendBtn.classList.toggle("send-btn-stop", busy);
     el.sendBtn.innerHTML = busy ? "&#9632;" : "&#x2191;";
     el.sendBtn.title = busy ? "Stop" : "Send";
+    el.sendBtn.setAttribute("aria-label", busy ? "Stop" : "Send message");
     setStatus(disconnected ? "disconnected" : busy ? "busy" : "connected");
     el.progressSection.classList.toggle("hud-busy", busy);
   }
@@ -1549,7 +1632,7 @@
             <div class="session-item-title">${escapeHtml(s.title)}</div>
             <div class="session-item-time">${formatRelativeTime(s.updatedAt)}</div>
           </div>
-          <span class="session-item-delete" title="Delete chat">&times;</span>
+          <button type="button" class="session-item-delete" title="Delete chat" aria-label="Delete chat">&times;</button>
         `;
         row.addEventListener("click", () => {
           if (s.id !== state.sessionId) send({ type: "switch_session", id: s.id });
@@ -1890,6 +1973,7 @@
     { id: "aurora", name: "Aurora", swatch: ["#0a0a14", "#a78bfa", "#2dd4bf"] },
     { id: "sunset", name: "Sunset", swatch: ["#120a0d", "#fb923c", "#f472b6"] },
     { id: "midnight", name: "Midnight", swatch: ["#070a12", "#5b8def", "#7dd3fc"] },
+    { id: "daylight", name: "Daylight", swatch: ["#f6f7f9", "#2563eb", "#7c3aed"] },
   ];
 
   function applyTheme(themeId) {
@@ -1913,12 +1997,20 @@
       const row = document.createElement("div");
       row.className = `theme-item${theme.id === active ? " active" : ""}`;
       row.innerHTML = `
-        <span class="theme-swatch">
-          ${theme.swatch.map((c) => `<span class="theme-swatch-dot" style="background:${c}"></span>`).join("")}
-        </span>
+        <span class="theme-swatch"></span>
         <span class="theme-item-name">${escapeHtml(theme.name)}</span>
         ${theme.id === active ? '<span class="theme-item-check">&#10003;</span>' : ""}
       `;
+      // Swatch dot colors are set via the .style CSSOM setter, not an HTML `style="..."` string —
+      // this app's CSP has no 'unsafe-inline' for style-src, which silently drops inline style
+      // attributes (confirmed live: they were rendering as colorless dots).
+      const swatch = row.querySelector(".theme-swatch");
+      for (const c of theme.swatch) {
+        const dot = document.createElement("span");
+        dot.className = "theme-swatch-dot";
+        dot.style.background = c;
+        swatch.appendChild(dot);
+      }
       row.addEventListener("click", () => {
         applyTheme(theme.id);
         renderThemeList();
@@ -2282,13 +2374,13 @@
           <option value="stdio" ${isHttp ? "" : "selected"}>Local command (stdio)</option>
           <option value="http" ${isHttp ? "selected" : ""}>Remote URL (Streamable HTTP, OAuth if required)</option>
         </select>
-        <div class="mcp-stdio-fields" ${isHttp ? 'style="display:none"' : ""}>
+        <div class="mcp-stdio-fields">
           <label>Command</label>
           <input class="folder-input mcp-command-input" type="text" value="${escapeHtml(config.command || "")}" placeholder="e.g. npx" />
           <label>Args</label>
           <input class="folder-input mcp-args-input" type="text" value="${escapeHtml((config.args || []).join(" "))}" placeholder="space-separated args" />
         </div>
-        <div class="mcp-http-fields" ${isHttp ? "" : 'style="display:none"'}>
+        <div class="mcp-http-fields">
           <label>URL</label>
           <input class="folder-input mcp-url-input" type="text" value="${escapeHtml(config.url || "")}" placeholder="https://example.com/mcp" />
         </div>
@@ -2298,6 +2390,11 @@
     const typeSelect = row.querySelector(".mcp-type-select");
     const stdioFields = row.querySelector(".mcp-stdio-fields");
     const httpFields = row.querySelector(".mcp-http-fields");
+    // Set via the .style CSSOM setter, not an HTML `style="..."` string — this app's CSP has no
+    // 'unsafe-inline' for style-src, which silently drops inline style attributes (confirmed live:
+    // both field groups were showing at once regardless of the selected type until this ran).
+    stdioFields.style.display = isHttp ? "none" : "";
+    httpFields.style.display = isHttp ? "" : "none";
     typeSelect.addEventListener("change", () => {
       const http = typeSelect.value === "http";
       stdioFields.style.display = http ? "none" : "";
@@ -2683,19 +2780,33 @@
     return (sizePt / slideWidthPt) * 100;
   }
 
-  function pptxParagraphToHtml(paragraph, slideWidthPt) {
-    return paragraph.runs
-      .map((run) => {
-        let text = escapeHtml(run.text);
-        if (run.bold) text = `<strong>${text}</strong>`;
-        if (run.italic) text = `<em>${text}</em>`;
-        if (run.underline) text = `<u>${text}</u>`;
-        const style = [];
-        if (run.color) style.push(`color:#${run.color}`);
-        style.push(`font-size:${ptToCqw(run.sizePt || 18, slideWidthPt).toFixed(3)}cqw`);
-        return `<span style="${style.join(";")}">${text}</span>`;
-      })
-      .join("");
+  // Builds real DOM nodes and sets styles via the `.style.x = value` CSSOM setter, not an
+  // HTML `style="..."` string — this app's CSP has no 'unsafe-inline' for style-src, which blocks
+  // both literal `style="..."` attributes AND `setAttribute("style", ...)`, but does NOT block the
+  // CSSOM property setter, so that's the only path that actually applies here.
+  function buildPptxRun(run, slideWidthPt) {
+    let node = document.createTextNode(run.text);
+    const wrap = (tag) => {
+      const el2 = document.createElement(tag);
+      el2.appendChild(node);
+      node = el2;
+    };
+    if (run.underline) wrap("u");
+    if (run.italic) wrap("em");
+    if (run.bold) wrap("strong");
+    const span = document.createElement("span");
+    span.appendChild(node);
+    if (run.color) span.style.color = `#${run.color}`;
+    span.style.fontSize = `${ptToCqw(run.sizePt || 18, slideWidthPt).toFixed(3)}cqw`;
+    return span;
+  }
+
+  function buildPptxParagraph(paragraph, slideWidthPt) {
+    const p = document.createElement("div");
+    p.className = "pptx-shape-para";
+    p.style.textAlign = PPTX_ALIGN[paragraph.align] || "left";
+    for (const run of paragraph.runs) p.appendChild(buildPptxRun(run, slideWidthPt));
+    return p;
   }
 
   const PPTX_ALIGN = { l: "left", ctr: "center", r: "right", just: "justify" };
@@ -2736,9 +2847,7 @@
     if (shape.fill) el2.style.background = `#${shape.fill}`;
     if (shape.radius === "ellipse") el2.style.borderRadius = "50%";
     else if (shape.radius === "round") el2.style.borderRadius = "12%";
-    el2.innerHTML = shape.paragraphs
-      .map((p) => `<div class="pptx-shape-para" style="text-align:${PPTX_ALIGN[p.align] || "left"}">${pptxParagraphToHtml(p, slideWidthPt)}</div>`)
-      .join("");
+    for (const paragraph of shape.paragraphs) el2.appendChild(buildPptxParagraph(paragraph, slideWidthPt));
     return el2;
   }
 
@@ -2875,7 +2984,7 @@
       row.innerHTML = `
         <span class="created-file-icon">${fileIcon(name)}</span>
         <span class="created-file-name">${escapeHtml(name)}</span>
-        <span class="created-file-download" title="Download">&#8681;</span>
+        <button type="button" class="created-file-download" title="Download" aria-label="Download ${escapeHtml(name)}">&#8681;</button>
       `;
       row.addEventListener("click", () => {
         list.querySelectorAll(".created-file-row.active").forEach((r) => r.classList.remove("active"));
@@ -2897,6 +3006,9 @@
   el.sidebarToggle.addEventListener("click", () => {
     el.sidebar.classList.toggle("open");
   });
+  el.sidebarScrim.addEventListener("click", () => {
+    el.sidebar.classList.remove("open");
+  });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
@@ -2906,7 +3018,84 @@
     if (!el.modelOverlay.hidden) el.modelOverlay.hidden = true;
     if (!el.themeOverlay.hidden) el.themeOverlay.hidden = true;
     if (!el.settingsOverlay.hidden) el.settingsOverlay.hidden = true;
+    el.sidebar.classList.remove("open");
   });
+
+  // ---------- Overlay entrance/exit animation ----------
+
+  // Every modal (`.overlay`) is opened/closed throughout this file with a plain
+  // `el.xOverlay.hidden = true/false` — rather than touching every one of those call sites, this
+  // observes the `hidden` attribute on each overlay and layers a fade around it automatically.
+  // Deliberately does NOT touch the `hidden` attribute itself (e.g. clearing it mid-close to buy
+  // time for the animation) — doing so would itself be an attribute mutation this same observer
+  // watches for, re-triggering the callback and looping forever. Instead, closing relies on a CSS
+  // rule (`.overlay.overlay-closing[hidden] { display: flex !important; }`, see style.css) that
+  // keeps the element painted for OVERLAY_ANIM_MS after `hidden` is set, purely by adding/removing
+  // a class — a mutation type this observer doesn't watch, so no re-entrancy risk.
+  const OVERLAY_ANIM_MS = 180;
+  const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  let lastFocusedBeforeOverlay = null;
+
+  function focusableIn(container) {
+    return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
+      (node) => !node.disabled && node.offsetParent !== null
+    );
+  }
+
+  // Basic focus trap for the open modal: Tab/Shift+Tab wrap within its focusable elements instead
+  // of escaping to whatever's behind the (still-present, just visually dimmed) backdrop.
+  function trapTabKey(e, overlayEl) {
+    if (e.key !== "Tab" || overlayEl.hidden) return;
+    const focusable = focusableIn(overlayEl);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  function initOverlayAnimations() {
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.attributeName !== "hidden") continue;
+        const overlayEl = m.target;
+        if (overlayEl.hidden) {
+          overlayEl.classList.add("overlay-closing");
+          overlayEl.classList.remove("overlay-visible");
+          setTimeout(() => overlayEl.classList.remove("overlay-closing"), OVERLAY_ANIM_MS);
+          // Give focus back to whatever opened this modal (usually the button that triggered it)
+          // instead of leaving it stranded on a now-hidden element.
+          if (lastFocusedBeforeOverlay && document.contains(lastFocusedBeforeOverlay)) {
+            lastFocusedBeforeOverlay.focus();
+          }
+          lastFocusedBeforeOverlay = null;
+        } else {
+          overlayEl.classList.remove("overlay-closing");
+          // Two rAFs, not one: the element needs an actual painted "not visible yet" frame before
+          // adding .overlay-visible, or the browser has nothing to transition from and just jumps
+          // straight to the end state with no visible fade. Re-checking `hidden` inside the
+          // callback guards against a close happening in the brief window before these rAFs fire
+          // (open-then-immediately-close) — without it, this would re-add .overlay-visible to an
+          // overlay that's already supposed to be gone.
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (!overlayEl.hidden) overlayEl.classList.add("overlay-visible");
+          }));
+          lastFocusedBeforeOverlay = document.activeElement;
+          const focusable = focusableIn(overlayEl);
+          (focusable[0] || overlayEl).focus();
+        }
+      }
+    });
+    document.querySelectorAll(".overlay").forEach((overlayEl) => {
+      observer.observe(overlayEl, { attributes: true, attributeFilter: ["hidden"] });
+      overlayEl.addEventListener("keydown", (e) => trapTabKey(e, overlayEl));
+    });
+  }
 
   // ---------- Init ----------
 
@@ -2914,6 +3103,7 @@
     el.composerInput.placeholder = "Ask the agent…";
   }
 
+  initOverlayAnimations();
   setBusy(false);
   bootstrapAuthToken().then(connect);
 })();
