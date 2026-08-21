@@ -58,15 +58,13 @@
   }
   readThemeColors();
 
-  // The tactical cockpit theme replaces this scene with a pixel-grid/scanline HUD overlay instead,
-  // and the paper theme replaces it with a plain white page + watermark — neither wants a
-  // cyber-space Earth drawn behind them. This sets `display` via the JS `.style` property (an
-  // inline style, which always wins over any external stylesheet rule short of !important) every
-  // time visibility is (re)synced, so a CSS-only override on #bg-canvas would get silently
-  // clobbered the next time this runs — the check has to live here, not in style.css.
+  // The Earth/sun scene is disabled outright, in every theme — it used to only hide itself for
+  // tactical/paper. This sets `display` via the JS `.style` property (an inline style, which always
+  // wins over any external stylesheet rule short of !important) every time visibility is (re)synced,
+  // so a CSS-only override on #bg-canvas would get silently clobbered the next time this runs — the
+  // check has to live here, not in style.css.
   function syncVisibility() {
-    const theme = document.documentElement.getAttribute("data-theme");
-    const sceneHidden = theme === "tactical" || theme === "paper";
+    const sceneHidden = true;
     const wasRunning = running;
     canvas.style.display = sceneHidden ? "none" : "block";
     running = !sceneHidden && !document.hidden;
@@ -438,13 +436,7 @@
   // ---------- Rotation / animation loop ----------
 
   document.addEventListener("visibilitychange", () => {
-    const theme = document.documentElement.getAttribute("data-theme");
-    if (theme === "tactical" || theme === "paper") return;
-    running = !document.hidden;
-    if (running) {
-      last = null;
-      requestAnimationFrame(frame);
-    }
+    // The scene is permanently disabled (see syncVisibility above) — nothing to resume here.
   });
 
   function frame(ts) {

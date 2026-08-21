@@ -12,7 +12,10 @@
   --border-soft: #1a2029;
   --text: #e6e9ef;
   --text-dim: #8b93a7;
-  --text-faint: #5b6472;
+  /* Brightened from #5b6472 — the old value read at ~3:1 contrast against this theme's own dark
+     surfaces, below the 4.5:1 WCAG AA minimum for normal text (confirmed live: the topbar's project
+     path, timestamps, and other --text-faint text were genuinely hard to read). This hits ~5:1. */
+  --text-faint: #7a8595;
   --accent-rgb: 34, 211, 238;
   --accent: #22d3ee;
   --accent-soft: rgba(var(--accent-rgb), 0.12);
@@ -66,7 +69,7 @@
   --border-soft: #142018;
   --text: #d7ffe4;
   --text-dim: #86c79a;
-  --text-faint: #4d6b57;
+  --text-faint: #638a70; /* brightened from #4d6b57 for WCAG AA contrast — see :root's comment */
   --accent-rgb: 57, 255, 136;
   --accent: #39ff88;
   --accent-soft: rgba(57, 255, 136, 0.14);
@@ -83,7 +86,7 @@
   --border-soft: #1c1c2e;
   --text: #ece9ff;
   --text-dim: #9d97c9;
-  --text-faint: #625c85;
+  --text-faint: #857fa7; /* brightened from #625c85 for WCAG AA contrast — see :root's comment */
   --accent-rgb: 167, 139, 250;
   --accent: #a78bfa;
   --accent-soft: rgba(var(--accent-rgb), 0.16);
@@ -100,7 +103,7 @@
   --border-soft: #241419;
   --text: #ffe9e6;
   --text-dim: #d3a3a8;
-  --text-faint: #8a6469;
+  --text-faint: #9f7a7f; /* brightened from #8a6469 for WCAG AA contrast — see :root's comment */
   --accent-rgb: 251, 146, 60;
   --accent: #fb923c;
   --accent-soft: rgba(251, 146, 60, 0.16);
@@ -117,7 +120,7 @@
   --border-soft: #161d30;
   --text: #dbe4ff;
   --text-dim: #8c9bc9;
-  --text-faint: #55628a;
+  --text-faint: #7582aa; /* brightened from #55628a for WCAG AA contrast — see :root's comment */
   --accent-rgb: 91, 141, 239;
   --accent: #5b8def;
   --accent-soft: rgba(91, 141, 239, 0.16);
@@ -197,21 +200,37 @@
   --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.1);
   --shadow-lg: 0 20px 60px rgba(16, 24, 40, 0.16);
 }
+/* Apple's own "materials" system (the translucent, blurred panels used throughout macOS/iOS — the
+   Finder/Mail/Music sidebar, sheets, popovers) — a frosted glass of the page's own white, not a
+   flat opaque panel, so the watermark reads as part of one continuous surface instead of getting
+   fully hidden behind it. Achieved with standard CSS (backdrop-filter + a translucent background);
+   no Apple asset, font file, or trademarked name is used anywhere here. */
 [data-theme="paper"] .sidebar,
 [data-theme="paper"] .artifact-panel,
 [data-theme="paper"] #code-panel {
-  background: var(--bg-panel);
-  backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(1.4);
+}
+[data-theme="paper"] .msg-assistant .bubble {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(14px) saturate(1.3);
+  border-color: rgba(17, 24, 39, 0.09);
+}
+[data-theme="paper"] .msg-user .bubble {
+  background: rgba(17, 24, 39, 0.055);
+  backdrop-filter: blur(14px) saturate(1.3);
 }
 /* The animated space/planet scene (background.js's #bg-canvas) and the ambient accent glow both
    read as decorative flourish that fights a stark white/ink page instead of complementing it —
    dropped entirely rather than just dimmed, the way the other light theme (daylight) dims them. */
 [data-theme="paper"] #bg-canvas { display: none; }
 [data-theme="paper"] body::before { display: none; }
-/* The brand watermark: a huge, low-opacity "W" sitting behind the actual UI. .sidebar/.main and the
-   side panels above are all given real (non-transparent) backgrounds, so this only actually shows
-   through the chat log's own empty space — "prominent" without ever competing with real content or
-   text contrast, since nothing readable ever sits directly on top of it at full strength. */
+/* The brand watermark: a huge "W" sitting behind the actual UI, in the system font stack (the same
+   -apple-system/system-ui keyword the rest of the app already uses — the standards-based way to
+   pick up San Francisco on Apple hardware without bundling or claiming the font itself) rather than
+   the previous sci-fi display face, which read as more "tech HUD" than "clean, minimal page." Dark
+   enough to read clearly through the frosted panels above it, not just in the empty gaps between
+   them. */
 [data-theme="paper"] body::after {
   content: "W";
   position: fixed;
@@ -220,11 +239,11 @@
   transform: translate(-50%, -46%);
   z-index: 0;
   pointer-events: none;
-  font-family: "Orbitron", var(--sans);
+  font-family: var(--sans);
   font-weight: 800;
   font-size: min(52vw, 820px);
   line-height: 1;
-  color: rgba(var(--accent-rgb), 0.055);
+  color: rgba(var(--accent-rgb), 0.16);
   user-select: none;
   white-space: nowrap;
 }
@@ -269,7 +288,7 @@ summary:focus-visible {
   --border-soft: rgba(var(--grid-rgb), 0.22);
   --text: #e2e8f0;
   --text-dim: #9aa5b4;
-  --text-faint: #4a5568;
+  --text-faint: #73829b; /* brightened from #4a5568 for WCAG AA contrast — see :root's comment */
   --accent-rgb: 0, 240, 255;
   --accent: #00f0ff;
   --accent-soft: rgba(0, 240, 255, 0.12);
